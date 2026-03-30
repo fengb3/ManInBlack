@@ -1,12 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI;
 
 /// <summary>
 /// Google Gemini 兼容 API 适配器，实现 IChatClient 接口
-/// 可连接任何兼容 Gemini API 形状的接口
+/// 可连接任何兼容 Gemini API 形状的接口，支持 tool calling
 /// </summary>
 public sealed class GeminiCompatibleChatClient : IChatClient
 {
@@ -16,14 +17,6 @@ public sealed class GeminiCompatibleChatClient : IChatClient
     private readonly string _blockedEndpoint;
     private readonly string _streamEndPoint;
 
-    /// <summary>
-    /// 创建 Gemini 兼容聊天客户端
-    /// </summary>
-    /// <param name="httpClient">HttpClient 实例，通过依赖注入提供</param>
-    /// <param name="apiKey">API 密钥</param>
-    /// <param name="baseUrl">非流式 API 基础地址模板，其中 {0} 替换为模型 ID，{1} 替换为 API 密钥</param>
-    /// <param name="streamBaseUrl">流式 API 基础地址模板，其中 {0} 替换为模型 ID，{1} 替换为 API 密钥</param>
-    /// <param name="modelId">模型 ID</param>
     public GeminiCompatibleChatClient(
         HttpClient httpClient,
         string apiKey,
@@ -42,58 +35,14 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         CancellationToken cancellationToken = default)
     {
         var endPoint = string.Format(_blockedEndpoint, _modelId, _apiKey);
-
-        var requestBody = new
-        {
-            contents = messages.Select(m => new
-            {
-                role = m.Role == ChatRole.Assistant ? "model" : "user",
-                parts = new[]
-                {
-                    new { text = m.Text }
-                }
-            }).ToArray(),
-            generationConfig = new
-            {
-                maxOutputTokens = options?.MaxOutputTokens ?? 4096,
-                temperature = (float?)(options?.Temperature ?? 0.7),
-                topP = (float?)(options?.TopP)
-            }
-        };
-
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var body = BuildRequestBody(messages, options);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync(endPoint, content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson)
-                     ?? throw new InvalidOperationException("Failed to parse Gemini-compatible response");
-
-        var candidate = result.Candidates?.FirstOrDefault()
-                        ?? throw new InvalidOperationException("No candidates in response");
-
-        var text = candidate.Content?.Parts?.FirstOrDefault()?.Text ?? "";
-
-        var chatResponse = new ChatResponse(
-            new List<ChatMessage> { new ChatMessage(ChatRole.Assistant, text) }
-        );
-
-        if (result.UsageMetadata is not null)
-        {
-#pragma warning disable CS8602
-            var usage = result.UsageMetadata!;
-            chatResponse.AdditionalProperties["Usage"] = new
-            {
-                InputTokenCount = usage.PromptTokenCount,
-                OutputTokenCount = usage.CandidatesTokenCount,
-                TotalTokenCount = usage.TotalTokenCount
-            };
-#pragma warning restore CS8602
-        }
-
-        return chatResponse;
+        return ParseResponse(responseJson);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -103,27 +52,8 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         CancellationToken cancellationToken = default)
     {
         var endPoint = string.Format(_streamEndPoint, _modelId, _apiKey);
-
-        var requestBody = new
-        {
-            contents = messages.Select(m => new
-            {
-                role = m.Role == ChatRole.Assistant ? "model" : "user",
-                parts = new[]
-                {
-                    new { text = m.Text }
-                }
-            }).ToArray(),
-            generationConfig = new
-            {
-                maxOutputTokens = options?.MaxOutputTokens ?? 4096,
-                temperature = (float?)(options?.Temperature ?? 0.7),
-                topP = (float?)(options?.TopP)
-            }
-        };
-
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var body = BuildRequestBody(messages, options);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var request = new HttpRequestMessage(HttpMethod.Post, endPoint) { Content = content };
         var response =
@@ -144,38 +74,207 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                 break;
 
             GeminiResponse? result = null;
-            try
-            {
-                result = JsonSerializer.Deserialize<GeminiResponse>(jsonStr);
-            }
-            catch
-            {
-            }
+            try { result = JsonSerializer.Deserialize<GeminiResponse>(jsonStr); }
+            catch { }
 
-            var text = result?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-            if (!string.IsNullOrEmpty(text))
+            var parts = result?.Candidates?.FirstOrDefault()?.Content?.Parts;
+            if (parts is null) continue;
+
+            foreach (var part in parts)
             {
-                var update = new ChatResponseUpdate
+                if (part.Text is not null)
                 {
-                    Role = ChatRole.Assistant,
-                    Contents = [new TextContent(text)]
-                };
-                yield return update;
+                    yield return new ChatResponseUpdate
+                    {
+                        Role = ChatRole.Assistant,
+                        Contents = [new TextContent(part.Text)]
+                    };
+                }
+                else if (part.FunctionCall is not null)
+                {
+                    var fc = part.FunctionCall;
+                    var args = fc.Args.HasValue
+                        ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
+                        : new Dictionary<string, object?>();
+                    yield return new ChatResponseUpdate
+                    {
+                        Role = ChatRole.Assistant,
+                        Contents = [new FunctionCallContent("", fc.Name ?? "", args)]
+                    };
+                }
             }
         }
     }
 
-    public void Dispose()
+    private string BuildRequestBody(IEnumerable<ChatMessage> messages, ChatOptions? options)
     {
-        // HttpClient 由 DI 容器管理，不在此处释放
+        var body = new JsonObject
+        {
+            ["contents"] = SerializeMessages(messages),
+            ["generationConfig"] = new JsonObject
+            {
+                ["maxOutputTokens"] = options?.MaxOutputTokens ?? 4096,
+                ["temperature"] = (double?)(options?.Temperature ?? 0.7),
+                ["topP"] = (double?)options?.TopP
+            }
+        };
+
+        if (options?.Tools?.Count > 0)
+            body["tools"] = SerializeTools(options.Tools);
+
+        return body.ToJsonString();
     }
 
-    public object? GetService(Type serviceType, object? serviceKey = null)
+    private static JsonArray SerializeMessages(IEnumerable<ChatMessage> messages)
     {
-        return null;
+        var array = new JsonArray();
+        // 追踪 CallId → Name，用于 functionResponse 查找函数名
+        var callIdToName = new Dictionary<string, string>();
+
+        foreach (var msg in messages)
+        {
+            // 记录 function call 的 CallId → Name
+            foreach (var fc in msg.Contents.OfType<FunctionCallContent>())
+                callIdToName[fc.CallId] = fc.Name;
+
+            if (msg.Role == ChatRole.System)
+            {
+                array.Add(SerializeSingleMessage("user", msg, callIdToName));
+                continue;
+            }
+
+            var role = msg.Role == ChatRole.Assistant ? "model" : "user";
+            array.Add(SerializeSingleMessage(role, msg, callIdToName));
+        }
+
+        return array;
     }
 
-    #region JSON 响应模型
+    private static JsonObject SerializeSingleMessage(string role, ChatMessage msg, Dictionary<string, string> callIdToName)
+    {
+        var parts = new JsonArray();
+
+        // 文本内容
+        var text = msg.Text;
+        if (!string.IsNullOrEmpty(text))
+            parts.Add(new JsonObject { ["text"] = text });
+
+        // function call（assistant 消息中的工具调用）
+        foreach (var fc in msg.Contents.OfType<FunctionCallContent>())
+        {
+            var argsJson = fc.Arguments.Count > 0
+                ? JsonSerializer.Serialize(fc.Arguments)
+                : "{}";
+            parts.Add(new JsonObject
+            {
+                ["functionCall"] = new JsonObject
+                {
+                    ["name"] = fc.Name,
+                    ["args"] = JsonNode.Parse(argsJson)
+                }
+            });
+        }
+
+        // function response（user 消息中的工具结果）
+        foreach (var fr in msg.Contents.OfType<FunctionResultContent>())
+        {
+            var funcName = callIdToName.TryGetValue(fr.CallId, out var name) ? name : fr.CallId;
+            parts.Add(new JsonObject
+            {
+                ["functionResponse"] = new JsonObject
+                {
+                    ["name"] = funcName,
+                    ["response"] = new JsonObject
+                    {
+                        ["result"] = fr.Result?.ToString() ?? ""
+                    }
+                }
+            });
+        }
+
+        if (parts.Count == 0)
+            parts.Add(new JsonObject { ["text"] = "" });
+
+        return new JsonObject
+        {
+            ["role"] = role,
+            ["parts"] = parts
+        };
+    }
+
+    private static JsonArray SerializeTools(IList<AITool> tools)
+    {
+        var declarations = new JsonArray();
+        foreach (var tool in tools)
+        {
+            var obj = new JsonObject
+            {
+                ["name"] = tool.Name,
+                ["description"] = tool.Description ?? ""
+            };
+
+            if (tool is AIFunction aiFunc)
+                obj["parameters"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            else
+                obj["parameters"] = new JsonObject { ["type"] = "object" };
+
+            declarations.Add(obj);
+        }
+
+        // Gemini tools 格式：[{ functionDeclarations: [...] }]
+        return new JsonArray
+        {
+            new JsonObject { ["functionDeclarations"] = declarations }
+        };
+    }
+
+    private ChatResponse ParseResponse(string responseJson)
+    {
+        var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson)
+                     ?? throw new InvalidOperationException("Failed to parse Gemini-compatible response");
+
+        var candidate = result.Candidates?.FirstOrDefault()
+                        ?? throw new InvalidOperationException("No candidates in response");
+
+        var contents = new List<AIContent>();
+
+        if (candidate.Content?.Parts is not null)
+        {
+            foreach (var part in candidate.Content.Parts)
+            {
+                if (part.Text is not null)
+                    contents.Add(new TextContent(part.Text));
+                else if (part.FunctionCall is not null)
+                {
+                    var fc = part.FunctionCall;
+                    var args = fc.Args.HasValue
+                        ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
+                        : new Dictionary<string, object?>();
+                    contents.Add(new FunctionCallContent("", fc.Name ?? "", args));
+                }
+            }
+        }
+
+        var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+
+        if (result.UsageMetadata is not null)
+        {
+            chatResponse.AdditionalProperties["Usage"] = new
+            {
+                InputTokenCount = result.UsageMetadata.PromptTokenCount,
+                OutputTokenCount = result.UsageMetadata.CandidatesTokenCount,
+                TotalTokenCount = result.UsageMetadata.TotalTokenCount
+            };
+        }
+
+        return chatResponse;
+    }
+
+    public void Dispose() { }
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    #region JSON 模型
 
     private class GeminiResponse
     {
@@ -197,6 +296,13 @@ public sealed class GeminiCompatibleChatClient : IChatClient
     private class GeminiPart
     {
         public string? Text { get; set; }
+        public GeminiFunctionCall? FunctionCall { get; set; }
+    }
+
+    private class GeminiFunctionCall
+    {
+        public string? Name { get; set; }
+        public JsonElement? Args { get; set; }
     }
 
     private class GeminiUsageMetadata

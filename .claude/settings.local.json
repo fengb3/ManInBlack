@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet:*)"
+      "Bash(dotnet:*)",
+      "Read(//c/Users/fohhy/source/repos/ManInBlack/$USERPROFILE/.nuget/packages/microsoft.extensions.ai/10.4.0/lib/**)",
+      "Bash(python3 -c \":*)",
+      "Bash(mkdir -p /tmp/ReflectionInspector)",
+      "Read(//tmp/**)"
     ]
   }
 }

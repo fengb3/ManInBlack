@@ -1,12 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI;
 
 /// <summary>
 /// Anthropic 兼容 API 适配器，实现 IChatClient 接口
-/// 可连接任何兼容 Anthropic API 形状的接口
+/// 可连接任何兼容 Anthropic API 形状的接口，支持 tool calling
 /// </summary>
 public sealed class AnthropicCompatibleChatClient : IChatClient
 {
@@ -14,12 +15,6 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
     private readonly string _modelId;
     private readonly string _endPoint;
 
-
-    /// <summary>
-    /// 创建 Anthropic 兼容聊天客户端
-    /// </summary>
-    /// <param name="httpClient">HttpClient 实例，通过依赖注入提供</param>
-    /// <param name="modelId">模型 ID</param>
     public AnthropicCompatibleChatClient(
         HttpClient httpClient,
         string modelId = "claude-sonnet-4-20250514")
@@ -34,55 +29,14 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var messageList = messages.ToList();
-
-        var requestBody = new
-        {
-            model = _modelId,
-            max_tokens = options?.MaxOutputTokens ?? 4096,
-            temperature = (float?)(options?.Temperature ?? 1.0),
-            top_p = (float?)(options?.TopP),
-            system = messageList.FirstOrDefault(m => m.Role == ChatRole.System)?.Text,
-            messages = messageList
-                .Where(m => m.Role != ChatRole.System)
-                .Select(m => new
-                {
-                    role = m.Role.ToString().ToLower(),
-                    content = m.Text
-                })
-                .ToArray()
-        };
-
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var body = BuildRequestBody(messages, options, stream: false);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync(_endPoint, content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson)
-            ?? throw new InvalidOperationException($"Failed to parse Anthropic-compatible response with model {_modelId} to url {_httpClient.BaseAddress}");
-
-        var text = result.Content?.FirstOrDefault(c => c.Type == "text")?.Text ?? "";
-
-        var chatResponse = new ChatResponse(
-            new List<ChatMessage> { new ChatMessage(ChatRole.Assistant, text) }
-        );
-
-        if (result.Usage is not null)
-        {
-#pragma warning disable CS8602
-            var usage = result.Usage!;
-            chatResponse.AdditionalProperties["Usage"] = new
-            {
-                InputTokenCount = usage.InputTokens,
-                OutputTokenCount = usage.OutputTokens,
-                TotalTokenCount = usage.InputTokens + usage.OutputTokens
-            };
-#pragma warning restore CS8602
-        }
-
-        return chatResponse;
+        return ParseResponse(responseJson);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -90,28 +44,8 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         ChatOptions? options = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var messageList = messages.ToList();
-
-        var requestBody = new
-        {
-            model = _modelId,
-            max_tokens = options?.MaxOutputTokens ?? 4096,
-            temperature = (float?)(options?.Temperature ?? 1.0),
-            top_p = (float?)(options?.TopP),
-            stream = true,
-            system = messageList.FirstOrDefault(m => m.Role == ChatRole.System)?.Text,
-            messages = messageList
-                .Where(m => m.Role != ChatRole.System)
-                .Select(m => new
-                {
-                    role = m.Role.ToString().ToLower(),
-                    content = m.Text
-                })
-                .ToArray()
-        };
-
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var body = BuildRequestBody(messages, options, stream: true);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var request = new HttpRequestMessage(HttpMethod.Post, _endPoint) { Content = content };
         var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -119,6 +53,9 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
+
+        // 累积 tool_use 分片：index → (id, name, partialJson)
+        var toolUseBlocks = new Dictionary<int, (string Id, string Name, StringBuilder PartialJson)>();
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -128,65 +65,247 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
             var jsonStr = line[6..];
 
-            AnthropicStreamResponse? result = null;
-            try
-            {
-                result = JsonSerializer.Deserialize<AnthropicStreamResponse>(jsonStr);
-            }
+            JsonNode? node = null;
+            try { node = JsonNode.Parse(jsonStr); }
             catch { }
+            if (node is null) continue;
 
-            var delta = result?.Delta?.Text;
-            if (!string.IsNullOrEmpty(delta))
+            var type = node["type"]?.GetValue<string>();
+
+            // 文本增量
+            if (type == "content_block_delta")
             {
-                var update = new ChatResponseUpdate
+                var delta = node["delta"];
+                var deltaType = delta?["type"]?.GetValue<string>();
+                var index = node["index"]?.GetValue<int>() ?? 0;
+
+                if (deltaType == "text_delta")
                 {
-                    Role = ChatRole.Assistant,
-                    Contents = [new TextContent(delta)]
-                };
-                yield return update;
+                    var text = delta?["text"]?.GetValue<string>();
+                    if (text is not null)
+                    {
+                        yield return new ChatResponseUpdate
+                        {
+                            Role = ChatRole.Assistant,
+                            Contents = [new TextContent(text)]
+                        };
+                    }
+                }
+                else if (deltaType == "input_json_delta")
+                {
+                    var partial = delta?["partial_json"]?.GetValue<string>() ?? "";
+                    if (toolUseBlocks.TryGetValue(index, out var existing))
+                        toolUseBlocks[index] = (existing.Id, existing.Name, existing.PartialJson.Append(partial));
+                }
+            }
+            // tool_use 块开始
+            else if (type == "content_block_start")
+            {
+                var contentBlock = node["content_block"];
+                var blockType = contentBlock?["type"]?.GetValue<string>();
+                var index = node["index"]?.GetValue<int>() ?? 0;
+
+                if (blockType == "tool_use")
+                {
+                    var id = contentBlock?["id"]?.GetValue<string>() ?? "";
+                    var name = contentBlock?["name"]?.GetValue<string>() ?? "";
+                    toolUseBlocks[index] = (id, name, new StringBuilder());
+                }
+            }
+            // content_block_stop → 输出累积的 tool call
+            else if (type == "content_block_stop")
+            {
+                var index = node["index"]?.GetValue<int>() ?? 0;
+                if (toolUseBlocks.TryGetValue(index, out var tc))
+                {
+                    var args = ParseArguments(tc.PartialJson.ToString());
+                    yield return new ChatResponseUpdate
+                    {
+                        Role = ChatRole.Assistant,
+                        Contents = [new FunctionCallContent(tc.Id, tc.Name, args)]
+                    };
+                    toolUseBlocks.Remove(index);
+                }
             }
         }
     }
 
-    public void Dispose()
+    private string BuildRequestBody(IEnumerable<ChatMessage> messages, ChatOptions? options, bool stream)
     {
-        // HttpClient 由 DI 容器管理，不在此处释放
+        var messageList = messages.ToList();
+
+        var body = new JsonObject
+        {
+            ["model"] = _modelId,
+            ["max_tokens"] = options?.MaxOutputTokens ?? 4096,
+            ["temperature"] = (double?)(options?.Temperature ?? 1.0),
+            ["top_p"] = (double?)options?.TopP,
+            ["system"] = messageList.FirstOrDefault(m => m.Role == ChatRole.System)?.Text,
+            ["messages"] = SerializeMessages(messageList.Where(m => m.Role != ChatRole.System))
+        };
+
+        if (stream)
+            body["stream"] = true;
+
+        if (options?.Tools?.Count > 0)
+            body["tools"] = SerializeTools(options.Tools);
+
+        return body.ToJsonString();
     }
 
-    public object? GetService(Type serviceType, object? serviceKey = null)
+    private static JsonArray SerializeMessages(IEnumerable<ChatMessage> messages)
     {
-        return null;
+        var array = new JsonArray();
+        foreach (var msg in messages)
+        {
+            var functionCalls = msg.Contents.OfType<FunctionCallContent>().ToList();
+            var functionResults = msg.Contents.OfType<FunctionResultContent>().ToList();
+
+            if (functionCalls.Count > 0)
+            {
+                // assistant 消息含 tool_use
+                var contentArray = new JsonArray();
+                foreach (var fc in functionCalls)
+                {
+                    contentArray.Add(new JsonObject
+                    {
+                        ["type"] = "tool_use",
+                        ["id"] = fc.CallId,
+                        ["name"] = fc.Name,
+                        ["input"] = fc.Arguments.Count > 0
+                            ? JsonNode.Parse(JsonSerializer.Serialize(fc.Arguments))
+                            : new JsonObject()
+                    });
+                }
+
+                array.Add(new JsonObject
+                {
+                    ["role"] = "assistant",
+                    ["content"] = contentArray
+                });
+            }
+            else if (functionResults.Count > 0)
+            {
+                // user 消息含 tool_result
+                var contentArray = new JsonArray();
+                foreach (var fr in functionResults)
+                {
+                    contentArray.Add(new JsonObject
+                    {
+                        ["type"] = "tool_result",
+                        ["tool_use_id"] = fr.CallId,
+                        ["content"] = fr.Result?.ToString()
+                    });
+                }
+
+                array.Add(new JsonObject
+                {
+                    ["role"] = "user",
+                    ["content"] = contentArray
+                });
+            }
+            else
+            {
+                array.Add(new JsonObject
+                {
+                    ["role"] = msg.Role.ToString().ToLower(),
+                    ["content"] = msg.Text
+                });
+            }
+        }
+        return array;
     }
 
-    #region JSON 响应模型
+    private static JsonArray SerializeTools(IList<AITool> tools)
+    {
+        var array = new JsonArray();
+        foreach (var tool in tools)
+        {
+            var obj = new JsonObject
+            {
+                ["name"] = tool.Name,
+                ["description"] = tool.Description ?? ""
+            };
+
+            if (tool is AIFunction aiFunc)
+                obj["input_schema"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            else
+                obj["input_schema"] = new JsonObject { ["type"] = "object" };
+
+            array.Add(obj);
+        }
+        return array;
+    }
+
+    private ChatResponse ParseResponse(string responseJson)
+    {
+        var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson)
+            ?? throw new InvalidOperationException(
+                $"Failed to parse Anthropic-compatible response with model {_modelId} to url {_httpClient.BaseAddress}");
+
+        var contents = new List<AIContent>();
+
+        if (result.Content is not null)
+        {
+            foreach (var block in result.Content)
+            {
+                if (block.Type == "text" && block.Text is not null)
+                    contents.Add(new TextContent(block.Text));
+                else if (block.Type == "tool_use")
+                    contents.Add(new FunctionCallContent(
+                        block.Id ?? "",
+                        block.Name ?? "",
+                        ParseArguments(block.Input?.ToString() ?? "{}")));
+            }
+        }
+
+        var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+
+        if (result.Usage is not null)
+        {
+            chatResponse.AdditionalProperties["Usage"] = new
+            {
+                InputTokenCount = result.Usage.InputTokens,
+                OutputTokenCount = result.Usage.OutputTokens,
+                TotalTokenCount = result.Usage.InputTokens + result.Usage.OutputTokens
+            };
+        }
+
+        return chatResponse;
+    }
+
+    private static Dictionary<string, object?> ParseArguments(string json)
+    {
+        try { return JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new(); }
+        catch { return new(); }
+    }
+
+    public void Dispose() { }
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    #region JSON 模型
 
     private class AnthropicResponse
     {
-        public List<AnthropicContent>? Content { get; set; }
+        public List<AnthropicContentBlock>? Content { get; set; }
         public AnthropicUsage? Usage { get; set; }
         public string? StopReason { get; set; }
     }
 
-    private class AnthropicContent
+    private class AnthropicContentBlock
     {
         public string Type { get; set; } = "";
         public string? Text { get; set; }
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public JsonElement? Input { get; set; }
     }
 
     private class AnthropicUsage
     {
         public int InputTokens { get; set; }
         public int OutputTokens { get; set; }
-    }
-
-    private class AnthropicStreamResponse
-    {
-        public AnthropicDelta? Delta { get; set; }
-    }
-
-    private class AnthropicDelta
-    {
-        public string? Text { get; set; }
     }
 
     #endregion

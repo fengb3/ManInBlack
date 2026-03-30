@@ -1,28 +1,21 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI;
 
 /// <summary>
 /// OpenAI 兼容 API 适配器，实现 IChatClient 接口
-/// 可连接任何兼容 OpenAI API 形状的接口
+/// 可连接任何兼容 OpenAI API 形状的接口，支持 tool calling
 /// </summary>
 public sealed class OpenAICompatibleChatClient : IChatClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _modelId;
     private readonly string _endPoint;
-    
-    /// <summary>
-    /// 创建 OpenAI 兼容聊天客户端
-    /// </summary>
-    /// <param name="httpClient">HttpClient 实例，通过依赖注入提供</param>
-    /// <param name="apiKey">API 密钥</param>
-    /// <param name="baseUrl">API 基础地址，默认为官方 OpenAI 地址</param>
-    /// <param name="modelId">模型 ID</param>
-    public OpenAICompatibleChatClient(
-        HttpClient httpClient, string  modelId)
+
+    public OpenAICompatibleChatClient(HttpClient httpClient, string modelId)
     {
         _httpClient = httpClient;
         _modelId = modelId;
@@ -34,51 +27,14 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var requestBody = new
-        {
-            model = _modelId,
-            messages = messages.Select(m => new
-            {
-                role = m.Role.ToString().ToLower(),
-                content = m.Text
-            }).ToArray(),
-            max_tokens = options?.MaxOutputTokens,
-            temperature = (float?)(options?.Temperature),
-            top_p = (float?)(options?.TopP)
-        };
-
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var body = BuildRequestBody(messages, options, stream: false);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync(_endPoint, content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize<OpenAIResponse>(responseJson)
-            ?? throw new InvalidOperationException("Failed to parse OpenAI-compatible response");
-
-        var choice = result.Choices?.FirstOrDefault()
-            ?? throw new InvalidOperationException("No choices in response");
-
-        var responseMessage = new ChatMessage(ChatRole.Assistant, choice.Message?.Content ?? "");
-
-        var chatResponse = new ChatResponse(new List<ChatMessage> { responseMessage });
-
-        // 设置使用统计
-        if (result.Usage is not null)
-        {
-#pragma warning disable CS8602
-            var usage = result.Usage!;
-            chatResponse.AdditionalProperties["Usage"] = new
-            {
-                InputTokenCount = usage.PromptTokens,
-                OutputTokenCount = usage.CompletionTokens,
-                TotalTokenCount = usage.PromptTokens + usage.CompletionTokens
-            };
-#pragma warning restore CS8602
-        }
-
-        return chatResponse;
+        return ParseResponse(responseJson);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -86,30 +42,18 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         ChatOptions? options = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var requestBody = new
-        {
-            model = _modelId,
-            messages = messages.Select(m => new
-            {
-                role = m.Role.ToString().ToLower(),
-                content = m.Text
-            }).ToArray(),
-            max_tokens = options?.MaxOutputTokens,
-            temperature = (float?)(options?.Temperature),
-            top_p = (float?)(options?.TopP),
-            stream = true
-        };
+        var body = BuildRequestBody(messages, options, stream: true);
+        var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-        var jsonContent = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-        
-        // Trim
         var request = new HttpRequestMessage(HttpMethod.Post, _endPoint) { Content = content };
         var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
+
+        // 累积 tool call 分片
+        var toolCalls = new Dictionary<int, (string Id, string Name, StringBuilder Arguments)>();
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -121,37 +65,206 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             if (jsonStr == "[DONE]")
                 break;
 
-            OpenAIStreamResponse? result = null;
-            try
-            {
-                result = JsonSerializer.Deserialize<OpenAIStreamResponse>(jsonStr);
-            }
+            OpenAIStreamChunk? chunk = null;
+            try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr); }
             catch { }
 
-            var delta = result?.Choices?.FirstOrDefault()?.Delta;
-            if (delta?.Content is not null)
+            var choice = chunk?.Choices?.FirstOrDefault();
+            if (choice is null) continue;
+
+            // 文本内容
+            if (choice.Delta?.Content is not null)
             {
-                var update = new ChatResponseUpdate
+                yield return new ChatResponseUpdate
                 {
                     Role = ChatRole.Assistant,
-                    Contents = [new TextContent(delta.Content)]
+                    Contents = [new TextContent(choice.Delta.Content)]
                 };
-                yield return update;
+            }
+
+            // tool call 分片累积
+            if (choice.Delta?.ToolCalls is not null)
+            {
+                foreach (var tc in choice.Delta.ToolCalls)
+                {
+                    if (!toolCalls.TryGetValue(tc.Index, out var existing))
+                    {
+                        toolCalls[tc.Index] = (
+                            tc.Id ?? "",
+                            tc.Function?.Name ?? "",
+                            new StringBuilder(tc.Function?.Arguments ?? "")
+                        );
+                    }
+                    else
+                    {
+                        var id = tc.Id ?? existing.Id;
+                        var name = tc.Function?.Name ?? existing.Name;
+                        var sb = existing.Arguments;
+                        if (tc.Function?.Arguments is not null)
+                            sb.Append(tc.Function.Arguments);
+                        toolCalls[tc.Index] = (id, name, sb);
+                    }
+                }
+            }
+
+            // 完成时输出累积的 tool calls
+            if (choice.FinishReason is "tool_calls" or "stop" && toolCalls.Count > 0)
+            {
+                foreach (var (_, tc) in toolCalls)
+                {
+                    var args = ParseArguments(tc.Arguments.ToString());
+                    yield return new ChatResponseUpdate
+                    {
+                        Role = ChatRole.Assistant,
+                        Contents = [new FunctionCallContent(tc.Id, tc.Name, args)]
+                    };
+                }
+                toolCalls.Clear();
             }
         }
     }
 
-    public void Dispose()
+    private string BuildRequestBody(IEnumerable<ChatMessage> messages, ChatOptions? options, bool stream)
     {
-        // 有依赖注入控制Dispose
+        var body = new JsonObject
+        {
+            ["model"] = _modelId,
+            ["messages"] = SerializeMessages(messages),
+            ["max_tokens"] = options?.MaxOutputTokens,
+            ["temperature"] = (double?)options?.Temperature,
+            ["top_p"] = (double?)options?.TopP
+        };
+
+        if (stream)
+            body["stream"] = true;
+
+        if (options?.Tools?.Count > 0)
+            body["tools"] = SerializeTools(options.Tools);
+
+        return body.ToJsonString();
     }
 
-    public object? GetService(Type serviceType, object? serviceKey = null)
+    private static JsonArray SerializeMessages(IEnumerable<ChatMessage> messages)
     {
-        return null;
+        var array = new JsonArray();
+        foreach (var msg in messages)
+        {
+            var obj = new JsonObject { ["role"] = msg.Role.ToString().ToLower() };
+
+            var functionCalls = msg.Contents.OfType<FunctionCallContent>().ToList();
+            var functionResults = msg.Contents.OfType<FunctionResultContent>().ToList();
+
+            if (functionCalls.Count > 0)
+            {
+                var calls = new JsonArray();
+                foreach (var fc in functionCalls)
+                {
+                    calls.Add(new JsonObject
+                    {
+                        ["id"] = fc.CallId,
+                        ["type"] = "function",
+                        ["function"] = new JsonObject
+                        {
+                            ["name"] = fc.Name,
+                            ["arguments"] = JsonSerializer.Serialize(fc.Arguments)
+                        }
+                    });
+                }
+                obj["tool_calls"] = calls;
+                obj["content"] = msg.Text;
+            }
+            else if (functionResults.Count > 0)
+            {
+                var result = functionResults[0];
+                obj["tool_call_id"] = result.CallId;
+                obj["content"] = result.Result?.ToString();
+            }
+            else
+            {
+                obj["content"] = msg.Text;
+            }
+
+            array.Add(obj);
+        }
+        return array;
     }
 
-    #region JSON 响应模型
+    private static JsonArray SerializeTools(IList<AITool> tools)
+    {
+        var array = new JsonArray();
+        foreach (var tool in tools)
+        {
+            var funcObj = new JsonObject
+            {
+                ["name"] = tool.Name,
+                ["description"] = tool.Description ?? ""
+            };
+
+            if (tool is AIFunction aiFunc)
+                funcObj["parameters"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            else
+                funcObj["parameters"] = new JsonObject { ["type"] = "object" };
+
+            array.Add(new JsonObject
+            {
+                ["type"] = "function",
+                ["function"] = funcObj
+            });
+        }
+        return array;
+    }
+
+    private ChatResponse ParseResponse(string responseJson)
+    {
+        var result = JsonSerializer.Deserialize<OpenAIResponse>(responseJson)
+            ?? throw new InvalidOperationException("Failed to parse OpenAI-compatible response");
+
+        var choice = result.Choices?.FirstOrDefault()
+            ?? throw new InvalidOperationException("No choices in response");
+
+        var message = choice.Message
+            ?? throw new InvalidOperationException("No message in response");
+
+        var contents = new List<AIContent>();
+
+        if (!string.IsNullOrEmpty(message.Content))
+            contents.Add(new TextContent(message.Content));
+
+        if (message.ToolCalls?.Count > 0)
+        {
+            foreach (var tc in message.ToolCalls)
+            {
+                var args = ParseArguments(tc.Function.Arguments);
+                contents.Add(new FunctionCallContent(tc.Id, tc.Function.Name, args));
+            }
+        }
+
+        var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+
+        if (result.Usage is not null)
+        {
+            chatResponse.AdditionalProperties["Usage"] = new
+            {
+                InputTokenCount = result.Usage.PromptTokens,
+                OutputTokenCount = result.Usage.CompletionTokens,
+                TotalTokenCount = result.Usage.PromptTokens + result.Usage.CompletionTokens
+            };
+        }
+
+        return chatResponse;
+    }
+
+    private static Dictionary<string, object?> ParseArguments(string json)
+    {
+        try { return JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new(); }
+        catch { return new(); }
+    }
+
+    public void Dispose() { }
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    #region JSON 模型
 
     private class OpenAIResponse
     {
@@ -168,6 +281,19 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIMessage
     {
         public string? Content { get; set; }
+        public List<OpenAIToolCall>? ToolCalls { get; set; }
+    }
+
+    private class OpenAIToolCall
+    {
+        public string Id { get; set; } = "";
+        public OpenAIToolCallFunction Function { get; set; } = new();
+    }
+
+    private class OpenAIToolCallFunction
+    {
+        public string Name { get; set; } = "";
+        public string Arguments { get; set; } = "";
     }
 
     private class OpenAIUsage
@@ -176,19 +302,34 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         public int CompletionTokens { get; set; }
     }
 
-    private class OpenAIStreamResponse
+    private class OpenAIStreamChunk
     {
         public List<OpenAIStreamChoice>? Choices { get; set; }
     }
 
     private class OpenAIStreamChoice
     {
-        public OpenAIDelta? Delta { get; set; }
+        public OpenAIStreamDelta? Delta { get; set; }
+        public string? FinishReason { get; set; }
     }
 
-    private class OpenAIDelta
+    private class OpenAIStreamDelta
     {
         public string? Content { get; set; }
+        public List<OpenAIStreamToolCall>? ToolCalls { get; set; }
+    }
+
+    private class OpenAIStreamToolCall
+    {
+        public int Index { get; set; }
+        public string? Id { get; set; }
+        public OpenAIStreamToolCallFunction? Function { get; set; }
+    }
+
+    private class OpenAIStreamToolCallFunction
+    {
+        public string? Name { get; set; }
+        public string? Arguments { get; set; }
     }
 
     #endregion
