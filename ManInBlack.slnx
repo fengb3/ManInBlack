@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="ManInBlack.AI/ManInBlack.AI.csproj" />
+  <Project Path="ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Project Path="Playground/Playground.csproj" />
 </Solution>
