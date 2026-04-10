@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
+using ManInBlack.AI.Tools;
+using Microsoft.Extensions.AI;
 using Playground;
 
 // 构建 DI 容器
@@ -12,20 +15,31 @@ var caller = new ToolCaller(sp);
 
 Console.WriteLine("--- ToolCaller test ---");
 
-var addResult = caller.CallTool("Add", new Dictionary<string, object?> { {"a", 3}, {"b", 5} });
-Console.WriteLine($"Add(3, 5) = {addResult}");
+// Add: 无 filter
+var addCtx = new ToolExecuteContext(sp) { ToolName = "Add", Arguments = new Dictionary<string, object?> { {"a", 3}, {"b", 5} } };
+await caller.CallTool(addCtx);
+Console.WriteLine($"Add(3, 5) = {addCtx.Result}");
 
-var subResult = caller.CallTool("Sub", new Dictionary<string, object?> { {"a", 10}, {"b", 4} });
-Console.WriteLine($"Sub(10, 4) = {subResult}");
+// Sub: 有 LoggingToolCallFilter + RetryCallFilter
+var subCtx = new ToolExecuteContext(sp) { ToolName = "Sub", Arguments = new Dictionary<string, object?> { {"a", 10}, {"b", 4} } };
+await caller.CallTool(subCtx);
+Console.WriteLine($"Sub(10, 4) = {subCtx.Result}");
 
-// 静态方法不需要 DI 解析
-var mulResult = caller.CallTool("Mul", new Dictionary<string, object?> { {"a", 3}, {"b", 7} });
-Console.WriteLine($"Mul(3, 7) = {mulResult}");
+// 静态方法 Mul: RateLimitCallFilter + LoggingToolCallFilter
+var mulCtx = new ToolExecuteContext(sp) { ToolName = "Mul", Arguments = new Dictionary<string, object?> { {"a", 3}, {"b", 7} } };
+await caller.CallTool(mulCtx);
+Console.WriteLine($"Mul(3, 7) = {mulCtx.Result}");
+
+// Div: CacheCallFilter
+var divCtx = new ToolExecuteContext(sp) { ToolName = "Div", Arguments = new Dictionary<string, object?> { {"a", 20}, {"b", 4} } };
+await caller.CallTool(divCtx);
+Console.WriteLine($"Div(20, 4) = {divCtx.Result}");
 
 // 未知 tool
 try
 {
-    caller.CallTool("Unknown", new Dictionary<string, object?>());
+    var unknownCtx = new ToolExecuteContext(sp) { ToolName = "Unknown", Arguments = new Dictionary<string, object?>() };
+    await caller.CallTool(unknownCtx);
 }
 catch (ArgumentException ex)
 {
@@ -35,7 +49,8 @@ catch (ArgumentException ex)
 // 缺少参数
 try
 {
-    caller.CallTool("Add", new Dictionary<string, object?> { {"a", 3} });
+    var missingCtx = new ToolExecuteContext(sp) { ToolName = "Add", Arguments = new Dictionary<string, object?> { {"a", 3} } };
+    await caller.CallTool(missingCtx);
 }
 catch (ArgumentNullException ex)
 {
@@ -46,7 +61,8 @@ catch (ArgumentNullException ex)
 var callerNoService = new ToolCaller(new ServiceCollection().BuildServiceProvider());
 try
 {
-    callerNoService.CallTool("Add", new Dictionary<string, object?> { {"a", 1}, {"b", 2} });
+    var noServiceCtx = new ToolExecuteContext(new ServiceCollection().BuildServiceProvider()) { ToolName = "Add", Arguments = new Dictionary<string, object?> { {"a", 1}, {"b", 2} } };
+    await callerNoService.CallTool(noServiceCtx);
 }
 catch (InvalidOperationException ex)
 {

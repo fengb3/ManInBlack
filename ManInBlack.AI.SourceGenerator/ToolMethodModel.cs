@@ -16,6 +16,7 @@ public sealed class ToolMethodModel
     public bool ReturnsVoid { get; set; }
     public string ReturnType { get; set; } = "void";
     public List<ToolParameterModel> Parameters { get; set; } = [];
+    public List<string> FilterTypes { get; set; } = [];
 }
 
 /// <summary>

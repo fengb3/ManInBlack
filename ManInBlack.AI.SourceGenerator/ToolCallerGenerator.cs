@@ -12,7 +12,9 @@ namespace ManInBlack.AI.SourceGenerator;
 [Generator]
 public sealed class ToolCallerGenerator : IIncrementalGenerator
 {
-    private const string ToolAttributeFullName = "ManInBlack.AI.Tools.ToolAttribute";
+    //TODO : 用类型 type 对象获取全程而不是字符串对比，避免命名空间变更导致生成器失效
+    private const string ToolAttributeFullName = "ManInBlack.AI.Attributes.AiToolAttribute";
+    private const string HasFilterAttributePrefix = "ManInBlack.AI.Attributes.AiTool.HasFilterAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -90,6 +92,20 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
                 : null
         }).ToList();
 
+        // 提取 [AiTool.HasFilter<T...>] 属性中的 filter 类型
+        var filterTypes = new List<string>();
+        foreach (var attr in methodSymbol.GetAttributes())
+        {
+            if (attr.AttributeClass is not null &&
+                attr.AttributeClass.ToDisplayString().StartsWith(HasFilterAttributePrefix))
+            {
+                foreach (var typeArg in attr.AttributeClass.TypeArguments)
+                {
+                    filterTypes.Add(typeArg.ToDisplayString(fullyQualifiedFormat));
+                }
+            }
+        }
+
         return new ToolMethodModel
         {
             MethodName = methodSymbol.Name,
@@ -99,7 +115,8 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
             IsStatic = methodSymbol.IsStatic,
             ReturnsVoid = methodSymbol.ReturnsVoid,
             ReturnType = methodSymbol.ReturnType.ToDisplayString(fullyQualifiedFormat),
-            Parameters = parameters
+            Parameters = parameters,
+            FilterTypes = filterTypes
         };
     }
 
