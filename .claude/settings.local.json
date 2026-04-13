@@ -5,7 +5,23 @@
       "Read(//c/Users/fohhy/source/repos/ManInBlack/$USERPROFILE/.nuget/packages/microsoft.extensions.ai/10.4.0/lib/**)",
       "Bash(python3 -c \":*)",
       "Bash(mkdir -p /tmp/ReflectionInspector)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(dotnet-lib-view query-type:*)",
+      "Bash(powershell:*)",
+      "Bash(cat ~/.nuget/packages/fengb3.easycodebuilder/*/lib/*/Fengb3.EasyCodeBuilder.dll)",
+      "Bash(find ~/.nuget/packages/fengb3.easycodebuilder/ -name \"*.nuspec\" -exec cat {} \\\\;)",
+      "Bash(dotnet-lib-view --version)",
+      "Bash(dotnet-lib-view detail:*)",
+      "Bash(dotnet-lib-view query-member:*)",
+      "Bash(1\" --package-version 0.1.4)",
+      "Bash(find Playground:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh api:*)",
+      "WebSearch"
     ]
   }
 }
