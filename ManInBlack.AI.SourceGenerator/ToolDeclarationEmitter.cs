@@ -29,6 +29,7 @@ public static class ToolDeclarationEmitter
 
     private static void BuildPartialClass(NamespaceOption ns, string typeName, List<ToolDeclarationModel> tools)
     {
+        var isStatic = tools.First().IsStaticClass;
         var parts = typeName.Split('.');
 
         if (parts.Length == 1)
@@ -37,6 +38,7 @@ public static class ToolDeclarationEmitter
             {
                 cls.WithName(parts[0]);
                 cls.Keywords.Add("partial");
+                if (isStatic) cls.Keywords.Add("static");
                 BuildDeclarationMembers(cls, tools);
             });
         }
@@ -47,6 +49,7 @@ public static class ToolDeclarationEmitter
             {
                 cls.WithName(parts[0]);
                 cls.Keywords.Add("partial");
+                if (isStatic) cls.Keywords.Add("static");
                 BuildNestedClass(cls, parts, 1, tools);
             });
         }
