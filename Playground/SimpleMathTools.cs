@@ -1,13 +1,13 @@
-﻿using System.Diagnostics;
-using System.Numerics;
-using System.Text;
+﻿using System.Numerics;
 using ManInBlack.AI.Attributes;
 using ManInBlack.AI.Tools;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace Playground;
 
-public class SimpleMathTools
+[ServiceRegister.Scoped]
+public partial class SimpleMathTools
 {
     /// <summary>
     /// Add 2 number
@@ -50,7 +50,7 @@ public class SimpleMathTools
     }
 }
 
-public static class ComplexMathTools
+public static partial class ComplexMathTools
 {
     [AiTool]
     [AiTool.HasFilter<LoggingToolCallFilter, RetryCallFilter>]
@@ -65,78 +65,6 @@ public static class ComplexMathTools
     public static int Log10(Complex a, Complex b)
     {
         return (int)(Complex.Log10(a) / Complex.Log10(b)).Real;
-    }
-}
-
-public class CommandLineTools
-{
-    /// <summary>
-    /// run powershell command.
-    /// </summary>
-    /// <param name="command">the command</param>
-    /// <returns>the output of executed command</returns>
-    [AiTool]
-    [AiTool.HasFilter<LoggingToolCallFilter>]
-    public string RunPowershell(string command)
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName               = @"pwsh",
-            RedirectStandardOutput = true,
-            RedirectStandardError  = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding  = Encoding.UTF8,
-            UseShellExecute        = false,
-            CreateNoWindow         = true,
-            // WorkingDirectory       = WorkingDir,
-        };
-        processInfo.ArgumentList.Add("-Command");
-        processInfo.ArgumentList.Add(command);
-        using var process = Process.Start(processInfo);
-        if (process == null)
-            return "Failed to start PowerShell process.";
-
-        var output = process.StandardOutput.ReadToEnd();
-        var error  = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        var result = !string.IsNullOrEmpty(error)
-            ? $"PowerShell error: {error.Trim()}"
-            : output.Trim();
-
-        return result;
-    }
-    
-    [AiTool]
-    [AiTool.HasFilter<LoggingToolCallFilter>]
-    public string RunBash(string command)
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName               = "/bin/bash",
-            RedirectStandardOutput = true,
-            RedirectStandardError  = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding  = Encoding.UTF8,
-            UseShellExecute        = false,
-            CreateNoWindow         = true,
-            // WorkingDirectory       = WorkingDir,
-        };
-        processInfo.ArgumentList.Add("-c");
-        processInfo.ArgumentList.Add(command);
-        using var process = Process.Start(processInfo);
-        if (process == null)
-            return "Failed to start Bash process.";
-
-        var output = process.StandardOutput.ReadToEnd();
-        var error  = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        var result = !string.IsNullOrEmpty(error)
-            ? $"Bash error: {error.Trim()}"
-            : output.Trim();
-
-        return result;
     }
 }
 
@@ -225,5 +153,22 @@ public class RateLimitCallFilter : ToolCallFilter
 
         await next(context);
         _lastCallTimes[toolName] = DateTime.UtcNow;
+    }
+}
+
+
+public class LongResultReferenceCallFilter : ToolCallFilter
+{
+    public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
+    {
+        // 过长result 保存到一个文件
+        await next(context);
+        
+        if(context.Result?.ToString()?.Length > 1024)
+        {
+            var filePath = $"result_{Guid.NewGuid()}.txt";
+            await File.WriteAllTextAsync(filePath, context.Result.ToString() ?? string.Empty);
+            context.Result = $"Result is too long, saved to file: {filePath}";
+        }
     }
 }
