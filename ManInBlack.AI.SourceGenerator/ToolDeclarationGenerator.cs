@@ -124,7 +124,15 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
         var classDecl = methodDecl.FirstAncestorOrSelf<ClassDeclarationSyntax>();
         var isPartialClass = classDecl is not null &&
                              classDecl.Modifiers.Any(SyntaxKind.PartialKeyword);
+        var isStaticClass = classDecl is not null &&
+                            classDecl.Modifiers.Any(SyntaxKind.StaticKeyword);
         var classLocation = classDecl?.Identifier.GetLocation();
+        var methodLocation = methodDecl.Identifier.GetLocation();
+
+        // 获取不含命名空间的类型名（仅类名+嵌套外层类名）
+        var typeOnlyFormat = new SymbolDisplayFormat(
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypes);
+        var typeNameWithoutNamespace = containingType.ToDisplayString(typeOnlyFormat);
 
         var parameters = methodSymbol.Parameters.Select(p => new ToolDeclarationParameterModel
         {
@@ -141,7 +149,7 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
         return new ToolDeclarationModel
         {
             MethodName = methodSymbol.Name,
-            ContainingTypeName = containingType.ToDisplayString(fullyQualifiedFormat),
+            ContainingTypeName = typeNameWithoutNamespace,
             ContainingTypeShortName = containingType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
             ContainingNamespace = containingNamespace,
             IsStatic = methodSymbol.IsStatic,
@@ -152,7 +160,9 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
             ParamDescriptions = paramDescriptions,
             ReturnsDescription = returnsDescription,
             IsPartialClass = isPartialClass,
-            ClassLocation = classLocation
+            IsStaticClass = isStaticClass,
+            ClassLocation = classLocation,
+            MethodLocation = methodLocation
         };
     }
 
@@ -372,7 +382,7 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
             // MIB011: 缺少 summary
             if (string.IsNullOrWhiteSpace(method.Summary))
             {
-                spc.ReportDiagnostic(Diagnostic.Create(MissingSummary, Location.None, method.MethodName));
+                spc.ReportDiagnostic(Diagnostic.Create(MissingSummary, method.MethodLocation, method.MethodName));
             }
 
             // MIB012: 缺少 param 文档
@@ -380,14 +390,14 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
             {
                 if (!method.ParamDescriptions.ContainsKey(param.Name))
                 {
-                    spc.ReportDiagnostic(Diagnostic.Create(MissingParamDoc, Location.None, method.MethodName, param.Name));
+                    spc.ReportDiagnostic(Diagnostic.Create(MissingParamDoc, method.MethodLocation, method.MethodName, param.Name));
                 }
             }
 
             // MIB013: 非 void 缺少 returns 文档
             if (!method.ReturnsVoid && string.IsNullOrWhiteSpace(method.ReturnsDescription))
             {
-                spc.ReportDiagnostic(Diagnostic.Create(MissingReturnsDoc, Location.None, method.MethodName, method.ReturnType));
+                spc.ReportDiagnostic(Diagnostic.Create(MissingReturnsDoc, method.MethodLocation, method.MethodName, method.ReturnType));
             }
         }
     }

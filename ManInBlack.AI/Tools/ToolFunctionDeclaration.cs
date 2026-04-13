@@ -19,7 +19,7 @@ public class ToolFunctionDeclaration : AIFunctionDeclaration
         using var doc = JsonDocument.Parse(jsonSchema);
         _jsonSchema = doc.RootElement.Clone();
         _returnJsonSchema = returnJsonSchema is not null
-            ? JsonDocument.Parse(returnJsonSchema).RootElement.Clone()
+            ? ParseAndClone(returnJsonSchema)
             : null;
     }
 
@@ -27,4 +27,10 @@ public class ToolFunctionDeclaration : AIFunctionDeclaration
     public override string Description { get; }
     public override JsonElement JsonSchema => _jsonSchema;
     public override JsonElement? ReturnJsonSchema => _returnJsonSchema;
+
+    private static JsonElement ParseAndClone(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
 }
