@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -32,47 +33,41 @@ public static class ToolDeclarationEmitter
         var isStatic = tools.First().IsStaticClass;
         var parts = typeName.Split('.');
 
+        void ConfigureClass(TypeOption cls)
+        {
+            cls.WithName(parts[parts.Length - 1]);
+            BuildDeclarationMembers(cls, tools);
+        }
+
         if (parts.Length == 1)
         {
-            ns.Class(cls =>
-            {
-                cls.WithName(parts[0]);
-                cls.Keywords.Add("partial");
-                if (isStatic) cls.Keywords.Add("static");
-                BuildDeclarationMembers(cls, tools);
-            });
+            var keywordConfig = isStatic ? ns.Partial.Static : ns.Partial;
+            keywordConfig.Class(ConfigureClass);
         }
         else
         {
-            // 嵌套类型：递归包裹 partial 类
-            ns.Class(cls =>
+            var keywordConfig = isStatic ? ns.Partial.Static : ns.Partial;
+            keywordConfig.Class(cls =>
             {
                 cls.WithName(parts[0]);
-                cls.Keywords.Add("partial");
-                if (isStatic) cls.Keywords.Add("static");
-                BuildNestedClass(cls, parts, 1, tools);
+                BuildNestedClass(cls.Partial, parts, 1, ConfigureClass);
             });
         }
     }
 
-    private static void BuildNestedClass(TypeOption parent, string[] parts, int index, List<ToolDeclarationModel> tools)
+    private static void BuildNestedClass(KeywordOptionConfigurator<TypeOption> parentConfig, string[] parts, int index, Action<TypeOption> configureLeaf)
     {
         if (index == parts.Length - 1)
         {
-            parent.NestedClass(cls =>
-            {
-                cls.WithName(parts[index]);
-                cls.Keywords.Add("partial");
-                BuildDeclarationMembers(cls, tools);
-            });
+            parentConfig.NestedClass(configureLeaf);
         }
         else
         {
-            parent.NestedClass(cls =>
+            var currentIndex = index;
+            parentConfig.NestedClass(cls =>
             {
-                cls.WithName(parts[index]);
-                cls.Keywords.Add("partial");
-                BuildNestedClass(cls, parts, index + 1, tools);
+                cls.WithName(parts[currentIndex]);
+                BuildNestedClass(cls.Partial, parts, currentIndex + 1, configureLeaf);
             });
         }
     }
