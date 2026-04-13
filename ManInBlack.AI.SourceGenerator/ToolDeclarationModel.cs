@@ -38,9 +38,19 @@ public sealed class ToolDeclarationModel
     public bool IsPartialClass { get; set; }
 
     /// <summary>
+    /// 所属类是否为 static
+    /// </summary>
+    public bool IsStaticClass { get; set; }
+
+    /// <summary>
     /// 诊断位置（类声明）
     /// </summary>
     public Location? ClassLocation { get; set; }
+
+    /// <summary>
+    /// 诊断位置（方法声明）
+    /// </summary>
+    public Location? MethodLocation { get; set; }
 
     /// <summary>
     /// 工具名（处理冲突后）
