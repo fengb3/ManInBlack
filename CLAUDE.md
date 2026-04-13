@@ -36,18 +36,53 @@ The core pattern is **Provider + Adapter**:
 - Streaming adapters accumulate tool call fragments and emit them as complete `FunctionCallContent` updates
 - JSON serialization uses `System.Text.Json` with `JsonNode`/`JsonObject` for request building and typed inner classes for response parsing
 
+### Source Generators
+
+`ManInBlack.AI.SourceGenerator` (targets .NET Standard 2.0) contains three incremental generators:
+
+| Generator | Output | Purpose |
+|-----------|--------|---------|
+| `ToolCallerGenerator` | `ToolCaller.g.cs` | Generates a `ToolCaller` class that dispatches `[AiTool]` method calls at runtime via `IServiceProvider` |
+| `ToolDeclarationGenerator` | `{Type}.ToolDeclarations.g.cs` | Generates `AIFunctionDeclaration` static members and `AllToolDeclarations` array for each partial class with `[AiTool]` methods |
+| `ServiceRegistrationGenerator` | `ServiceRegistrationExtensions.g.cs` | Generates DI registration extensions for `[ServiceRegister]`-attributed classes |
+
+All emitters use **Fengb3.EasyCodeBuilder** for code generation. When generating new emitters, follow the same pattern: use `Code.Create().Using(...).Namespace(ns => ...)` with `Code.Build(option, new CodeBuilder())`.
+
+### Tool declaration pipeline
+
+1. `[AiTool]` marks methods as AI-callable tools
+2. `ToolDeclarationGenerator` extracts method signatures + XML doc comments (`<summary>`, `<param>`, `<returns>`)
+3. For each containing partial class, generates `ToolFunctionDeclaration` fields with JSON Schema for parameters/returns
+4. `ToolFunctionDeclaration` (in `ManInBlack.AI/Tools/`) is a concrete `AIFunctionDeclaration` subclass that parses JSON Schema strings at construction
+
+### Diagnostic rules
+
+| ID | Severity | Trigger |
+|----|----------|---------|
+| MIB001 | Error | `[ServiceRegister.X.As<T>]` where type doesn't implement T |
+| MIB010 | Error | Class with `[AiTool]` methods is not `partial` |
+| MIB011 | Warning | `[AiTool]` method missing `<summary>` XML doc |
+| MIB012 | Warning | `[AiTool]` method parameter missing `<param>` XML doc |
+| MIB013 | Warning | Non-void `[AiTool]` method missing `<returns>` XML doc |
+
 ### Files with commented-out code
 
 `ServiceCollectionExtensions.cs`, `ChatClientFactory.cs`, and `AdditionalProviders.cs` are entirely commented out. They represent an older iteration of the DI/factory pattern. The active code uses the simpler `ModelProvider` + `ChatClientProviderExtensions` approach instead.
 
 ## Dependencies
 
-- `Microsoft.Extensions.AI` 10.4.1 — Core `IChatClient` / `ChatMessage` / `AITool` abstractions
+### ManInBlack.AI
+- `Microsoft.Extensions.AI` 10.4.1 — Core `IChatClient` / `ChatMessage` / `AITool` / `AIFunctionDeclaration` abstractions
 - `Microsoft.Extensions.Http` 10.0.0 — `IHttpClientFactory` integration
 - `ModelContextProtocol` 1.2.0 — MCP protocol support
+
+### ManInBlack.AI.SourceGenerator
+- `Fengb3.EasyCodeBuilder` 0.1.4 — Fluent code generation API
+- `Microsoft.CodeAnalysis.CSharp` 4.11.0 — Roslyn API for source generation
 
 ## Code Style
 
 - Comments and XML docs are in Chinese
 - C# 10 with file-scoped namespaces, implicit usings, nullable enabled
 - IDE: JetBrains Rider
+- Source generator emitters must use EasyCodeBuilder, not raw StringBuilder
