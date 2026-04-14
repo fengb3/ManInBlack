@@ -2,8 +2,9 @@
 using System.Text;
 using ManInBlack.AI.Attributes;
 
-namespace Playground;
+namespace Playground.Tools;
 
+[ServiceRegister.Scoped]
 public partial class CommandLineTools
 {
     /// <summary>
@@ -43,6 +44,11 @@ public partial class CommandLineTools
         return result;
     }
     
+    /// <summary>
+    /// Run Bash command 
+    /// </summary>
+    /// <param name="command">the command u want to run</param>
+    /// <returns></returns>
     [AiTool]
     [AiTool.HasFilter<LoggingToolCallFilter, LongResultReferenceCallFilter>]
     public string RunBash(string command)
