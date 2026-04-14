@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 using Playground;
+using Playground.Tools;
 
 // 构建 DI 容器
 var services = new ServiceCollection();

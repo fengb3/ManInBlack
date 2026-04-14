@@ -1,10 +1,9 @@
 ﻿using System.Numerics;
 using ManInBlack.AI.Attributes;
 using ManInBlack.AI.Tools;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
-namespace Playground;
+namespace Playground.Tools;
 
 [ServiceRegister.Scoped]
 public partial class SimpleMathTools

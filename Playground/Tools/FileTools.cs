@@ -1,10 +1,15 @@
 ﻿using ManInBlack.AI.Attributes;
 
-namespace Playground;
+namespace Playground.Tools;
 
 [ServiceRegister.Scoped]
 public partial class FileTools
 {
+    /// <summary>
+    /// read file
+    /// </summary>
+    /// <param name="fileName"></param>
+    /// <returns>file content</returns>
     [AiTool]
     public string ReadFile(string fileName)
     {
@@ -12,6 +17,11 @@ public partial class FileTools
         return file;
     }
 
+    /// <summary>
+    /// create file
+    /// </summary>
+    /// <param name="fileName"></param>
+    /// <returns>result of file creation</returns>
     [AiTool]
     public string CreateFile(string fileName)
     {
@@ -19,6 +29,12 @@ public partial class FileTools
         return $"File {fileName} created.";
     }
     
+    /// <summary>
+    /// write file
+    /// </summary>
+    /// <param name="fileName"></param>
+    /// <param name="content"></param>
+    /// <returns>success if content write to file</returns>
     [AiTool]
     public string WriteFile(string fileName, string content)
     {
