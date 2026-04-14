@@ -21,7 +21,8 @@
       "Bash(git push:*)",
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(dotnet-lib-view doc:*)"
     ]
   }
 }
