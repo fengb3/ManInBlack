@@ -19,6 +19,7 @@ public static class ToolCallerEmitter
             .Namespace(ns => {
                 ns.Name = namespaceName;
                 ns.Public.Class(cls => BuildToolExecutorClass(cls, tools));
+                ns.Public.Static.Class(cls => BuildServiceCollectionExtensions(cls));
             });
 
         var body = option.Build();
@@ -51,6 +52,23 @@ public static class ToolCallerEmitter
         // 每个 tool 的辅助方法
         foreach (var tool in tools)
             BuildToolHelperMethod(cls, tool);
+    }
+
+    /// <summary>
+    /// 生成 AddToolExecutor() 扩展方法，将 ToolExecutor 注册到 DI 容器
+    /// </summary>
+    private static void BuildServiceCollectionExtensions(TypeOption cls)
+    {
+        cls.WithName("ToolExecutorServiceExtensions");
+
+        cls.Public.Method(m => {
+            m.WithName("AddToolExecutor")
+                .WithReturnType("IServiceCollection")
+                .WithParameters("this IServiceCollection services")
+                .WithKeyword("static")
+                .AppendLine("services.AddScoped<IToolExecutor, ToolExecutor>();")
+                .AppendLine("return services;");
+        });
     }
 
     private static void BuildExecuteAsyncMethod(TypeOption cls, List<ToolMethodModel> tools)

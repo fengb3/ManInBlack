@@ -20,7 +20,14 @@ if (string.IsNullOrWhiteSpace(userInput))
 
 // 构建 DI 容器
 var services = new ServiceCollection();
-services.AddManInBlackChatClient(new ModelChoice { Provider = provider, ModelId = modelId });
+services.AddManInBlack(opt =>
+{
+    opt.ModelChoice = new ModelChoice
+    {
+        Provider = provider,
+        ModelId = modelId
+    };
+});
 services.AddTransient<CommandLineTools>();
 var sp = services.BuildServiceProvider();
 

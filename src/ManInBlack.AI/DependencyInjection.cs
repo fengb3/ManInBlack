@@ -5,24 +5,30 @@ using Microsoft.Extensions.AI;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+
+public class ManInBlackOptions
+{
+    public ModelChoice ModelChoice { get; set; } = default!;
+}
+
 public static class DependencyInjection
 {
     extension(IServiceCollection services)
     {
-        public IServiceCollection AddManInBlack()
+        /// <summary>
+        /// 注册 ManInBlack 核心服务（AgentPipeline、AgentContext）
+        /// </summary>
+        public IServiceCollection AddManInBlack(Action<ManInBlackOptions> configure)
         {
+
+            var options = new ManInBlackOptions();
+            configure(options);
+
             services.AddScoped<AgentPipeline>();
             services.AddScoped<AgentContext>();
-            return services;
-        }
 
-        /// <summary>
-        /// 注册 ModelChoice 并自动创建对应的 IChatClient
-        /// </summary>
-        public IServiceCollection AddManInBlackChatClient(ModelChoice modelChoice)
-        {
             services.AddHttpClient();
-            services.AddSingleton(modelChoice);
+            services.AddSingleton(options.ModelChoice);
             services.AddSingleton<IChatClient>(sp =>
             {
                 var choice = sp.GetRequiredService<ModelChoice>();
