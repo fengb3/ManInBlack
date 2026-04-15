@@ -90,7 +90,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 yield return new ChatResponseUpdate
                 {
                     Role = ChatRole.Assistant,
-                    Contents = [new TextContent(choice.Delta.ReasoningContent)]
+                    Contents = [new TextReasoningContent(choice.Delta.ReasoningContent)]
                 };
             }
 

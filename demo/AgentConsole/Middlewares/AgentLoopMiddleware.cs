@@ -4,13 +4,15 @@ using ManInBlack.AI.Middleware;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 using AgentConsole;
+using ManInBlack.AI.Attributes;
 
 namespace AgentConsole.Middlewares;
 
 /// <summary>
 /// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史
 /// </summary>
-public class AgentLoopMiddleware(ToolExecutor toolExecutor) : AgentMiddleware
+[ServiceRegister.Scoped]
+public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
         AgentContext context,
