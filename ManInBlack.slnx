@@ -1,7 +1,7 @@
 <Solution>
-  <Project Path="ManInBlack.AI/ManInBlack.AI.csproj" />
-  <Project Path="ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
-  <Project Path="Playground/Playground.csproj" />
-  <Project Path="AgentConsole/AgentConsole.csproj" />
-  <Project Path="ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
+  <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
+  <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
+  <Project Path="demo/Playground/Playground.csproj" />
+  <Project Path="demo/AgentConsole/AgentConsole.csproj" />
+  <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
 </Solution>
