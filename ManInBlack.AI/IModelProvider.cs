@@ -115,7 +115,14 @@ public sealed class QwenProvider : ModelProvider
 public sealed class ZhipuProvider : ModelProvider
 {
     public override string ProviderName => "Zhipu";
-    public override string BaseUrl { get; set; } = "https://open.bigmodel.cn/api/paas";
+    public override string BaseUrl { get; set; } = "https://open.bigmodel.cn/api/paas/v4";
+    public override string CompatibleWith => "OpenAI";
+}
+
+public sealed class ZhipuCodingPlanProvider : ModelProvider
+{
+    public override string ProviderName => "ZhipuCodingPlan";
+    public override string BaseUrl { get; set; } = "https://open.bigmodel.cn/api/coding/paas/v4";
     public override string CompatibleWith => "OpenAI";
 }
 
