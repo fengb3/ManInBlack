@@ -22,7 +22,13 @@
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
       "WebSearch",
-      "Bash(dotnet-lib-view doc:*)"
+      "Bash(dotnet-lib-view doc:*)",
+      "Bash(git mv:*)",
+      "Bash(cmd.exe /c \"move ManInBlack.AI src\\\\\\\\ManInBlack.AI\")",
+      "Bash(cp -r ManInBlack.AI.SourceGenerator src/)",
+      "Bash(cp -r Playground src/)",
+      "Bash(cp -r AgentConsole src/)",
+      "Bash(cp -r ManInBlack.AI.Tests test/)"
     ]
   }
 }
