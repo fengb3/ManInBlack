@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI;
@@ -14,6 +15,7 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
     private readonly HttpClient _httpClient;
     private readonly string _modelId;
     private readonly string _endPoint;
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public AnthropicCompatibleChatClient(
         HttpClient httpClient,
@@ -239,7 +241,7 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
     private ChatResponse ParseResponse(string responseJson)
     {
-        var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson)
+        var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson, JsonOptions)
             ?? throw new InvalidOperationException(
                 $"Failed to parse Anthropic-compatible response with model {_modelId} to url {_httpClient.BaseAddress}");
 
@@ -260,7 +262,10 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary()
+        };
 
         if (result.Usage is not null)
         {
@@ -290,6 +295,7 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
     {
         public List<AnthropicContentBlock>? Content { get; set; }
         public AnthropicUsage? Usage { get; set; }
+        [JsonPropertyName("stop_reason")]
         public string? StopReason { get; set; }
     }
 
@@ -304,7 +310,9 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
     private class AnthropicUsage
     {
+        [JsonPropertyName("input_tokens")]
         public int InputTokens { get; set; }
+        [JsonPropertyName("output_tokens")]
         public int OutputTokens { get; set; }
     }
 

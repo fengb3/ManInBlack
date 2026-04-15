@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI;
@@ -14,12 +15,13 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private readonly HttpClient _httpClient;
     private readonly string _modelId;
     private readonly string _endPoint;
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public OpenAICompatibleChatClient(HttpClient httpClient, string modelId)
     {
         _httpClient = httpClient;
         _modelId = modelId;
-        _endPoint = "v1/chat/completions";
+        _endPoint = "chat/completions";
     }
 
     public async Task<ChatResponse> GetResponseAsync(
@@ -66,7 +68,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 break;
 
             OpenAIStreamChunk? chunk = null;
-            try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr); }
+            try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr, JsonOptions); }
             catch { }
 
             var choice = chunk?.Choices?.FirstOrDefault();
@@ -79,6 +81,16 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 {
                     Role = ChatRole.Assistant,
                     Contents = [new TextContent(choice.Delta.Content)]
+                };
+            }
+
+            // 推理内容（如 glm-4.7 的 reasoning_content）
+            if (choice.Delta?.ReasoningContent is not null)
+            {
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new TextContent(choice.Delta.ReasoningContent)]
                 };
             }
 
@@ -216,7 +228,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
     private ChatResponse ParseResponse(string responseJson)
     {
-        var result = JsonSerializer.Deserialize<OpenAIResponse>(responseJson)
+        var result = JsonSerializer.Deserialize<OpenAIResponse>(responseJson, JsonOptions)
             ?? throw new InvalidOperationException("Failed to parse OpenAI-compatible response");
 
         var choice = result.Choices?.FirstOrDefault()
@@ -240,7 +252,10 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary()
+        };
 
         if (result.Usage is not null)
         {
@@ -275,12 +290,14 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIChoice
     {
         public OpenAIMessage? Message { get; set; }
+        [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
     }
 
     private class OpenAIMessage
     {
         public string? Content { get; set; }
+        [JsonPropertyName("tool_calls")]
         public List<OpenAIToolCall>? ToolCalls { get; set; }
     }
 
@@ -298,7 +315,9 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
     private class OpenAIUsage
     {
+        [JsonPropertyName("prompt_tokens")]
         public int PromptTokens { get; set; }
+        [JsonPropertyName("completion_tokens")]
         public int CompletionTokens { get; set; }
     }
 
@@ -310,12 +329,16 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIStreamChoice
     {
         public OpenAIStreamDelta? Delta { get; set; }
+        [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
     }
 
     private class OpenAIStreamDelta
     {
         public string? Content { get; set; }
+        [JsonPropertyName("reasoning_content")]
+        public string? ReasoningContent { get; set; }
+        [JsonPropertyName("tool_calls")]
         public List<OpenAIStreamToolCall>? ToolCalls { get; set; }
     }
 

@@ -16,6 +16,7 @@ public sealed class GeminiCompatibleChatClient : IChatClient
     private readonly string _modelId;
     private readonly string _blockedEndpoint;
     private readonly string _streamEndPoint;
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public GeminiCompatibleChatClient(
         HttpClient httpClient,
@@ -74,7 +75,7 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                 break;
 
             GeminiResponse? result = null;
-            try { result = JsonSerializer.Deserialize<GeminiResponse>(jsonStr); }
+            try { result = JsonSerializer.Deserialize<GeminiResponse>(jsonStr, JsonOptions); }
             catch { }
 
             var parts = result?.Candidates?.FirstOrDefault()?.Content?.Parts;
@@ -230,7 +231,7 @@ public sealed class GeminiCompatibleChatClient : IChatClient
 
     private ChatResponse ParseResponse(string responseJson)
     {
-        var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson)
+        var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson, JsonOptions)
                      ?? throw new InvalidOperationException("Failed to parse Gemini-compatible response");
 
         var candidate = result.Candidates?.FirstOrDefault()
@@ -256,7 +257,10 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary()
+        };
 
         if (result.UsageMetadata is not null)
         {
