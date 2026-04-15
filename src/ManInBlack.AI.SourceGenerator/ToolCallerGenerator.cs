@@ -39,6 +39,10 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
             var (methods, ns) = source;
             var methodList = methods.Where(m => m is not null).Select(m => m!).ToList();
 
+            // 没有任何 [AiTool] 方法时跳过生成
+            if (methodList.Count == 0)
+                return;
+
             // 解析命名冲突：同名方法加类名前缀
             ResolveToolNames(methodList);
 
