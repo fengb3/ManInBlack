@@ -25,11 +25,11 @@ services.AddTransient<CommandLineTools>();
 var sp = services.BuildServiceProvider();
 
 // 构建管道
-var toolCaller = new ToolCaller(sp);
+var toolExecutor = new ToolExecutor(sp);
 var pipeline = new AgentPipeline(sp);
 pipeline.Use(new SystemPromptMiddleware("你是一个有用的 AI 助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。"));
 pipeline.Use<CommandToolMiddleware>();
-pipeline.Use(new AgentLoopMiddleware(toolCaller));
+pipeline.Use(new AgentLoopMiddleware(toolExecutor));
 var agent = new Agent(pipeline.Build(), sp);
 
 // 执行

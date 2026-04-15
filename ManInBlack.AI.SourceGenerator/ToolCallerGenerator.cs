@@ -43,7 +43,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
             ResolveToolNames(methodList);
 
             var sourceText = ToolCallerEmitter.Emit(ns, methodList);
-            spc.AddSource("ToolCaller.g.cs", SourceText.From(sourceText, Encoding.UTF8));
+            spc.AddSource("ToolExecutor.g.cs", SourceText.From(sourceText, Encoding.UTF8));
         });
     }
 
