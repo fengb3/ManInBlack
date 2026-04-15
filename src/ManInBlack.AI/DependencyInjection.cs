@@ -24,7 +24,7 @@ public static class DependencyInjection
             var options = new ManInBlackOptions();
             configure(options);
 
-            services.AddScoped<AgentPipeline>();
+            services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
 
             services.AddHttpClient();

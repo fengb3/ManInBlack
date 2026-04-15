@@ -3,6 +3,8 @@ using AgentConsole.Middlewares;
 using AgentConsole.Tools;
 using ManInBlack.AI;
 using ManInBlack.AI.Middleware;
+using ManInBlack.AI.Tools;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 // ============ 配置（替换为你自己的值） ============
@@ -28,30 +30,46 @@ services.AddManInBlack(opt =>
         ModelId = modelId
     };
 });
-services.AddTransient<CommandLineTools>();
-var sp = services.BuildServiceProvider();
+services.AddAutoRegisteredServices();
+services.AddToolExecutor();
 
-// 构建管道
-var toolExecutor = new ToolExecutor(sp);
-var pipeline = new AgentPipeline(sp);
-pipeline.Use(new SystemPromptMiddleware("你是一个有用的 AI 助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。"));
-pipeline.Use<CommandToolMiddleware>();
-pipeline.Use(new AgentLoopMiddleware(toolExecutor));
-var agent = new Agent(pipeline.Build(), sp);
+var rootSp = services.BuildServiceProvider();
 
-// 执行
+
+using var scope = rootSp.CreateScope();
+var sp = scope.ServiceProvider;
+
+var pipeline = new AgentPipelineBuilder()
+        .Use(new SystemPromptMiddleware("你是一个有用的 AI 助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。"))
+        .Use<CommandToolMiddleware>()
+        .Use<AgentLoopMiddleware>()
+        .Build(sp)
+    ;
+
+var agentContext = sp.GetRequiredService<AgentContext>();
+agentContext.Messages.Add(new ChatMessage(ChatRole.User, userInput));
+
+var updates = pipeline(agentContext);
+
 Console.WriteLine("=== ManInBlack Agent Console ===");
 Console.WriteLine($"模型: {provider.ProviderName} / {modelId}");
 Console.WriteLine($"用户: {userInput}");
 Console.WriteLine();
 
-try
+await foreach (ChatResponseUpdate update in updates)
 {
-    var result = await agent.RunToEndAsync(userInput);
-    Console.WriteLine(result.Text);
-    Console.WriteLine($"\n--- 对话完成 ({result.Steps} 步) ---");
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"[Error] {ex.GetType().Name}: {ex.Message}");
+    foreach (var content in update.Contents)
+    {
+        switch (content)
+        {
+            case TextReasoningContent reasoning:
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write(reasoning.Text);
+                Console.ResetColor();
+                break;
+            case TextContent text:
+                Console.Write(text.Text);
+                break;
+        }
+    }
 }
