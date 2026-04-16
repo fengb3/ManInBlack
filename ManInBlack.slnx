@@ -3,6 +3,7 @@
   <Folder Name="/Others/">
     <File Path=".gitignore" />
     <File Path="CLAUDE.md" />
+    <File Path="sessions/console/1776322298313.session" />
   </Folder>
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Folder Name="/Demo/">

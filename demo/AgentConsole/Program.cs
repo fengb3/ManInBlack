@@ -43,15 +43,17 @@ var pipeline = new AgentPipelineBuilder()
     .Use<SavePersistenceMiddleware>()
     .Use<UserInputMiddleware>()
     // .Use<CommandToolMiddleware>()
+    .Use<ContextCompressMiddleware>()
     .Use<SimpleMathToolMiddleware>()
     .Use<AgentLoopMiddleware>()// Agent Loop 应该在最后一个
     .Build(sp);
 
 // 构造随机数学表达式
-var rng = new Random();
-List<int> nums = Enumerable.Range(0, 4).Select(_ => rng.Next(1, 100)).ToList();
-List<string> ops = ["+", "-", "*", "/"];
-List<string> selectedOps = Enumerable.Range(0, 3).Select(_ => ops[rng.Next(ops.Count)]).ToList();
+var          numberCount = 8;
+var          rng         = new Random();
+List<int>    nums        = Enumerable.Range(0, numberCount).Select(_ => rng.Next(1, 100)).ToList();
+List<string> ops         = ["+", "-", "*", "/"];
+List<string> selectedOps = Enumerable.Range(0, numberCount - 1).Select(_ => ops[rng.Next(ops.Count)]).ToList();
 
 int bracketPos = rng.Next(0, 3);
 
@@ -66,7 +68,7 @@ for (int i = 0; i < nums.Count; i++)
 
 
 var agentContext = sp.GetRequiredService<AgentContext>();
-agentContext.UserInput    = $"请计算以下数学表达式的结果: {expression}。请详细说明你的计算过程。请使用计算工具来计算，并在最后给出结果。";
+agentContext.UserInput    = $"请计算以下数学表达式的结果: {expression}。请使用计算工具来计算，并在最后给出结果, 不用给出详细过程。";
 agentContext.SystemPrompt = "你是一个有用的 AI 助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
 
 var updates = pipeline(agentContext);
