@@ -5,12 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-dotnet build ManInBlack.slnx           # Build the solution
-dotnet build ManInBlack.AI             # Build just the library
-dotnet run --project Playground        # Run the playground (explores M.E.AI types)
+dotnet build ManInBlack.slnx                          # Build the entire solution
+dotnet build src/ManInBlack.AI                        # Build just the library
+dotnet build src/ManInBlack.AI.SourceGenerator        # Build just the source generator
+dotnet run --project demo/AgentConsole                # Run the agent console demo
+dotnet run --project demo/Playground                  # Run the playground (explores M.E.AI types)
+dotnet test test/ManInBlack.AI.Tests                  # Run all tests (xunit)
+dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Run specific tests
 ```
 
-No test project exists yet. No linting or formatting tools are configured.
+No linting or formatting tools are configured.
 
 ## Project Overview
 
@@ -18,7 +22,9 @@ ManInBlack is a .NET 10 library that provides unified abstractions for accessing
 
 ## Architecture
 
-The core pattern is **Provider + Adapter**:
+The project is organized into `src/`, `demo/`, and `test/` directories.
+
+### Provider + Adapter (ChatClient layer)
 
 - **`IModelProvider` / `ModelProvider`** (`IModelProvider.cs`) — Abstract provider definitions. Each provider declares a `ProviderName`, `BaseUrl`, `ApiKey`, and `CompatibleWith` (the API shape it follows: `"OpenAI"`, `"Anthropic"`, or `"Gemini"`). Most Chinese providers are OpenAI-compatible.
 - **ChatClient adapters** (`ChatClient/`) — Three `IChatClient` implementations, one per API shape:
@@ -28,6 +34,22 @@ The core pattern is **Provider + Adapter**:
 - **`ChatClientProviderExtensions.CreateChatClient()`** (`IModelProvider.cs`) — Factory method that dispatches to the correct adapter based on `CompatibleWith`
 - **`ModelChoice`** — Couples a `ModelProvider` with a `ModelId` for client creation
 - **`ModelProviderRegistry`** — Named provider registry (currently minimal, no lookup API yet)
+
+### Middleware Pipeline (Agent layer)
+
+The agent layer sits above the ChatClient layer and provides a composable middleware pipeline:
+
+- **`AgentContext`** — Pipeline context carrying `Messages`, `Options`, `SystemPrompt`, `UserInput`, `Items` (shared state dictionary), `CancellationToken`, and `IServiceProvider`
+- **`AgentMiddleware`** — Abstract base class. Each middleware implements `HandleAsync(AgentContext, Func<IAsyncEnumerable<ChatResponseUpdate>>, CancellationToken)` and calls `next()` to pass to the next middleware
+- **`AgentPipelineBuilder`** — Builds the pipeline. Register middleware via `Use(middleware)` (instance) or `Use<TMiddleware>()` (DI-resolved). `Build(IServiceProvider)` returns a `Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>>` by wrapping middlewares in reverse order around the terminal `IChatClient` call
+- **`Agent`** — Entity with `AgentId`, `ParentId`, `ParentType` for tracking agent hierarchy
+
+### Dependency Injection
+
+`DependencyInjection.cs` defines `AddManInBlack(Action<ManInBlackOptions>)` as a C# extension method on `IServiceCollection`. It registers:
+- `AgentPipelineBuilder`, `AgentContext`, `Agent` as scoped
+- `IChatClient` as singleton (built from `ModelChoice` via `IHttpClientFactory`)
+- `ManInBlackOptions.ModelChoice` as singleton
 
 ### Key design points
 
@@ -77,12 +99,17 @@ All emitters use **Fengb3.EasyCodeBuilder** for code generation. When generating
 - `ModelContextProtocol` 1.2.0 — MCP protocol support
 
 ### ManInBlack.AI.SourceGenerator
-- `Fengb3.EasyCodeBuilder` 0.1.4 — Fluent code generation API
+- `Fengb3.EasyCodeBuilder` 0.1.6 — Fluent code generation API
 - `Microsoft.CodeAnalysis.CSharp` 4.11.0 — Roslyn API for source generation
+
+### ManInBlack.AI.Tests
+- `xunit` — Test framework
+- Test helpers: `MockHttpMessageHandler` and `SseResponseBuilder` for mocking HTTP/SSE responses
 
 ## Code Style
 
 - Comments and XML docs are in Chinese
-- C# 10 with file-scoped namespaces, implicit usings, nullable enabled
+- C# with file-scoped namespaces, implicit usings, nullable enabled
+- Uses C# extension syntax (`extension(IServiceCollection services)`) for DI methods
 - IDE: JetBrains Rider
 - Source generator emitters must use EasyCodeBuilder, not raw StringBuilder
