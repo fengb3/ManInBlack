@@ -38,11 +38,11 @@ agent.ParentType = "User";
 // middle ware 顺序, 系统提示, 持久会话
 
 var pipeline = new AgentPipelineBuilder()
+    .Use<MessageEnrichMiddleware>()
     .Use<SystemPromptMiddleware>()
     .Use<ReadPersistenceMiddleware>()
     .Use<SavePersistenceMiddleware>()
     .Use<UserInputMiddleware>()
-    // .Use<CommandToolMiddleware>()
     .Use<ContextCompressMiddleware>()
     .Use<SimpleMathToolMiddleware>()
     .Use<AgentLoopMiddleware>()// Agent Loop 应该在最后一个

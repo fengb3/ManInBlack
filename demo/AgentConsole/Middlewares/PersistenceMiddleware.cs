@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -41,11 +42,6 @@ public class ReadPersistenceMiddleware(string directoryPath = "sessions") : Agen
         {
             context.Messages.Add(message);
         }
-        
-        // Console.ForegroundColor = ConsoleColor.DarkRed;
-        // Console.BackgroundColor = ConsoleColor.Magenta;
-        // Console.WriteLine("add history messages Count" + messages.Count);
-        // Console.ResetColor();
 
         // 执行管道
         await foreach (ChatResponseUpdate update in next().WithCancellation(cancellationToken))
@@ -56,78 +52,40 @@ public class ReadPersistenceMiddleware(string directoryPath = "sessions") : Agen
 }
 
 /// <summary>
-/// 保存会话持久化中间件，将对话消息追加保存到用户对应的会话文件中
+/// 保存会话持久化中间件，每条新消息添加到 context 时立即持久化到会话文件
 /// </summary>
 [ServiceRegister.Scoped]
 public class SavePersistenceMiddleware : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context, 
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next, 
+        AgentContext context,
+        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
         CancellationToken cancellationToken = default)
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<SessionStorage>();
 
-        // 保存用户消息
-        sessionStorage.AppendChatMessage(new ChatMessage(ChatRole.User, context.UserInput));
+        // 用包装集合替换原始 Messages，每添加一条消息立即持久化
+        var original = context.Messages;
+        context.Messages = new PersistingMessageCollection(original, sessionStorage);
 
-        // 收集 assistant 文本，合并为一条消息
-        var textBuffer = new StringBuilder(256);
-        var reasoningBuffer = new StringBuilder(256);
-        var functionCalls = new List<FunctionCallContent>();
-
-        void FlushAssistant()
-        {
-            var contents = new List<AIContent>();
-            if (reasoningBuffer.Length > 0)
-                contents.Add(new TextReasoningContent(reasoningBuffer.ToString()));
-            if (textBuffer.Length > 0)
-                contents.Add(new TextContent(textBuffer.ToString()));
-            if (contents.Count > 0)
-            {
-                sessionStorage.AppendChatMessage(new ChatMessage(ChatRole.Assistant, contents));
-                textBuffer.Clear();
-                reasoningBuffer.Clear();
-            }
-        }
-
-        // 执行管道
         await foreach (ChatResponseUpdate update in next().WithCancellation(cancellationToken))
         {
-            foreach (var content in update.Contents)
-            {
-                switch (content)
-                {
-                    case TextContent text:
-                        textBuffer.Append(text.Text);
-                        break;
-                    case TextReasoningContent reasoning:
-                        reasoningBuffer.Append(reasoning.Text);
-                        break;
-                    case FunctionCallContent fcc:
-                        FlushAssistant();
-                        functionCalls.Add(fcc);
-                        break;
-                    case FunctionResultContent frc:
-                        // 遇到 tool result 时，先保存收集到的 function calls
-                        if (functionCalls.Count > 0)
-                        {
-                            sessionStorage.AppendChatMessage(new ChatMessage(ChatRole.Assistant, functionCalls.Cast<AIContent>().ToList()));
-                            functionCalls.Clear();
-                        }
-                        sessionStorage.AppendChatMessage(new ChatMessage(ChatRole.Tool, [frc]));
-                        break;
-                }
-            }
-
             yield return update;
         }
 
-        // 流结束后保存剩余内容
-        FlushAssistant();
-        if (functionCalls.Count > 0)
+        context.Messages = original;
+    }
+
+    /// <summary>
+    /// 在消息添加到集合时自动持久化（跳过 system 角色）
+    /// </summary>
+    private class PersistingMessageCollection(IList<ChatMessage> list, SessionStorage sessionStorage) : Collection<ChatMessage>(list)
+    {
+        protected override void InsertItem(int index, ChatMessage item)
         {
-            sessionStorage.AppendChatMessage(new ChatMessage(ChatRole.Assistant, functionCalls.Cast<AIContent>().ToList()));
+            base.InsertItem(index, item);
+            if (item.Role != ChatRole.System)
+                sessionStorage.AppendChatMessage(item);
         }
     }
 }
@@ -183,5 +141,9 @@ public class SessionStorage(Agent agent)
         File.AppendAllText(sessionFile, json + Environment.NewLine);
     }
 
-    private static JsonSerializerOptions JsonOptions = new() { WriteIndented = false };
+    private static JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = false,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 }

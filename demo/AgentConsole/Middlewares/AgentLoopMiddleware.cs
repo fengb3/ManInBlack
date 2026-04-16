@@ -22,23 +22,43 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
         while (true)
         {
             var functionCalls = new List<FunctionCallContent>();
+            var textBuilder = new StringBuilder();
+            var reasoningBuilder = new StringBuilder();
 
             await foreach (var update in next().WithCancellation(cancellationToken))
             {
                 foreach (var content in update.Contents)
                 {
-                    if (content is FunctionCallContent fcc)
-                        functionCalls.Add(fcc);
+                    switch (content)
+                    {
+                        case FunctionCallContent fcc:
+                            functionCalls.Add(fcc);
+                            break;
+                        case TextContent text:
+                            textBuilder.Append(text.Text);
+                            break;
+                        case TextReasoningContent reasoning:
+                            reasoningBuilder.Append(reasoning.Text);
+                            break;
+                    }
                 }
 
                 yield return update;
             }
 
+            // 构建 assistant 消息内容（text + reasoning + function calls）
+            var assistantContents = new List<AIContent>();
+            if (reasoningBuilder.Length > 0)
+                assistantContents.Add(new TextReasoningContent(reasoningBuilder.ToString()));
+            if (textBuilder.Length > 0)
+                assistantContents.Add(new TextContent(textBuilder.ToString()));
+            assistantContents.AddRange(functionCalls);
+
+            if (assistantContents.Count > 0)
+                context.Messages.Add(new ChatMessage(ChatRole.Assistant, assistantContents));
+
             if (functionCalls.Count == 0)
                 yield break;
-
-            // 追加 assistant 消息（包含 tool calls）
-            context.Messages.Add(new ChatMessage(ChatRole.Assistant, functionCalls.Cast<AIContent>().ToList()));
 
             // 执行每个 tool call 并将结果通过流式输出
             var toolResults = new List<AIContent>();
@@ -53,13 +73,13 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 
                 await toolExecutor.ExecuteAsync(toolCtx, cancellationToken);
 
-                if (toolCtx.Error != null)
-                {
-                    Console.BackgroundColor = ConsoleColor.Red;
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"Error: {toolCtx.Error}");
-                    Console.ResetColor();
-                }
+                // if (toolCtx.Error != null)
+                // {
+                //     Console.BackgroundColor = ConsoleColor.Red;
+                //     Console.ForegroundColor = ConsoleColor.White;
+                //     Console.WriteLine($"Error: {toolCtx.Error}");
+                //     Console.ResetColor();
+                // }
                 
                 var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
                 toolResults.Add(result);
