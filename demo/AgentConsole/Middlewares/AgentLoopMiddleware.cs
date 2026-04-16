@@ -40,7 +40,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
             // 追加 assistant 消息（包含 tool calls）
             context.Messages.Add(new ChatMessage(ChatRole.Assistant, functionCalls.Cast<AIContent>().ToList()));
 
-            // 执行每个 tool call
+            // 执行每个 tool call 并将结果通过流式输出
             var toolResults = new List<AIContent>();
             foreach (var fc in functionCalls)
             {
@@ -52,7 +52,18 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
                 };
 
                 await toolExecutor.ExecuteAsync(toolCtx, cancellationToken);
-                toolResults.Add(new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result));
+
+                if (toolCtx.Error != null)
+                {
+                    Console.BackgroundColor = ConsoleColor.Red;
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"Error: {toolCtx.Error}");
+                    Console.ResetColor();
+                }
+                
+                var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
+                toolResults.Add(result);
+                yield return new ChatResponseUpdate(ChatRole.Tool, [result]);
             }
 
             context.Messages.Add(new ChatMessage(ChatRole.Tool, toolResults));

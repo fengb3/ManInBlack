@@ -17,7 +17,7 @@ public class FileContextMiddleware(string directoryPath) : AgentMiddleware
         // 记录请求
         var requestPath = Path.Combine(directoryPath, $"{id}_request.json");
         await File.WriteAllTextAsync(requestPath,
-            $"Messages: {context.Messages.Count}, Streaming: {context.IsStreaming}", cancellationToken);
+            $"Messages: {context.Messages.Count}", cancellationToken);
 
         // 收集响应并记录
         var sb = new StringBuilder();

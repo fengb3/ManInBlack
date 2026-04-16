@@ -11,6 +11,16 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// 服务提供者，用于依赖注入
     /// </summary>
     public IServiceProvider ServiceProvider { get; } = serviceProvider;
+    
+    /// <summary>
+    /// 系统提示词
+    /// </summary>
+    public string SystemPrompt { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// 本轮用户输入的原始文本，供中间件参考，但不一定会直接发送给模型
+    /// </summary>
+    public string UserInput { get; set; } = string.Empty;
 
     /// <summary>
     /// 聊天消息列表，中间件可对其进行修改
@@ -21,11 +31,6 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// 聊天选项，中间件可对其进行修改
     /// </summary>
     public ChatOptions? Options { get; set; }
-
-    /// <summary>
-    /// 是否为流式请求
-    /// </summary>
-    public bool IsStreaming { get; set; }
 
     /// <summary>
     /// 中间件之间共享的状态字典
