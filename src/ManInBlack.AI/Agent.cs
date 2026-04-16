@@ -1,8 +1,3 @@
-using System.Text;
-using ManInBlack.AI.Attributes;
-using ManInBlack.AI.Middleware;
-using Microsoft.Extensions.AI;
-
 namespace ManInBlack.AI;
 
 /// <summary>
@@ -10,11 +5,11 @@ namespace ManInBlack.AI;
 /// </summary>
 public class Agent
 {
-    public string AgentId { get; set; }
-    public string ParentId { get; set; }
-    
+    public string AgentId { get; set; } = string.Empty;
+    public string ParentId { get; set; } = string.Empty;
+
     /// <summary>
     /// can be User or 'Agent'
     /// </summary>
-    public string ParentType { get; set; }
+    public string ParentType { get; set; } = string.Empty;
 }

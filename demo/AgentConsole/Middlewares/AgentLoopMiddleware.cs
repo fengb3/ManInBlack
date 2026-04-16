@@ -48,7 +48,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
                 {
                     ToolName = fc.Name,
                     CallId = fc.CallId,
-                    Arguments = fc.Arguments as Dictionary<string, object?> ?? new Dictionary<string, object?>()
+                    Arguments = fc.Arguments
                 };
 
                 await toolExecutor.ExecuteAsync(toolCtx, cancellationToken);

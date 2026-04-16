@@ -136,15 +136,22 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
     {
         var messageList = messages.ToList();
 
+        var systemText = string.Join("\n", messageList
+            .Where(m => m.Role == ChatRole.System)
+            .Select(m => m.Text)
+            .Where(t => !string.IsNullOrEmpty(t)));
+
         var body = new JsonObject
         {
             ["model"] = _modelId,
             ["max_tokens"] = options?.MaxOutputTokens ?? 4096,
-            ["temperature"] = (double?)(options?.Temperature ?? 1.0),
             ["top_p"] = (double?)options?.TopP,
-            ["system"] = messageList.FirstOrDefault(m => m.Role == ChatRole.System)?.Text,
+            ["system"] = string.IsNullOrEmpty(systemText) ? null : systemText,
             ["messages"] = SerializeMessages(messageList.Where(m => m.Role != ChatRole.System))
         };
+
+        if (options?.Temperature is not null)
+            body["temperature"] = (double?)options.Temperature;
 
         if (stream)
             body["stream"] = true;
@@ -167,6 +174,17 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
             {
                 // assistant 消息含 tool_use
                 var contentArray = new JsonArray();
+
+                // 保留 assistant 的文本内容
+                if (!string.IsNullOrEmpty(msg.Text))
+                {
+                    contentArray.Add(new JsonObject
+                    {
+                        ["type"] = "text",
+                        ["text"] = msg.Text
+                    });
+                }
+
                 foreach (var fc in functionCalls)
                 {
                     contentArray.Add(new JsonObject

@@ -384,7 +384,7 @@ public class AnthropicCompatibleChatClientTests
     }
 
     [Fact]
-    public async Task BuildRequest_DefaultTemperature_为1点0()
+    public async Task BuildRequest_未设Temperature_不发送Temperature字段()
     {
         var handler = new MockHttpMessageHandler("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}""");
         var client = CreateClient(handler);
@@ -392,7 +392,8 @@ public class AnthropicCompatibleChatClientTests
         await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
 
         var body = JsonDocument.Parse(handler.LastRequestBody!);
-        Assert.Equal(1.0, body.RootElement.GetProperty("temperature").GetDouble(), 1);
+        // 未设置 temperature 时不应发送该字段，由模型使用默认值
+        Assert.False(body.RootElement.TryGetProperty("temperature", out _));
     }
 
     [Fact]
@@ -471,6 +472,96 @@ public class AnthropicCompatibleChatClientTests
         Assert.Equal("toolu_1", content[0].GetProperty("tool_use_id").GetString());
         Assert.Equal("tool_result", content[1].GetProperty("type").GetString());
         Assert.Equal("toolu_2", content[1].GetProperty("tool_use_id").GetString());
+    }
+
+    #endregion
+
+    #region URL 路径
+
+    [Fact]
+    public async Task CreateChatClient_AnthropicProviderBaseUrl_无重复V1路径()
+    {
+        // 模拟 CreateChatClient 中对 AnthropicProvider.BaseUrl 的处理逻辑
+        var handler = new MockHttpMessageHandler("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}""");
+        var provider = new AnthropicProvider { ApiKey = "test-key" };
+
+        // 复现 CreateChatClient 中的 BaseAddress 设置逻辑
+        var http = new HttpClient(handler);
+        http.BaseAddress = provider.BaseUrl.EndsWith('/')
+            ? new Uri(provider.BaseUrl)
+            : new Uri(provider.BaseUrl + "/");
+        http.DefaultRequestHeaders.Add("x-api-key", provider.ApiKey);
+        http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+        var client = new AnthropicCompatibleChatClient(http, "test-model");
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        var requestUrl = handler.LastRequest!.RequestUri!.ToString();
+        Assert.DoesNotContain("/v1/v1/", requestUrl);
+        Assert.Equal("https://api.anthropic.com/v1/messages", requestUrl);
+    }
+
+    #endregion
+
+    #region 请求序列化补全
+
+    [Fact]
+    public async Task BuildRequest_Assistant消息含文本和ToolUse_内容不丢失()
+    {
+        var handler = new MockHttpMessageHandler("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}""");
+        var client = CreateClient(handler);
+
+        // assistant 消息同时有文本和 function call
+        var assistantMsg = new ChatMessage(ChatRole.Assistant, "让我查一下天气。");
+        assistantMsg.Contents.Add(new FunctionCallContent("toolu_1", "get_weather", new Dictionary<string, object?> { ["city"] = "Beijing" }));
+
+        await client.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "天气"),
+            assistantMsg
+        ]);
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!);
+        var messages = body.RootElement.GetProperty("messages");
+
+        var toolUseMsg = messages[1];
+        Assert.Equal("assistant", toolUseMsg.GetProperty("role").GetString());
+        var content = toolUseMsg.GetProperty("content");
+
+        // Anthropic: content 应包含 text 和 tool_use 两个块
+        var types = new List<string>();
+        for (var i = 0; i < content.GetArrayLength(); i++)
+            types.Add(content[i].GetProperty("type").GetString()!);
+
+        Assert.Contains("text", types);
+        Assert.Contains("tool_use", types);
+
+        // 验证文本内容
+        var textBlock = content.EnumerateArray().First(b => b.GetProperty("type").GetString() == "text");
+        Assert.Equal("让我查一下天气。", textBlock.GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task BuildRequest_多条System消息_内容拼接()
+    {
+        var handler = new MockHttpMessageHandler("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}""");
+        var client = CreateClient(handler);
+
+        await client.GetResponseAsync([
+            new ChatMessage(ChatRole.System, "你是助手"),
+            new ChatMessage(ChatRole.System, "请用中文回答"),
+            new ChatMessage(ChatRole.User, "你好")
+        ]);
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!);
+
+        // 多条 System 消息应拼接为一条
+        var system = body.RootElement.GetProperty("system").GetString();
+        Assert.Contains("你是助手", system);
+        Assert.Contains("请用中文回答", system);
+
+        // messages 数组不含 system
+        var messages = body.RootElement.GetProperty("messages");
+        Assert.Equal(1, messages.GetArrayLength());
     }
 
     #endregion

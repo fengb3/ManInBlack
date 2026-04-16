@@ -64,6 +64,8 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
+        var callIdCounter = 0;
+
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
         {
@@ -97,10 +99,11 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                     var args = fc.Args.HasValue
                         ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
                         : new Dictionary<string, object?>();
+                    var callId = $"call_{callIdCounter++}";
                     yield return new ChatResponseUpdate
                     {
                         Role = ChatRole.Assistant,
-                        Contents = [new FunctionCallContent("", fc.Name ?? "", args)]
+                        Contents = [new FunctionCallContent(callId, fc.Name ?? "", args)]
                     };
                 }
             }
@@ -241,6 +244,7 @@ public sealed class GeminiCompatibleChatClient : IChatClient
 
         if (candidate.Content?.Parts is not null)
         {
+            var callIdCounter = 0;
             foreach (var part in candidate.Content.Parts)
             {
                 if (part.Text is not null)
@@ -251,7 +255,8 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                     var args = fc.Args.HasValue
                         ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
                         : new Dictionary<string, object?>();
-                    contents.Add(new FunctionCallContent("", fc.Name ?? "", args));
+                    var callId = $"call_{callIdCounter++}";
+                    contents.Add(new FunctionCallContent(callId, fc.Name ?? "", args));
                 }
             }
         }

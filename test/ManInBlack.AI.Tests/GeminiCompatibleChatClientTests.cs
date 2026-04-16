@@ -537,6 +537,72 @@ public class GeminiCompatibleChatClientTests
 
     #endregion
 
+    #region FunctionCall CallId
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_多个FunctionCall_各自有独立CallId()
+    {
+        var chunks = new[]
+        {
+            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"get_weather","args":{"city":"BJ"}}},{"functionCall":{"name":"get_time","args":{"tz":"UTC"}}}],"role":"model"}}]}"""
+        };
+        var stream = SseResponseBuilder.BuildWithDone(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        var toolCalls = updates.SelectMany(u => u.Contents.OfType<FunctionCallContent>()).ToList();
+        Assert.Equal(2, toolCalls.Count);
+
+        // 每个 FunctionCallContent 应有非空且不同的 CallId
+        Assert.False(string.IsNullOrEmpty(toolCalls[0].CallId));
+        Assert.False(string.IsNullOrEmpty(toolCalls[1].CallId));
+        Assert.NotEqual(toolCalls[0].CallId, toolCalls[1].CallId);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_多个FunctionCall_各自有独立CallId()
+    {
+        var json = """
+                   {
+                       "candidates": [{
+                           "content": {
+                               "parts": [
+                                   {"functionCall": {"name": "get_weather", "args": {"city": "BJ"}}},
+                                   {"functionCall": {"name": "get_time", "args": {"tz": "UTC"}}}
+                               ],
+                               "role": "model"
+                           },
+                           "finishReason": "STOP"
+                       }],
+                       "usageMetadata": {
+                           "promptTokenCount": 10,
+                           "candidatesTokenCount": 10,
+                           "totalTokenCount": 20
+                       }
+                   }
+                   """;
+        var handler = new MockHttpMessageHandler(json);
+        var client = CreateClient(handler);
+
+        var response = await client.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "天气和时间")
+        ]);
+
+        var toolCalls = response.Messages[0].Contents.OfType<FunctionCallContent>().ToList();
+        Assert.Equal(2, toolCalls.Count);
+
+        // 每个 FunctionCallContent 应有非空且不同的 CallId
+        Assert.False(string.IsNullOrEmpty(toolCalls[0].CallId));
+        Assert.False(string.IsNullOrEmpty(toolCalls[1].CallId));
+        Assert.NotEqual(toolCalls[0].CallId, toolCalls[1].CallId);
+    }
+
+    #endregion
+
     #region 服务与生命周期
 
     [Fact]
