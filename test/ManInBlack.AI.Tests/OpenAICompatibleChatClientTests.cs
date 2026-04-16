@@ -294,7 +294,7 @@ public class OpenAICompatibleChatClientTests
     }
 
     [Fact]
-    public async Task GetStreamingResponseAsync_ReasoningContent_作为TextContent返回()
+    public async Task GetStreamingResponseAsync_ReasoningContent_作为TextReasoningContent返回()
     {
         var chunks = new[]
         {
@@ -310,10 +310,13 @@ public class OpenAICompatibleChatClientTests
         await foreach (var update in client.GetStreamingResponseAsync([]))
             updates.Add(update);
 
-        var allText = string.Concat(updates.SelectMany(u => u.Contents.OfType<TextContent>().Select(t => t.Text)));
-        // reasoning_content 和 content 都应该被返回
-        Assert.Contains("Let me think about it", allText);
-        Assert.Contains("答案是42", allText);
+        // reasoning_content 应作为 TextReasoningContent 返回
+        var reasoning = string.Concat(updates.SelectMany(u => u.Contents.OfType<TextReasoningContent>().Select(t => t.Text)));
+        Assert.Equal("Let me think about it", reasoning);
+
+        // content 应作为 TextContent 返回
+        var text = string.Concat(updates.SelectMany(u => u.Contents.OfType<TextContent>().Select(t => t.Text)));
+        Assert.Equal("答案是42", text);
     }
 
     [Fact]
@@ -510,7 +513,7 @@ public class OpenAICompatibleChatClientTests
     }
 
     [Fact]
-    public async Task BuildRequest_ChatOptions为Null_字段为Null()
+    public async Task BuildRequest_ChatOptions为Null_不包含可选字段()
     {
         var handler = new MockHttpMessageHandler("""{"choices":[{"message":{"content":"ok","role":"assistant"},"finish_reason":"stop"}]}""");
         var client = CreateClient(handler);
@@ -518,9 +521,9 @@ public class OpenAICompatibleChatClientTests
         await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
 
         var body = JsonDocument.Parse(handler.LastRequestBody!);
-        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("max_tokens").ValueKind);
-        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("temperature").ValueKind);
-        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("top_p").ValueKind);
+        Assert.False(body.RootElement.TryGetProperty("max_tokens", out _));
+        Assert.False(body.RootElement.TryGetProperty("temperature", out _));
+        Assert.False(body.RootElement.TryGetProperty("top_p", out _));
     }
 
     [Fact]
@@ -570,6 +573,49 @@ public class OpenAICompatibleChatClientTests
         Assert.Equal("call_1", toolCalls[0].GetProperty("id").GetString());
         Assert.Equal("get_time", toolCalls[1].GetProperty("function").GetProperty("name").GetString());
         Assert.Equal("call_2", toolCalls[1].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task BuildRequest_多个FunctionResultContent_各自序列化为独立Tool消息()
+    {
+        var handler = new MockHttpMessageHandler("""{"choices":[{"message":{"content":"ok","role":"assistant"},"finish_reason":"stop"}]}""");
+        var client = CreateClient(handler);
+
+        var assistantMsg = new ChatMessage(ChatRole.Assistant,
+        [
+            new FunctionCallContent("call_1", "get_weather", new Dictionary<string, object?> { ["city"] = "Beijing" }),
+            new FunctionCallContent("call_2", "get_time", new Dictionary<string, object?> { ["tz"] = "UTC" })
+        ]);
+        var toolResultMsg = new ChatMessage(ChatRole.Tool,
+        [
+            new FunctionResultContent("call_1", "晴天"),
+            new FunctionResultContent("call_2", "12:00")
+        ]);
+
+        await client.GetResponseAsync([
+            new ChatMessage(ChatRole.User, "天气和时间"),
+            assistantMsg,
+            toolResultMsg
+        ]);
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!);
+        var messages = body.RootElement.GetProperty("messages");
+
+        // assistant 消息（index 1）应含 tool_calls
+        var assistantJson = messages[1];
+        Assert.True(assistantJson.TryGetProperty("tool_calls", out var toolCalls));
+        Assert.Equal(2, toolCalls.GetArrayLength());
+
+        // 多个 FunctionResultContent 应各自生成独立的 tool 消息
+        var toolMsg1 = messages[2];
+        Assert.Equal("tool", toolMsg1.GetProperty("role").GetString());
+        Assert.Equal("call_1", toolMsg1.GetProperty("tool_call_id").GetString());
+        Assert.Equal("晴天", toolMsg1.GetProperty("content").GetString());
+
+        var toolMsg2 = messages[3];
+        Assert.Equal("tool", toolMsg2.GetProperty("role").GetString());
+        Assert.Equal("call_2", toolMsg2.GetProperty("tool_call_id").GetString());
+        Assert.Equal("12:00", toolMsg2.GetProperty("content").GetString());
     }
 
     #endregion

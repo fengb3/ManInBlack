@@ -1,8 +1,5 @@
-using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Win32;
 
 namespace ManInBlack.AI;
 
@@ -55,7 +52,7 @@ public sealed class OpenAIProvider : ModelProvider
 public sealed class AnthropicProvider : ModelProvider
 {
     public override string ProviderName => "Anthropic";
-    public override string BaseUrl { get; set; } = "https://api.anthropic.com/v1";
+    public override string BaseUrl { get; set; } = "https://api.anthropic.com";
     public override string CompatibleWith => "Anthropic";
 }
 
@@ -201,8 +198,8 @@ public sealed class ModelProviderRegistry
 
 public sealed class ModelChoice
 {
-    public ModelProvider Provider { get; set; }
-    public string ModelId { get; set; }
+    public ModelProvider Provider { get; set; } = null!;
+    public string ModelId { get; set; } = string.Empty;
 }
 
 public static class ChatClientProviderExtensions

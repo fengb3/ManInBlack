@@ -141,11 +141,15 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         var body = new JsonObject
         {
             ["model"] = _modelId,
-            ["messages"] = SerializeMessages(messages),
-            ["max_tokens"] = options?.MaxOutputTokens,
-            ["temperature"] = (double?)options?.Temperature,
-            ["top_p"] = (double?)options?.TopP
+            ["messages"] = SerializeMessages(messages)
         };
+
+        if (options?.MaxOutputTokens is not null)
+            body["max_tokens"] = options.MaxOutputTokens;
+        if (options?.Temperature is not null)
+            body["temperature"] = (double?)options.Temperature;
+        if (options?.TopP is not null)
+            body["top_p"] = (double?)options.TopP;
 
         if (stream)
             body["stream"] = true;
@@ -187,9 +191,18 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             }
             else if (functionResults.Count > 0)
             {
-                var result = functionResults[0];
-                obj["tool_call_id"] = result.CallId;
-                obj["content"] = result.Result?.ToString();
+                // 每个 FunctionResultContent 生成独立的 tool 消息
+                foreach (var result in functionResults)
+                {
+                    array.Add(new JsonObject
+                    {
+                        ["role"] = "tool",
+                        ["tool_call_id"] = result.CallId,
+                        ["content"] = result.Result?.ToString()
+                    });
+                }
+                // 跳过外层的 array.Add(obj)，因为已经手动添加了
+                continue;
             }
             else
             {
