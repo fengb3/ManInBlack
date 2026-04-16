@@ -58,6 +58,8 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
         // 累积 tool_use 分片：index → (id, name, partialJson)
         var toolUseBlocks = new Dictionary<int, (string Id, string Name, StringBuilder PartialJson)>();
+        long? inputTokens = null;
+        long? outputTokens = null;
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -129,6 +131,35 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
                     toolUseBlocks.Remove(index);
                 }
             }
+            // message_start → 提取 input_tokens
+            else if (type == "message_start")
+            {
+                var usage = node["message"]?["usage"];
+                if (usage is not null)
+                    inputTokens = usage["input_tokens"]?.GetValue<int>();
+            }
+            // message_delta → 提取 output_tokens
+            else if (type == "message_delta")
+            {
+                var usage = node["usage"];
+                if (usage is not null)
+                    outputTokens = usage["output_tokens"]?.GetValue<int>();
+            }
+        }
+
+        // 流结束后输出 usage
+        if (inputTokens is not null || outputTokens is not null)
+        {
+            yield return new ChatResponseUpdate
+            {
+                Role = ChatRole.Assistant,
+                Contents = [new UsageContent(new UsageDetails
+                {
+                    InputTokenCount = inputTokens,
+                    OutputTokenCount = outputTokens,
+                    TotalTokenCount = (inputTokens ?? 0) + (outputTokens ?? 0)
+                })]
+            };
         }
     }
 
@@ -280,14 +311,11 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
-        {
-            AdditionalProperties = new AdditionalPropertiesDictionary()
-        };
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
 
         if (result.Usage is not null)
         {
-            chatResponse.AdditionalProperties["Usage"] = new
+            chatResponse.Usage = new UsageDetails
             {
                 InputTokenCount = result.Usage.InputTokens,
                 OutputTokenCount = result.Usage.OutputTokens,

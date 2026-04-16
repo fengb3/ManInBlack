@@ -56,6 +56,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
         // 累积 tool call 分片
         var toolCalls = new Dictionary<int, (string Id, string Name, StringBuilder Arguments)>();
+        UsageDetails? lastUsage = null;
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -70,6 +71,17 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             OpenAIStreamChunk? chunk = null;
             try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr, JsonOptions); }
             catch { }
+
+            // 追踪 usage（最后一个非 null 的为最终值）
+            if (chunk?.Usage is not null)
+            {
+                lastUsage = new UsageDetails
+                {
+                    InputTokenCount = chunk.Usage.PromptTokens,
+                    OutputTokenCount = chunk.Usage.CompletionTokens,
+                    TotalTokenCount = chunk.Usage.PromptTokens + chunk.Usage.CompletionTokens
+                };
+            }
 
             var choice = chunk?.Choices?.FirstOrDefault();
             if (choice is null) continue;
@@ -134,6 +146,16 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 toolCalls.Clear();
             }
         }
+
+        // 流结束后输出 usage
+        if (lastUsage is not null)
+        {
+            yield return new ChatResponseUpdate
+            {
+                Role = ChatRole.Assistant,
+                Contents = [new UsageContent(lastUsage)]
+            };
+        }
     }
 
     private string BuildRequestBody(IEnumerable<ChatMessage> messages, ChatOptions? options, bool stream)
@@ -152,7 +174,10 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             body["top_p"] = (double?)options.TopP;
 
         if (stream)
+        {
             body["stream"] = true;
+            body["stream_options"] = new JsonObject { ["include_usage"] = true };
+        }
 
         if (options?.Tools?.Count > 0)
             body["tools"] = SerializeTools(options.Tools);
@@ -265,14 +290,11 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
-        {
-            AdditionalProperties = new AdditionalPropertiesDictionary()
-        };
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
 
         if (result.Usage is not null)
         {
-            chatResponse.AdditionalProperties["Usage"] = new
+            chatResponse.Usage = new UsageDetails
             {
                 InputTokenCount = result.Usage.PromptTokens,
                 OutputTokenCount = result.Usage.CompletionTokens,
@@ -337,6 +359,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIStreamChunk
     {
         public List<OpenAIStreamChoice>? Choices { get; set; }
+        public OpenAIUsage? Usage { get; set; }
     }
 
     private class OpenAIStreamChoice

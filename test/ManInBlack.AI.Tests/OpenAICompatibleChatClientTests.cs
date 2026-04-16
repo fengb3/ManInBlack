@@ -130,7 +130,10 @@ public class OpenAICompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        Assert.True(response.AdditionalProperties.ContainsKey("Usage"));
+        Assert.NotNull(response.Usage);
+        Assert.Equal(100, response.Usage.InputTokenCount);
+        Assert.Equal(50, response.Usage.OutputTokenCount);
+        Assert.Equal(150, response.Usage.TotalTokenCount);
     }
 
     [Fact]
@@ -156,15 +159,14 @@ public class OpenAICompatibleChatClientTests
     }
 
     [Fact]
-    public async Task GetResponseAsync_Usage信息_TokenCount值正确()
+    public async Task GetResponseAsync_无Usage_返回Null()
     {
         var json = """
                    {
                        "choices": [{
                            "message": { "content": "ok", "role": "assistant" },
                            "finish_reason": "stop"
-                       }],
-                       "usage": { "prompt_tokens": 100, "completion_tokens": 50 }
+                       }]
                    }
                    """;
         var handler = new MockHttpMessageHandler(json);
@@ -174,11 +176,7 @@ public class OpenAICompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        var usageJson = JsonSerializer.Serialize(response.AdditionalProperties["Usage"]);
-        var usage = JsonDocument.Parse(usageJson);
-        Assert.Equal(100, usage.RootElement.GetProperty("InputTokenCount").GetInt32());
-        Assert.Equal(50, usage.RootElement.GetProperty("OutputTokenCount").GetInt32());
-        Assert.Equal(150, usage.RootElement.GetProperty("TotalTokenCount").GetInt32());
+        Assert.Null(response.Usage);
     }
 
     [Fact]
@@ -386,6 +384,50 @@ public class OpenAICompatibleChatClientTests
         Assert.Equal("test", fcc.Arguments["q"]?.ToString());
     }
 
+    [Fact]
+    public async Task GetStreamingResponseAsync_有UsageChunk_最后一个为UsageContent()
+    {
+        var chunks = new[]
+        {
+            """{"choices":[{"delta":{"content":"hi"}}]}""",
+            """{"choices":[{"delta":{"content":" there"}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"stop"}]}""",
+            """{"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5}}"""
+        };
+        var stream = SseResponseBuilder.BuildWithDone(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        var usageContent = updates.SelectMany(u => u.Contents.OfType<UsageContent>()).FirstOrDefault();
+        Assert.NotNull(usageContent);
+        Assert.Equal(10, usageContent.Details.InputTokenCount);
+        Assert.Equal(5, usageContent.Details.OutputTokenCount);
+        Assert.Equal(15, usageContent.Details.TotalTokenCount);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_无UsageChunk_无UsageContent()
+    {
+        var chunks = new[]
+        {
+            """{"choices":[{"delta":{"content":"hi"}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"stop"}]}"""
+        };
+        var stream = SseResponseBuilder.BuildWithDone(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        Assert.Empty(updates.SelectMany(u => u.Contents.OfType<UsageContent>()));
+    }
+
     #endregion
 
     #region 请求构建
@@ -453,6 +495,8 @@ public class OpenAICompatibleChatClientTests
         var body = JsonDocument.Parse(handler.LastRequestBody!);
         Assert.True(body.RootElement.TryGetProperty("stream", out var streamProp));
         Assert.True(streamProp.GetBoolean());
+        Assert.True(body.RootElement.TryGetProperty("stream_options", out var streamOpts));
+        Assert.True(streamOpts.GetProperty("include_usage").GetBoolean());
     }
 
     [Fact]
