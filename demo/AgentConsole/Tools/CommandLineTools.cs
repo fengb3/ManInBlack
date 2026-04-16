@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using ManInBlack.AI.Attributes;
+using ManInBlack.AI.Tools;
 
 namespace AgentConsole.Tools;
 
@@ -16,6 +17,7 @@ public partial class CommandLineTools
     /// <param name="command">The PowerShell command to execute</param>
     /// <returns>The output of the executed command</returns>
     [AiTool]
+    [AiTool.HasFilter<LoggingFilter>]
     public string RunPowershell(string command)
     {
         var processInfo = new ProcessStartInfo
@@ -29,7 +31,7 @@ public partial class CommandLineTools
             CreateNoWindow         = true,
         };
         processInfo.ArgumentList.Add("-Command");
-        processInfo.ArgumentList.Add(command);
+        processInfo.ArgumentList.Add($"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {command}");
         using var process = Process.Start(processInfo);
         if (process == null)
             return "Failed to start PowerShell process.";
@@ -74,5 +76,24 @@ public partial class CommandLineTools
         return !string.IsNullOrEmpty(error)
             ? $"Bash error: {error.Trim()}"
             : output.Trim();
+    }
+}
+
+[ServiceRegister.Scoped]
+public class LoggingFilter : ToolCallFilter
+{
+    public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
+    {
+        var arguments = context.Arguments.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
+        
+        // set console color for better visibility
+        var originalColor = Console.ForegroundColor;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine();
+        Console.WriteLine($"[ToolCall] {context.ToolName} ({string.Join(",", arguments)})");
+        await next(context);
+        var result = context.Result;
+        Console.WriteLine($"[ToolResult] {context.ToolName} => {result}");
+        Console.ForegroundColor = originalColor;
     }
 }

@@ -41,8 +41,11 @@ public class AgentPipelineBuilder
         
         var chatClient = serviceProvider.GetRequiredService<IChatClient>();
         
-        Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> pipeline = context =>
-            chatClient.GetStreamingResponseAsync(context.Messages, context.Options);
+        // message 第0条为 system prompt，最后1条为 user input，中间为 assistant 和 tool 消息
+        Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> pipeline = 
+            context => {
+                return chatClient.GetStreamingResponseAsync(context.Messages, context.Options);
+            };
         
             
         // 反向包裹中间件

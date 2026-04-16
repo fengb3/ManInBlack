@@ -240,22 +240,20 @@ public static class ToolCallerEmitter
     /// </summary>
     private static string ConvertExpr(string varName, string targetType, ToolParameterModel param)
     {
-        // string 类型直接 as 转换
+        // string 类型：优先 as 转换，JsonElement 用 GetString()
         if (targetType == "string" || targetType == "System.String")
-            return $"{varName} as string ?? {varName}?.ToString()";
+            return $"{varName} as string ?? ({varName} is System.Text.Json.JsonElement {varName}_je ? {varName}_je.GetString() : {varName}?.ToString())";
 
-        // bool 特殊处理
-        if (targetType == "bool" || targetType == "System.Boolean")
-            return $"{varName} is bool {varName}_b ? {varName}_b : Convert.ToBoolean({varName})";
-
-        // 常见值类型：先检查是否已装箱为正确类型，否则用 Convert
+        // 值类型：先检查是否已装箱为正确类型，再处理 JsonElement（支持 Number 和 String 类型），最后用 Convert
         if (param.IsValueType)
         {
+            // 从 JsonElement 提取文本：String 类型用 GetString()，Number 等类型用 GetRawText()
+            var jeExtract = $"{varName} is System.Text.Json.JsonElement {varName}_je ? ({varName}_je.ValueKind == System.Text.Json.JsonValueKind.String ? {varName}_je.GetString() : {varName}_je.GetRawText()) : {varName}";
             var convertMethod = GetConvertMethod(targetType);
             if (!string.IsNullOrEmpty(convertMethod))
-                return $"{varName} is {targetType} {varName}_v ? {varName}_v : {convertMethod}({varName})";
+                return $"{varName} is {targetType} {varName}_v ? {varName}_v : {convertMethod}({jeExtract})";
             // 未知值类型，使用 ChangeType 并传入 typeof
-            return $"{varName} is {targetType} {varName}_v ? {varName}_v : ({targetType})System.Convert.ChangeType({varName}, typeof({targetType}))";
+            return $"{varName} is {targetType} {varName}_v ? {varName}_v : ({targetType})System.Convert.ChangeType({jeExtract}, typeof({targetType}))";
         }
 
         // 引用类型：直接 as 转换

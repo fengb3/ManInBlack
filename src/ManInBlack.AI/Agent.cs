@@ -1,4 +1,5 @@
 using System.Text;
+using ManInBlack.AI.Attributes;
 using ManInBlack.AI.Middleware;
 using Microsoft.Extensions.AI;
 

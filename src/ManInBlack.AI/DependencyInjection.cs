@@ -26,6 +26,7 @@ public static class DependencyInjection
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
+            services.AddScoped<Agent>();
 
             services.AddHttpClient();
             services.AddSingleton(options.ModelChoice);
