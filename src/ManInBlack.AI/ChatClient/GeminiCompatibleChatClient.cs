@@ -65,6 +65,7 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         using var reader = new StreamReader(stream);
 
         var callIdCounter = 0;
+        UsageDetails? lastUsage = null;
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -79,6 +80,17 @@ public sealed class GeminiCompatibleChatClient : IChatClient
             GeminiResponse? result = null;
             try { result = JsonSerializer.Deserialize<GeminiResponse>(jsonStr, JsonOptions); }
             catch { }
+
+            // 追踪 usage（最后一个非 null 的为最终值）
+            if (result?.UsageMetadata is not null)
+            {
+                lastUsage = new UsageDetails
+                {
+                    InputTokenCount = result.UsageMetadata.PromptTokenCount,
+                    OutputTokenCount = result.UsageMetadata.CandidatesTokenCount,
+                    TotalTokenCount = result.UsageMetadata.TotalTokenCount
+                };
+            }
 
             var parts = result?.Candidates?.FirstOrDefault()?.Content?.Parts;
             if (parts is null) continue;
@@ -107,6 +119,16 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                     };
                 }
             }
+        }
+
+        // 流结束后输出 usage
+        if (lastUsage is not null)
+        {
+            yield return new ChatResponseUpdate
+            {
+                Role = ChatRole.Assistant,
+                Contents = [new UsageContent(lastUsage)]
+            };
         }
     }
 
@@ -262,14 +284,11 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         }
 
         var chatMessage = new ChatMessage(ChatRole.Assistant, contents);
-        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage })
-        {
-            AdditionalProperties = new AdditionalPropertiesDictionary()
-        };
+        var chatResponse = new ChatResponse(new List<ChatMessage> { chatMessage });
 
         if (result.UsageMetadata is not null)
         {
-            chatResponse.AdditionalProperties["Usage"] = new
+            chatResponse.Usage = new UsageDetails
             {
                 InputTokenCount = result.UsageMetadata.PromptTokenCount,
                 OutputTokenCount = result.UsageMetadata.CandidatesTokenCount,

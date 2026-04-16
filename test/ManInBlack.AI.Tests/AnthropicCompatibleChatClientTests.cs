@@ -108,7 +108,10 @@ public class AnthropicCompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        Assert.True(response.AdditionalProperties.ContainsKey("Usage"));
+        Assert.NotNull(response.Usage);
+        Assert.Equal(100, response.Usage.InputTokenCount);
+        Assert.Equal(50, response.Usage.OutputTokenCount);
+        Assert.Equal(150, response.Usage.TotalTokenCount);
     }
 
     [Fact]
@@ -139,11 +142,10 @@ public class AnthropicCompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        var usageJson = JsonSerializer.Serialize(response.AdditionalProperties["Usage"]);
-        var usage = JsonDocument.Parse(usageJson);
-        Assert.Equal(100, usage.RootElement.GetProperty("InputTokenCount").GetInt32());
-        Assert.Equal(50, usage.RootElement.GetProperty("OutputTokenCount").GetInt32());
-        Assert.Equal(150, usage.RootElement.GetProperty("TotalTokenCount").GetInt32());
+        Assert.NotNull(response.Usage);
+        Assert.Equal(100, response.Usage.InputTokenCount);
+        Assert.Equal(50, response.Usage.OutputTokenCount);
+        Assert.Equal(150, response.Usage.TotalTokenCount);
     }
 
     [Fact]
@@ -261,6 +263,32 @@ public class AnthropicCompatibleChatClientTests
             updates.Add(update);
 
         Assert.Empty(updates);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_messageStartAndDelta_产生UsageContent()
+    {
+        var chunks = new[]
+        {
+            """{"type":"message_start","message":{"id":"msg_1","role":"assistant","usage":{"input_tokens":25}}}""",
+            """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
+            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}""",
+            """{"type":"content_block_stop","index":0}""",
+            """{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}"""
+        };
+        var stream = SseResponseBuilder.Build(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        var usageContent = updates.SelectMany(u => u.Contents.OfType<UsageContent>()).FirstOrDefault();
+        Assert.NotNull(usageContent);
+        Assert.Equal(25, usageContent.Details.InputTokenCount);
+        Assert.Equal(10, usageContent.Details.OutputTokenCount);
+        Assert.Equal(35, usageContent.Details.TotalTokenCount);
     }
 
     #endregion

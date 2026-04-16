@@ -40,6 +40,9 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
                         case TextReasoningContent reasoning:
                             reasoningBuilder.Append(reasoning.Text);
                             break;
+                    case UsageContent usageContent:
+                        context.AccumulatedUsage.Add(usageContent.Details);
+                        break;
                     }
                 }
 

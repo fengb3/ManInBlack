@@ -38,6 +38,11 @@ public class AgentContext(IServiceProvider serviceProvider)
     public IDictionary<string, object> Items { get; } = new Dictionary<string, object>();
 
     /// <summary>
+    /// 累积的 token 用量，由 AgentLoopMiddleware 从流式响应中提取
+    /// </summary>
+    public UsageDetails AccumulatedUsage { get; } = new();
+
+    /// <summary>
     /// 取消令牌，用于优雅停止
     /// </summary>
     public CancellationToken CancellationToken { get; set; }

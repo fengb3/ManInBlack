@@ -92,6 +92,17 @@ await foreach (ChatResponseUpdate update in updates)
             case TextContent text:
                 Console.Write(text.Text);
                 break;
+            case UsageContent:
+                // usage 由 AgentLoopMiddleware 累积，不显示
+                break;
         }
     }
+}
+
+Console.WriteLine();
+Console.WriteLine();
+var usage = agentContext.AccumulatedUsage;
+if (usage.InputTokenCount is not null || usage.OutputTokenCount is not null)
+{
+    Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}");
 }

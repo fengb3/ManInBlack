@@ -142,7 +142,10 @@ public class GeminiCompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        Assert.True(response.AdditionalProperties.ContainsKey("Usage"));
+        Assert.NotNull(response.Usage);
+        Assert.Equal(100, response.Usage.InputTokenCount);
+        Assert.Equal(50, response.Usage.OutputTokenCount);
+        Assert.Equal(150, response.Usage.TotalTokenCount);
     }
 
     [Fact]
@@ -182,11 +185,10 @@ public class GeminiCompatibleChatClientTests
             new ChatMessage(ChatRole.User, "hi")
         ]);
 
-        var usageJson = JsonSerializer.Serialize(response.AdditionalProperties["Usage"]);
-        var usage = JsonDocument.Parse(usageJson);
-        Assert.Equal(100, usage.RootElement.GetProperty("InputTokenCount").GetInt32());
-        Assert.Equal(50, usage.RootElement.GetProperty("OutputTokenCount").GetInt32());
-        Assert.Equal(150, usage.RootElement.GetProperty("TotalTokenCount").GetInt32());
+        Assert.NotNull(response.Usage);
+        Assert.Equal(100, response.Usage.InputTokenCount);
+        Assert.Equal(50, response.Usage.OutputTokenCount);
+        Assert.Equal(150, response.Usage.TotalTokenCount);
     }
 
     [Fact]
@@ -312,6 +314,46 @@ public class GeminiCompatibleChatClientTests
         Assert.Equal(2, updates.Count);
         Assert.Equal("Hello", updates[0].Contents.OfType<TextContent>().First().Text);
         Assert.Equal(" World", updates[1].Contents.OfType<TextContent>().First().Text);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_有UsageMetadata_最后一个为UsageContent()
+    {
+        var chunks = new[]
+        {
+            """{"candidates":[{"content":{"parts":[{"text":"Hello"}],"role":"model"}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}"""
+        };
+        var stream = SseResponseBuilder.BuildWithDone(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        var usageContent = updates.SelectMany(u => u.Contents.OfType<UsageContent>()).FirstOrDefault();
+        Assert.NotNull(usageContent);
+        Assert.Equal(10, usageContent.Details.InputTokenCount);
+        Assert.Equal(5, usageContent.Details.OutputTokenCount);
+        Assert.Equal(15, usageContent.Details.TotalTokenCount);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_无UsageMetadata_无UsageContent()
+    {
+        var chunks = new[]
+        {
+            """{"candidates":[{"content":{"parts":[{"text":"Hello"}],"role":"model"}}]}"""
+        };
+        var stream = SseResponseBuilder.BuildWithDone(chunks);
+        var handler = new MockHttpMessageHandler(stream);
+        var client = CreateClient(handler);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([]))
+            updates.Add(update);
+
+        Assert.Empty(updates.SelectMany(u => u.Contents.OfType<UsageContent>()));
     }
 
     #endregion
