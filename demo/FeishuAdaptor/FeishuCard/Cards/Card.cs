@@ -112,12 +112,12 @@ public record CardStreamingConfig
     /// <summary>
     /// 各端的更新频率（毫秒）。key 为端标识，value 为毫秒数。
     /// </summary>
-    public Dictionary<string, int>? PrintFrequencyMs { get; set; }
+    public object? PrintFrequencyMs { get; set; }
 
     /// <summary>
     /// 各端的更新步长。key 为端标识，value 为步长值。
     /// </summary>
-    public Dictionary<string, int>? PrintStep { get; set; }
+    public object? PrintStep { get; set; }
 
     /// <summary>
     /// 更新策略。可取值：

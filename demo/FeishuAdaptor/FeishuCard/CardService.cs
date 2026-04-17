@@ -8,49 +8,36 @@ using ManInBlack.AI.Core.Attributes;
 
 namespace FeishuAdaptor.FeishuCard;
 
-[ServiceRegister.Transient]
-public class StreamingCard
+[ServiceRegister.Scoped]
+public class CardService(IFeishuTenantApi api)
 {
-    private readonly IFeishuTenantApi _api;
-    private int _sequence;
-    private string? _cardId;
-
-    public string CardId =>
-        _cardId ?? throw new InvalidOperationException($"Card not created yet. Call {nameof(CreateAsync)} first.");
-
-    /// <summary>从 Card 对象创建</summary>
-    public StreamingCard(IFeishuTenantApi api)
+    /// <summary>
+    /// 创建卡片实体并获取卡片ID, 卡片ID 用于后续更新卡片
+    /// </summary>
+    public async Task<string> CreateAsync(Card card, CancellationToken ct = default)
     {
-        _api = api;
-        _sequence = 1;
-    }
-
-    public async Task CreateAsync(Card card, CancellationToken ct = default)
-    {
-        var result = await _api.PostCardkitV1CardsAsync(
+        var result = await api.PostCardkitV1CardsAsync(
             new PostCardkitV1CardsBodyDto { Type = "card_json", Data = card.ToJson() },
             ct
         );
 
-        if (result.Code != 0)
-            throw new InvalidOperationException(
-                $"Failed to create card: code={result.Code}, msg={result.Msg}"
-            );
+        result.ThrowIfFeishuResponseNotSuccess();
 
-        _cardId = result.Data!.CardId;
+        return result.Data!.CardId;
     }
 
     public async Task SendMessageAsync(
+        string cardId,
         string receiveIdType,
         string receiveId,
         CancellationToken ct = default
     )
     {
         var msgContent = JsonSerializer.Serialize(
-            new { type = "card", data = new { card_id = CardId } }
+            new { type = "card", data = new { card_id = cardId } }
         );
 
-        var result = await _api.PostImV1MessagesAsync(
+        var result = await api.PostImV1MessagesAsync(
             receiveIdType,
             new PostImV1MessagesBodyDto
             {
@@ -61,28 +48,27 @@ public class StreamingCard
             ct
         );
 
-        if (result.Code != 0)
-            throw new InvalidOperationException(
-                $"Failed to send message: code={result.Code}, msg={result.Msg}"
-            );
+        result.ThrowIfFeishuResponseNotSuccess();
     }
 
     /// <summary>
-    /// 部分更新卡片元素 — 只修改传入的字段，未传入的字段保持不变。
+    /// 流式更新卡片文本, 传入卡片中指定元素的 elementId 和新的文本内容，API 将使用新的文本内容更新该元素，并保留其他属性不变。
     /// </summary>
-    public async Task PatchElementAsync(
+    public async Task UpdateElementStreamAsync(
+        string cardId,
         string elementId,
         string newContent,
+        int sequence,
         CancellationToken ct = default
     )
     {
-        var response = await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
-            CardId,
+        var response = await api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
+            cardId,
             elementId,
             new PutCardkitV1CardsByCardIdElementsByElementIdContentBodyDto
             {
                 Content = newContent,
-                Sequence = GetNextSequence(),
+                Sequence = sequence,
             },
             ct
         );
@@ -94,8 +80,10 @@ public class StreamingCard
     /// 全量替换卡片元素 — 用新的元素完全替换指定 elementId 的元素。
     /// </summary>
     public async Task ReplaceElementAsync(
+        string cardId,
         string elementId,
         CardElement element,
+        int sequence,
         CancellationToken ct = default
     )
     {
@@ -104,35 +92,30 @@ public class StreamingCard
             CardJsonSerializerOptions.Options
         );
 
-        await _api.PutCardkitV1CardsByCardIdElementsByElementIdAsync(
-            CardId,
+        await api.PutCardkitV1CardsByCardIdElementsByElementIdAsync(
+            cardId,
             elementId,
             new PutCardkitV1CardsByCardIdElementsByElementIdBodyDto
             {
                 Element = elementJson,
-                Sequence = GetNextSequence(),
+                Sequence = sequence,
             },
             ct
         );
     }
 
-    public async Task CloseStreamingAsync(CancellationToken ct = default)
+    public async Task CloseStreamingAsync(string cardId, int sequence, CancellationToken ct = default)
     {
         var settingsJson = """{"streaming_mode": false}""";
 
-        await _api.PatchCardkitV1CardsByCardIdSettingsAsync(
-            CardId,
+        await api.PatchCardkitV1CardsByCardIdSettingsAsync(
+            cardId,
             new PatchCardkitV1CardsByCardIdSettingsBodyDto
             {
                 Settings = settingsJson,
-                Sequence = _sequence,
+                Sequence = sequence,
             },
             ct
         );
-    }
-
-    internal int GetNextSequence()
-    {
-        return Interlocked.Increment(ref _sequence) - 1;
     }
 }

@@ -10,9 +10,8 @@ public class ImMessageReceiveEventHandler(
     IServiceProvider sp
 ) : IEventHandler<EventV2Dto<ImMessageReceiveV1EventBodyDto>, ImMessageReceiveV1EventBodyDto>
 {
-    public async Task ExecuteAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken cancellationToken = new())
+    public Task ExecuteAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken cancellationToken = new())
     {
-
         _ = ExecuteInner(input, cancellationToken)
             .ContinueWith(
                 t =>
@@ -28,6 +27,8 @@ public class ImMessageReceiveEventHandler(
                 },
                 cancellationToken
             );
+        
+        return Task.CompletedTask;
     }
 
     private async Task ExecuteInner(EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken ct = new())

@@ -22,7 +22,11 @@
       "Bash(dotnet-lib-view *)",
       "Bash(git mv:*)",
       "Bash(git status *)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(find . -name \"*.cs\" -exec grep -l \"UpdateElementStreamAsync\\\\|PutCardkitV1CardsByCardIdElementsByElementIdContent\" {} \\\\;)",
+      "mcp__ide__getDiagnostics",
+      "Bash(find C:\\\\Users\\\\fohhy\\\\source\\\\repos\\\\ManInBlack:*)",
+      "Bash(findstr feishu:*)"
     ]
   }
 }
