@@ -1,41 +1,22 @@
-using ManInBlack.AI;
-using ManInBlack.AI.Middleware;
+﻿using ManInBlack.AI.Core;
+using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
-// ReSharper disable once CheckNamespace
-namespace Microsoft.Extensions.DependencyInjection;
-
-
-public class ManInBlackOptions
-{
-    public ModelChoice ModelChoice { get; set; } = default!;
-}
+namespace ManInBlack.AI;
 
 public static class DependencyInjection
 {
     extension(IServiceCollection services)
     {
         /// <summary>
-        /// 注册 ManInBlack 核心服务（AgentPipeline、AgentContext）
+        /// 注册 ManInBlack 核心服务 以及基础中间件 和 工具
         /// </summary>
         public IServiceCollection AddManInBlack(Action<ManInBlackOptions> configure)
         {
-
-            var options = new ManInBlackOptions();
-            configure(options);
-
-            services.AddScoped<AgentPipelineBuilder>();
-            services.AddScoped<AgentContext>();
-            services.AddScoped<Agent>();
-
-            services.AddHttpClient();
-            services.AddSingleton(options.ModelChoice);
-            services.AddSingleton<IChatClient>(sp =>
-            {
-                var choice = sp.GetRequiredService<ModelChoice>();
-                return ChatClientProviderExtensions.CreateChatClient(
-                    sp.GetRequiredService<IHttpClientFactory>(), choice);
-            });
+            services.AddManInBlackCore(configure);
+            services.AddAutoRegisteredServices();
+            services.AddToolExecutor();
             return services;
         }
     }

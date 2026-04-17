@@ -1,6 +1,6 @@
 ﻿// using System.Numerics;
-// using ManInBlack.AI.Attributes;
-// using ManInBlack.AI.Tools;
+// using ManInBlack.AI.Core.Attributes;
+// using ManInBlack.AI.Core.Tools;
 // using Microsoft.Extensions.Logging;
 //
 // namespace Playground.Tools;

@@ -1,4 +1,4 @@
-﻿using ManInBlack.AI.Middleware;
+﻿using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 // using Playground.Tools;

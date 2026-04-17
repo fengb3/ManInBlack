@@ -1,13 +1,14 @@
 <Solution>
-  <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
   <Folder Name="/Others/">
     <File Path=".gitignore" />
     <File Path="CLAUDE.md" />
-    <File Path="sessions/console/1776322298313.session" />
   </Folder>
+  <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
+  <Project Path="src/ManInBlack.AI.Core/ManInBlack.AI.Core.csproj" />
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Folder Name="/Demo/">
     <Project Path="demo/AgentConsole/AgentConsole.csproj" />
+    <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
     <Project Path="demo/Playground/Playground.csproj" />
   </Folder>
   <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
