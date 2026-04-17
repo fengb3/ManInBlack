@@ -14,7 +14,15 @@ public abstract class CardViewBase
     /// </summary>
     public Card Card { get; } = new()
     {
-        Config = new CardConfig { StreamingMode = true },
+        Config = new CardConfig
+        {
+            StreamingMode = true, StreamingConfig = new CardStreamingConfig
+            {
+                PrintFrequencyMs = new { @default = 30 },
+                PrintStep = new { @default = 1 },
+                PrintStrategy = "fast"
+            }
+        },
         Body = new CardBody(),
     };
 
