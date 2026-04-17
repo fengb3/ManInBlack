@@ -12,12 +12,12 @@ namespace ManInBlack.AI.SourceGenerator;
 [Generator]
 public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
 {
-    private const string TransientAttributeFullName = "ManInBlack.AI.Attributes.ServiceRegister.TransientAttribute";
-    private const string TransientAsAttributePrefix = "ManInBlack.AI.Attributes.ServiceRegister.Transient.AsAttribute";
-    private const string ScopedAttributeFullName = "ManInBlack.AI.Attributes.ServiceRegister.ScopedAttribute";
-    private const string ScopedAsAttributePrefix = "ManInBlack.AI.Attributes.ServiceRegister.Scoped.AsAttribute";
-    private const string SingletonAttributeFullName = "ManInBlack.AI.Attributes.ServiceRegister.SingletonAttribute";
-    private const string SingletonAsAttributePrefix = "ManInBlack.AI.Attributes.ServiceRegister.Singleton.AsAttribute";
+    private const string TransientAttributeFullName = "ManInBlack.AI.Core.Attributes.ServiceRegister.TransientAttribute";
+    private const string TransientAsAttributePrefix = "ManInBlack.AI.Core.Attributes.ServiceRegister.Transient.AsAttribute";
+    private const string ScopedAttributeFullName = "ManInBlack.AI.Core.Attributes.ServiceRegister.ScopedAttribute";
+    private const string ScopedAsAttributePrefix = "ManInBlack.AI.Core.Attributes.ServiceRegister.Scoped.AsAttribute";
+    private const string SingletonAttributeFullName = "ManInBlack.AI.Core.Attributes.ServiceRegister.SingletonAttribute";
+    private const string SingletonAsAttributePrefix = "ManInBlack.AI.Core.Attributes.ServiceRegister.Singleton.AsAttribute";
 
     private static readonly DiagnosticDescriptor ServiceTypeNotAssignable = new(
         id: "MIB001",

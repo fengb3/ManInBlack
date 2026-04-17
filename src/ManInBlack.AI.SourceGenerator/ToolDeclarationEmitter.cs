@@ -87,7 +87,7 @@ public static class ToolDeclarationEmitter
             cls.Public.Static.Field(f =>
             {
                 f.WithKeyword("readonly")
-                    .WithType("global::ManInBlack.AI.Tools.ToolFunctionDeclaration")
+                    .WithType("global::ManInBlack.AI.Core.Tools.ToolFunctionDeclaration")
                     .WithName(fieldName);
 
                 if (returnSchema is not null)

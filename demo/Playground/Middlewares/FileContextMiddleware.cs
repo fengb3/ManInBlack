@@ -1,5 +1,5 @@
 using System.Text;
-using ManInBlack.AI.Middleware;
+using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
 namespace Playground.Middlewares;

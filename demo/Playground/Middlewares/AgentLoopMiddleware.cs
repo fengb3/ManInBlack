@@ -1,7 +1,7 @@
 using System.Text;
-using ManInBlack.AI.Attributes;
-using ManInBlack.AI.Middleware;
-using ManInBlack.AI.Tools;
+using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Tools;
 using Microsoft.Extensions.AI;
 
 namespace Playground.Middlewares;

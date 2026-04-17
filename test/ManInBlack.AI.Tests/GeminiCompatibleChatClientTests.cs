@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ManInBlack.AI.Core;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
 using Xunit;
