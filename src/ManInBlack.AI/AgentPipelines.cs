@@ -1,6 +1,5 @@
-﻿using AgentConsole.Middlewares;
-using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Middleware;
+﻿using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Middlewares;
 
 namespace ManInBlack.AI;
 

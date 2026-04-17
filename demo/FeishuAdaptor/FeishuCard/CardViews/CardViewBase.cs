@@ -5,7 +5,7 @@ namespace FeishuAdaptor.FeishuCard.CardViews;
 /// <summary>
 /// 非泛型的卡片视图基类 — 提供元素工厂方法和容器构建器。
 /// </summary>
-public abstract class StreamingCardViewBase
+public abstract class CardViewBase
 {
     private int _elementIdCounter;
 
@@ -27,13 +27,14 @@ public abstract class StreamingCardViewBase
     /// <summary>
     /// 将元素添加到 Card.Body.Elements 列表末尾。
     /// </summary>
-    protected T AddToBody<T>(T element) where T : CardElement
+    protected void AddToBody(params IEnumerable<CardElement> elements)
     {
-        Card.Body!.Elements.Add(element);
-        return element;
+        Card.Body!.Elements.AddRange(elements);
     }
 
-    // ──────────── 内容元素工厂 ────────────
+    #region 元素工厂
+
+    #region 内容元素工厂
 
     internal MarkdownElement Markdown(string? elementId = null)
     {
@@ -80,7 +81,9 @@ public abstract class StreamingCardViewBase
         return new PersonListElement { ElementId = elementId ?? NextElementId() };
     }
 
-    // ──────────── 交互元素工厂 ────────────
+    #endregion
+
+    #region 交互元素工厂
 
     internal ButtonElement Button(string? elementId = null)
     {
@@ -92,7 +95,9 @@ public abstract class StreamingCardViewBase
         return new InputElement { ElementId = elementId ?? NextElementId() };
     }
 
-    // ──────────── 容器元素工厂 ────────────
+    #endregion
+
+    #region 容器元素工厂
 
     internal ColumnSetElement ColumnSet(
         Action<ColumnSetBuilder> configure,
@@ -133,16 +138,20 @@ public abstract class StreamingCardViewBase
         configure(new InteractiveContainerBuilder(this, el));
         return el;
     }
+
+    #endregion
+
+    #endregion
 }
 
-// ──────────────────── 容器构建器 ────────────────────
+#region 容器构建器
 
 public sealed class ColumnSetBuilder
 {
-    private readonly StreamingCardViewBase _view;
+    private readonly CardViewBase _view;
     private readonly ColumnSetElement _columnSet;
 
-    internal ColumnSetBuilder(StreamingCardViewBase view, ColumnSetElement columnSet)
+    internal ColumnSetBuilder(CardViewBase view, ColumnSetElement columnSet)
     {
         _view = view;
         _columnSet = columnSet;
@@ -171,10 +180,10 @@ public sealed class ColumnSetBuilder
 
 public sealed class ColumnBuilder
 {
-    private readonly StreamingCardViewBase _view;
+    private readonly CardViewBase _view;
     private readonly Column _column;
 
-    internal ColumnBuilder(StreamingCardViewBase view, Column column)
+    internal ColumnBuilder(CardViewBase view, Column column)
     {
         _view = view;
         _column = column;
@@ -246,10 +255,10 @@ public sealed class ColumnBuilder
 
 public sealed class FormBuilder
 {
-    private readonly StreamingCardViewBase _view;
+    private readonly CardViewBase _view;
     private readonly FormElement _form;
 
-    internal FormBuilder(StreamingCardViewBase view, FormElement form)
+    internal FormBuilder(CardViewBase view, FormElement form)
     {
         _view = view;
         _form = form;
@@ -294,10 +303,10 @@ public sealed class FormBuilder
 
 public sealed class InteractiveContainerBuilder
 {
-    private readonly StreamingCardViewBase _view;
+    private readonly CardViewBase _view;
     private readonly InteractiveContainerElement _container;
 
-    internal InteractiveContainerBuilder(StreamingCardViewBase view, InteractiveContainerElement container)
+    internal InteractiveContainerBuilder(CardViewBase view, InteractiveContainerElement container)
     {
         _view = view;
         _container = container;
@@ -354,10 +363,10 @@ public sealed class InteractiveContainerBuilder
 
 public sealed class CollapsiblePanelBuilder
 {
-    private readonly StreamingCardViewBase _view;
+    private readonly CardViewBase _view;
     private readonly CollapsiblePanelElement _panel;
 
-    internal CollapsiblePanelBuilder(StreamingCardViewBase view, CollapsiblePanelElement panel)
+    internal CollapsiblePanelBuilder(CardViewBase view, CollapsiblePanelElement panel)
     {
         _view = view;
         _panel = panel;
@@ -405,3 +414,5 @@ public sealed class CollapsiblePanelBuilder
         return this;
     }
 }
+
+#endregion

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -37,8 +38,17 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             .Where(static m => m is not null)
             .Collect();
 
-        context.RegisterSourceOutput(registrations, (spc, models) =>
+        var rootNamespaces = context.AnalyzerConfigOptionsProvider
+            .Select(static (options, _) =>
+                options.GlobalOptions.TryGetValue("build_property.RootNamespace", out var ns) ? ns : "");
+
+        var registrationsWithNamespace = registrations.Combine(rootNamespaces);
+
+        context.RegisterSourceOutput(registrationsWithNamespace, (spc, pair) =>
         {
+            var models = pair.Left;
+            var rootNamespace = pair.Right;
+
             var modelList = models.Where(m => m is not null).Select(m => m!).ToList();
 
             foreach (var model in modelList.Where(m => !m.IsValidAssignment))
@@ -55,7 +65,7 @@ public sealed class ServiceRegistrationGenerator : IIncrementalGenerator
             if (validModels.Count == 0)
                 return;
 
-            var sourceText = ServiceRegistrationEmitter.Emit(validModels);
+            var sourceText = ServiceRegistrationEmitter.Emit(validModels, rootNamespace);
             spc.AddSource("ServiceRegistrationExtensions.g.cs", SourceText.From(sourceText, Encoding.UTF8));
         });
     }

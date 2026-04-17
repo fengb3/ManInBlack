@@ -4,18 +4,19 @@ using FeishuAdaptor.Helper;
 using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using FeishuNetSdk.Im;
+using ManInBlack.AI.Core.Attributes;
 
 namespace FeishuAdaptor.FeishuCard;
 
+[ServiceRegister.Transient]
 public class StreamingCard
 {
     private readonly IFeishuTenantApi _api;
-    private readonly Dictionary<string, StreamingElement> _elements = new();
     private int _sequence;
     private string? _cardId;
 
     public string CardId =>
-        _cardId ?? throw new InvalidOperationException("Card not created yet. Call CreateAsync first.");
+        _cardId ?? throw new InvalidOperationException($"Card not created yet. Call {nameof(CreateAsync)} first.");
 
     /// <summary>从 Card 对象创建</summary>
     public StreamingCard(IFeishuTenantApi api)
@@ -66,36 +67,21 @@ public class StreamingCard
             );
     }
 
-    public StreamingElement GetElement(string elementId)
-    {
-        if (!_elements.TryGetValue(elementId, out var element))
-        {
-            element = new StreamingElement(this, elementId, _api);
-            _elements[elementId] = element;
-        }
-        return element;
-    }
-
     /// <summary>
     /// 部分更新卡片元素 — 只修改传入的字段，未传入的字段保持不变。
     /// </summary>
     public async Task PatchElementAsync(
         string elementId,
-        CardElement element,
+        string newContent,
         CancellationToken ct = default
     )
     {
-        var elementJson = JsonSerializer.Serialize(
-            element,
-            CardJsonSerializerOptions.Options
-        );
-
-        var response = await _api.PatchCardkitV1CardsByCardIdElementsByElementIdAsync(
+        var response = await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
             CardId,
             elementId,
-            new PatchCardkitV1CardsByCardIdElementsByElementIdBodyDto
+            new PutCardkitV1CardsByCardIdElementsByElementIdContentBodyDto
             {
-                PartialElement = elementJson,
+                Content = newContent,
                 Sequence = GetNextSequence(),
             },
             ct

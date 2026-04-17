@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using ManInBlack.AI.Core.Attributes;
@@ -7,7 +6,7 @@ using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 会话持久化中间件，按用户 ID 恢复对话上下文

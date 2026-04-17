@@ -3,7 +3,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 消息丰富中间件，自动为所有添加到上下文的消息补全 CreatedAt 等元数据

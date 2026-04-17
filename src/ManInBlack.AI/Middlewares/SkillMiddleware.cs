@@ -2,7 +2,7 @@
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 给agent 添加skill能力
