@@ -1,12 +1,11 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Core.Tools;
 using Microsoft.Extensions.AI;
-using AgentConsole;
-using ManInBlack.AI.Core.Attributes;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史

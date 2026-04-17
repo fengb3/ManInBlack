@@ -10,9 +10,6 @@
       "Bash(powershell:*)",
       "Bash(cat ~/.nuget/packages/fengb3.easycodebuilder/*/lib/*/Fengb3.EasyCodeBuilder.dll)",
       "Bash(find ~/.nuget/packages/fengb3.easycodebuilder/ -name \"*.nuspec\" -exec cat {} \\\\;)",
-      "Bash(dotnet-lib-view --version)",
-      "Bash(dotnet-lib-view detail:*)",
-      "Bash(dotnet-lib-view query-member:*)",
       "Bash(1\" --package-version 0.1.4)",
       "Bash(find Playground:*)",
       "Bash(git checkout:*)",
@@ -22,13 +19,10 @@
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
       "WebSearch",
-      "Bash(dotnet-lib-view doc:*)",
+      "Bash(dotnet-lib-view *)",
       "Bash(git mv:*)",
-      "Bash(cmd.exe /c \"move ManInBlack.AI src\\\\\\\\ManInBlack.AI\")",
-      "Bash(cp -r ManInBlack.AI.SourceGenerator src/)",
-      "Bash(cp -r Playground src/)",
-      "Bash(cp -r AgentConsole src/)",
-      "Bash(cp -r ManInBlack.AI.Tests test/)"
+      "Bash(git status *)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

@@ -2,7 +2,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace ManInBlack.AI.Middleware;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 注入系统提示词中间件, 系统提示次构建的其他中间件 需要再此中间件之前执行，在消息列表开头插入系统提示消息

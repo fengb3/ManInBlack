@@ -3,7 +3,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 [ServiceRegister.Scoped]
 public class ContextCompressMiddleware : AgentMiddleware

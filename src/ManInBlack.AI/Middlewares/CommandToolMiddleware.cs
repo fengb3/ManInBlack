@@ -4,7 +4,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace AgentConsole.Middlewares;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 将命令行工具声明注入到 ChatOptions 中，使模型可以调用命令行工具
