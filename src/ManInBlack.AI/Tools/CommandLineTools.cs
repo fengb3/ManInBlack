@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text;
 using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Tools;
 
 namespace AgentConsole.Tools;
 
@@ -76,24 +75,5 @@ public partial class CommandLineTools
         return !string.IsNullOrEmpty(error)
             ? $"Bash error: {error.Trim()}"
             : output.Trim();
-    }
-}
-
-[ServiceRegister.Scoped]
-public class LoggingFilter : ToolCallFilter
-{
-    public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
-    {
-        var arguments = context.Arguments.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
-        
-        // set console color for better visibility
-        var originalColor = Console.ForegroundColor;
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine();
-        Console.WriteLine($"[ToolCall] {context.ToolName} ({string.Join(",", arguments)})");
-        await next(context);
-        var result = context.Result;
-        Console.WriteLine($"[ToolResult] {context.ToolName} => {result}");
-        Console.ForegroundColor = originalColor;
     }
 }

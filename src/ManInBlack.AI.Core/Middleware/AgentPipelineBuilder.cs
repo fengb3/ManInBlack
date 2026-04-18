@@ -1,5 +1,6 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Core.Middleware;
 
@@ -25,7 +26,12 @@ public class AgentPipelineBuilder
     /// </summary>
     public AgentPipelineBuilder Use<TMiddleware>() where TMiddleware : AgentMiddleware
     {
-        _middlewareFactories.Add(sp => sp.GetRequiredService<TMiddleware>());
+        _middlewareFactories.Add(sp =>
+        {
+            ILogger<TMiddleware> logger = sp.GetRequiredService<ILogger<TMiddleware>>();
+            logger.LogInformation("Resolving middleware {Middleware} from DI container", typeof(TMiddleware).Name);
+            return sp.GetRequiredService<TMiddleware>();
+        });
         return this;
     }
 
@@ -59,6 +65,8 @@ public class AgentPipelineBuilder
 
             pipeline = context =>
             {
+                // ILogger<AgentPipelineBuilder> logger = serviceProvider.GetRequiredService<ILogger<AgentPipelineBuilder>>();
+                // logger.LogInformation("Executing middleware {Middleware} for agent {AgentId}", middlewareFactory.Method.DeclaringType?.Name, context.AgentId);
                 var middle = middlewareFactory.Invoke(context.ServiceProvider);
                 return middle.HandleAsync(context, () => next(context), context.CancellationToken);
             };

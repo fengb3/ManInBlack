@@ -17,10 +17,9 @@ public class ReadPersistenceMiddleware(string directoryPath = "sessions") : Agen
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<SessionStorage>();
 
@@ -43,7 +42,7 @@ public class ReadPersistenceMiddleware(string directoryPath = "sessions") : Agen
         }
 
         // 执行管道
-        await foreach (ChatResponseUpdate update in next().WithCancellation(cancellationToken))
+        await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
         {
             yield return update;
         }
@@ -56,10 +55,9 @@ public class ReadPersistenceMiddleware(string directoryPath = "sessions") : Agen
 [ServiceRegister.Scoped]
 public class SavePersistenceMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<SessionStorage>();
 
@@ -67,7 +65,7 @@ public class SavePersistenceMiddleware : AgentMiddleware
         var original = context.Messages;
         context.Messages = new PersistingMessageCollection(original, sessionStorage);
 
-        await foreach (ChatResponseUpdate update in next().WithCancellation(cancellationToken))
+        await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
         {
             yield return update;
         }

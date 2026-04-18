@@ -14,10 +14,9 @@ namespace AgentConsole.Middlewares;
 [ServiceRegister.Scoped]
 public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         while (true)
         {
@@ -25,7 +24,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
             var textBuilder = new StringBuilder();
             var reasoningBuilder = new StringBuilder();
 
-            await foreach (var update in next().WithCancellation(cancellationToken))
+            await foreach (var update in next().WithCancellation(ct))
             {
                 foreach (var content in update.Contents)
                 {
@@ -74,7 +73,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
                     Arguments = fc.Arguments
                 };
 
-                await toolExecutor.ExecuteAsync(toolCtx, cancellationToken);
+                await toolExecutor.ExecuteAsync(toolCtx, ct);
 
                 // if (toolCtx.Error != null)
                 // {

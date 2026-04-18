@@ -13,17 +13,16 @@ namespace Playground.Middlewares;
 public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 {
 
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         while (true)
         {
             var functionCalls = new List<FunctionCallContent>();
             var textBuffer = new StringBuilder();
 
-            await foreach (var update in next().WithCancellation(cancellationToken))
+            await foreach (var update in next().WithCancellation(ct))
             {
                 // 收集 tool call
                 foreach (var content in update.Contents)
@@ -53,7 +52,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
                     Arguments = fc.Arguments as Dictionary<string, object?> ?? new Dictionary<string, object?>()
                 };
 
-                await toolExecutor.ExecuteAsync(toolCtx, cancellationToken);
+                await toolExecutor.ExecuteAsync(toolCtx, ct);
 
                 toolResults.Add(new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result));
             }

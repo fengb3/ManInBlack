@@ -1,4 +1,5 @@
-﻿using FeishuNetSdk.Im.Events;
+﻿using FeishuAdaptor.Middlewares;
+using FeishuNetSdk.Im.Events;
 using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Core.Middleware;
@@ -12,7 +13,7 @@ public class ImMessageReceiveEventHandler(
 {
     public Task ExecuteAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken cancellationToken = new())
     {
-        _ = ExecuteInner(input, cancellationToken)
+        _ = ExecuteInner(input)
             .ContinueWith(
                 t =>
                 {
@@ -31,25 +32,26 @@ public class ImMessageReceiveEventHandler(
         return Task.CompletedTask;
     }
 
-    private async Task ExecuteInner(EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken ct = new())
+    private async Task ExecuteInner(EventV2Dto<ImMessageReceiveV1EventBodyDto> input)
     {
-        using var scope  = sp.CreateScope();
-        var       logger = scope.ServiceProvider.GetRequiredService<ILogger<EventHandler>>();
+        using var scope = sp.CreateScope();
         
-        var pipeline     = new AgentPipelineBuilder().UseDefault().Build(sp);
+        var cts = new CancellationTokenSource();
+        var ct = cts.Token;
+
+        var pipeline = new AgentPipelineBuilder()
+            .Use<FeishuCardMiddleware>()
+            .UseDefault()
+            .Build(sp);
+
         var agentContext = scope.ServiceProvider.GetRequiredService<AgentContext>();
-        
-        // set properties
+
         agentContext.AgentId    = Guid.NewGuid().ToString();
         agentContext.ParentId   = input.Event.Sender.SenderId.OpenId;
         agentContext.ParentType = "FeishuUser";
         agentContext.UserInput  = input.Event.Message.Content;
-        
-        var updates = pipeline(agentContext);
 
-        await foreach (var update in updates)
-        {
-            logger.LogInformation(update.Contents.Select(c => c.ToString()).Aggregate((a, b) => a + b));
-        }
+        var updates = pipeline(agentContext);
+        await foreach (var _ in updates.WithCancellation(ct)) { }
     }
 }

@@ -12,7 +12,8 @@ namespace AgentConsole.Middlewares;
 public class SkillMiddleware(SkillTools skillTools) : AgentMiddleware
 {
 
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context, Func<IAsyncEnumerable<ChatResponseUpdate>> next, CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next, CancellationToken ct = default)
     {
         // 有技能时才注入提示词和tool声明
         if (skillTools.HasSkills())
@@ -36,7 +37,7 @@ public class SkillMiddleware(SkillTools skillTools) : AgentMiddleware
                 context.Options.Tools.Add(tool);
         }
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
     }
 }
