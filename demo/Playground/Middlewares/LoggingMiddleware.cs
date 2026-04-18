@@ -10,11 +10,12 @@ namespace Playground.Middlewares;
 /// </summary>
 public partial class LoggingMiddleware(ILogger<LoggingMiddleware> logger) : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context, Func<IAsyncEnumerable<ChatResponseUpdate>> next, CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next, CancellationToken ct = default)
     {
         Log发送Count条消息模型Model(logger, context.Messages.Count, context.Options?.ModelId ?? "unknown");
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
 
         Log响应完成(logger);

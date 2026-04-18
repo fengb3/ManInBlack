@@ -12,10 +12,9 @@ namespace AgentConsole.Middlewares;
 [ServiceRegister.Scoped]
 public class CommandToolMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         var tools = CommandLineTools.AllToolDeclarations;
 
@@ -25,7 +24,7 @@ public class CommandToolMiddleware : AgentMiddleware
         foreach (var tool in tools)
             context.Options.Tools!.Add(tool);
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
     }
 }
@@ -33,10 +32,9 @@ public class CommandToolMiddleware : AgentMiddleware
 [ServiceRegister.Scoped]
 public class SimpleMathToolMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         var tools = SimpleMathTools.AllToolDeclarations;
 
@@ -46,7 +44,7 @@ public class SimpleMathToolMiddleware : AgentMiddleware
         foreach (var tool in tools)
             context.Options.Tools!.Add(tool);
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
     }
 }

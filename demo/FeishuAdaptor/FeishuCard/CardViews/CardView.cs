@@ -71,6 +71,17 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
         return markdownElement;
     }
 
+    // protected TextElement BindText(Expression<Func<TViewModel, string>> expression)
+    // {
+    //     var div = Text();
+    //     Bind(div, expression, vm =>
+    //     {
+    //         div.Content = expression.Compile()(vm);
+    //         return div.ElementId!;
+    //     });
+    //     return div;
+    // }
+
     #region 生命周期
 
     /// <summary>

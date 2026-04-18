@@ -106,31 +106,6 @@ app.MapGet("/test-card", async (IServiceProvider sp, ILogger<Program> logger) =>
         """
         # Markdown 格式测试
 
-        ## 文本样式
-
-        **粗体文本** 和 *斜体文本* 以及 ***粗斜体***
-
-        ~~删除线文本~~ 和 `行内代码`
-
-        ## 列表
-
-        无序列表：
-        - 项目一
-        - 项目二
-          - 子项目 2.1
-          - 子项目 2.2
-        - 项目三
-
-        有序列表：
-        1. 第一步
-        2. 第二步
-        3. 第三步
-
-        ## 引用
-
-        > 这是一段引用文本
-        > 可以有多行
-
         ## 表格
 
         | 名称 | 值 | 说明 |
@@ -246,16 +221,16 @@ app.MapGet("/test-card", async (IServiceProvider sp, ILogger<Program> logger) =>
 
         ### 编程语言排行
 
-        | 排名 | 语言 | 评分 | 变化 | 主要领域 | 年度增长率 |
-        |------|------|------|------|----------|------------|
-        | 1 | Python | 100.0 | — | AI/数据 | +4.2% |
-        | 2 | JavaScript | 98.5 | — | Web 全栈 | +1.8% |
-        | 3 | TypeScript | 85.3 | ↑2 | Web 全栈 | +6.1% |
-        | 4 | Java | 82.1 | ↓1 | 企业级 | -0.5% |
-        | 5 | C# | 78.6 | ↑1 | 游戏/.NET | +2.3% |
-        | 6 | Go | 72.4 | — | 后端/云原生 | +3.7% |
-        | 7 | Rust | 65.8 | ↑3 | 系统/底层 | +8.9% |
-        | 8 | C++ | 63.2 | ↓2 | 系统/游戏 | -1.1% |
+        | 排名 | 语言 | 评分 | 变化 | 主要领域 | 年度增长率 | 官网 |
+        |------|------|------|------|----------|------------|------| 
+        | 1 | Python | 100.0 | — | AI/数据 | +4.2% | [python.org](https://www.python.org) |
+        | 2 | JavaScript | 98.5 | — | Web 全栈 | +1.8% | [javascript.com](https://www.javascript.com) |
+        | 3 | TypeScript | 85.3 | ↑2 | Web 全栈 | +6.1% | [typescriptlang.org](https://www.typescriptlang.org) |
+        | 4 | Java | 82.1 | ↓1 | 企业级 | -0.5% | [java.com](https://www.java.com) |
+        | 5 | C# | 78.6 | ↑1 | 游戏/.NET | +2.3% | [dotnet.microsoft.com](https://dotnet.microsoft.com/languages/csharp) |
+        | 6 | Go | 72.4 | — | 后端/云原生 | +3.7% | [go.dev](https://go.dev) |
+        | 7 | Rust | 65.8 | ↑3 | 系统/底层 | +8.9% | [rust-lang.org](https://www.rust-lang.org) |
+        | 8 | C++ | 63.2 | ↓2 | 系统/游戏 | -1.1% | [isocpp.org](https://isocpp.org) |
 
         ## 任务列表
 
@@ -287,7 +262,7 @@ app.MapGet("/test-card", async (IServiceProvider sp, ILogger<Program> logger) =>
         foreach (var c in markdownContent)
         {
             vm.AppendContent(c);
-            await Task.Delay(20);
+            await Task.Delay(10);
         }
         
         await Task.Delay(100);

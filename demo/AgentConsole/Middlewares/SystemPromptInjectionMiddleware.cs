@@ -10,10 +10,9 @@ namespace ManInBlack.AI.Middleware;
 [ServiceRegister.Scoped]
 public class SystemPromptInjectionMiddleware() : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         
         // Console.ForegroundColor = ConsoleColor.DarkGreen;
@@ -23,7 +22,7 @@ public class SystemPromptInjectionMiddleware() : AgentMiddleware
         
         context.Messages.Insert(0, new ChatMessage(ChatRole.System, context.SystemPrompt));
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
     }
 }
@@ -31,10 +30,9 @@ public class SystemPromptInjectionMiddleware() : AgentMiddleware
 [ServiceRegister.Scoped]
 public class UserInputMiddleware() : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         // Console.ForegroundColor = ConsoleColor.DarkGreen;
         // Console.BackgroundColor = ConsoleColor.Magenta;
@@ -43,7 +41,7 @@ public class UserInputMiddleware() : AgentMiddleware
         
         context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput));
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
     }
 }

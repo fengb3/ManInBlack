@@ -49,6 +49,11 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
         var request = new HttpRequestMessage(HttpMethod.Post, _endPoint) { Content = content };
         var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        
+        // // print response body
+        // Console.WriteLine("Response body:");
+        // var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        // Console.WriteLine(responseBody);
         response.EnsureSuccessStatusCode();
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

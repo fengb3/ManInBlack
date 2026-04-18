@@ -11,16 +11,15 @@ namespace ManInBlack.AI.Middlewares;
 [ServiceRegister.Scoped]
 public class MessageEnrichMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        CancellationToken ct = default)
     {
         // 用包装集合替换原始 Messages，拦截所有添加操作
         var original = context.Messages;
         context.Messages = new EnrichingMessageCollection(original);
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
             yield return update;
 
         // 恢复原始列表（已包含所有带元数据的消息）

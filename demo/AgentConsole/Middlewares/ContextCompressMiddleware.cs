@@ -9,10 +9,9 @@ namespace AgentConsole.Middlewares;
 public class ContextCompressMiddleware : AgentMiddleware
 {
 
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
-        AgentContext context,
-        Func<IAsyncEnumerable<ChatResponseUpdate>> next,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         // 对上下文中的tool结果进行压缩, 保留 近10个 Tool 结果, 旧的用 [old tool result has been compressed] 代替
 
@@ -48,6 +47,6 @@ public class ContextCompressMiddleware : AgentMiddleware
         // Console.ResetColor();
 
 
-        await foreach (var response in next().WithCancellation(cancellationToken)) yield return response;
+        await foreach (var response in next().WithCancellation(ct)) yield return response;
     }
 }

@@ -7,7 +7,8 @@ namespace Playground.Middlewares;
 
 public class CommandToolMiddleware(ILogger<CommandToolMiddleware> logger, IServiceProvider sp) : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context, Func<IAsyncEnumerable<ChatResponseUpdate>> next, CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+        ChatResponseUpdateHandler next, CancellationToken ct = default)
     {
         // var tools = CommandLineTools.AllToolDeclarations;
         //
@@ -17,7 +18,7 @@ public class CommandToolMiddleware(ILogger<CommandToolMiddleware> logger, IServi
         // foreach (var tool in tools)
         //     context.Options.Tools!.Add(tool);
 
-        await foreach (var update in next().WithCancellation(cancellationToken))
+        await foreach (var update in next().WithCancellation(ct))
         {
             yield return update;
         }
