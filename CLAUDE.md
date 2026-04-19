@@ -5,77 +5,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-dotnet build ManInBlack.slnx                          # Build the entire solution
-dotnet build src/ManInBlack.AI                        # Build just the library
-dotnet build src/ManInBlack.AI.SourceGenerator        # Build just the source generator
-dotnet run --project demo/AgentConsole                # Run the agent console demo
-dotnet run --project demo/Playground                  # Run the playground (explores M.E.AI types)
-dotnet test test/ManInBlack.AI.Tests                  # Run all tests (xunit)
-dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Run specific tests
+dotnet build ManInBlack.slnx                          # Build entire solution
+dotnet build src/ManInBlack.AI.Core                   # Core library (adapters + base types)
+dotnet build src/ManInBlack.AI                        # Main library (middleware implementations)
+dotnet build src/ManInBlack.AI.SourceGenerator        # Source generator
+dotnet run --project demo/AgentConsole                # Agent console demo
+dotnet run --project demo/Playground                  # M.E.AI type explorer
+dotnet run --project demo/FeishuAdaptor               # 飞书 bot demo
+dotnet test test/ManInBlack.AI.Tests                  # All tests (xunit)
+dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Specific tests
 ```
 
 No linting or formatting tools are configured.
 
 ## Project Overview
 
-ManInBlack is a .NET 10 library that provides unified abstractions for accessing multiple AI chat model providers through `Microsoft.Extensions.AI`'s `IChatClient` interface. It acts as an adapter layer supporting OpenAI, Anthropic, Gemini, and numerous Chinese AI providers (DeepSeek, Qwen, Kimi, Zhipu, Yi, Baichuan, StepFun, Spark, Doubao, MiniMax).
+.NET 10 library providing unified abstractions for multiple AI chat providers (OpenAI, Anthropic, Gemini, DeepSeek, Qwen, Kimi, Zhipu, Yi, Baichuan, StepFun, Spark, Doubao, MiniMax) through `Microsoft.Extensions.AI`'s `IChatClient` interface.
 
 ## Architecture
 
-The project is organized into `src/`, `demo/`, and `test/` directories.
+`src/` · `demo/` · `test/`
 
-### Provider + Adapter (ChatClient layer)
+### Project structure
 
-- **`IModelProvider` / `ModelProvider`** (`IModelProvider.cs`) — Abstract provider definitions. Each provider declares a `ProviderName`, `BaseUrl`, `ApiKey`, and `CompatibleWith` (the API shape it follows: `"OpenAI"`, `"Anthropic"`, or `"Gemini"`). Most Chinese providers are OpenAI-compatible.
-- **ChatClient adapters** (`ChatClient/`) — Three `IChatClient` implementations, one per API shape:
-  - `OpenAICompatibleChatClient` — POST to `v1/chat/completions`, SSE streaming, tool call fragment accumulation
-  - `AnthropicCompatibleChatClient` — POST to `v1/messages`, separate `content_block_start/delta/stop` SSE events, system prompt extracted from messages
-  - `GeminiCompatibleChatClient` — POST to `v1beta/models/{model}:generateContent` (and `:streamGenerateContent`), API key in URL query param
-- **`ChatClientProviderExtensions.CreateChatClient()`** (`IModelProvider.cs`) — Factory method that dispatches to the correct adapter based on `CompatibleWith`
-- **`ModelChoice`** — Couples a `ModelProvider` with a `ModelId` for client creation
-- **`ModelProviderRegistry`** — Named provider registry (currently minimal, no lookup API yet)
+- **`ManInBlack.AI.Core`** — Base abstractions: `IChatClient` adapters, `AgentMiddleware`/`AgentContext`/`AgentPipelineBuilder`, `[AiTool]`/`[ServiceRegister]` attributes, `ToolFunctionDeclaration`.
+- **`ManInBlack.AI`** — Concrete middlewares (Logging, MessageEnrich, SystemPromptInjection, Persistence, ContextCompress, CommandTool, Skill, AgentLoop). References Core.
+- **`ManInBlack.AI.SourceGenerator`** — Incremental generators (.NET Standard 2.0).
 
-### Middleware Pipeline (Agent layer)
+### ChatClient layer
 
-The agent layer sits above the ChatClient layer and provides a composable middleware pipeline:
+- **`IModelProvider`** — Provider definitions with `CompatibleWith` dispatching to API shape: `"OpenAI"`, `"Anthropic"`, or `"Gemini"`. Most Chinese providers are OpenAI-compatible.
+- **Three adapters** — `OpenAICompatibleChatClient` (SSE), `AnthropicCompatibleChatClient` (content_block events), `GeminiCompatibleChatClient` (query-param auth). All handle streaming + non-streaming + tool calling.
+- **`ChatClientProviderExtensions.CreateChatClient()`** — Factory dispatching by `CompatibleWith`.
 
-- **`AgentContext`** — Pipeline context carrying `Messages`, `Options`, `SystemPrompt`, `UserInput`, `Items` (shared state dictionary), `CancellationToken`, and `IServiceProvider`
-- **`AgentMiddleware`** — Abstract base class. Each middleware implements `HandleAsync(AgentContext, Func<IAsyncEnumerable<ChatResponseUpdate>>, CancellationToken)` and calls `next()` to pass to the next middleware
-- **`AgentPipelineBuilder`** — Builds the pipeline. Register middleware via `Use(middleware)` (instance) or `Use<TMiddleware>()` (DI-resolved). `Build(IServiceProvider)` returns a `Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>>` by wrapping middlewares in reverse order around the terminal `IChatClient` call
-- **`Agent`** — Entity with `AgentId`, `ParentId`, `ParentType` for tracking agent hierarchy
+### Middleware pipeline
 
-### Dependency Injection
+- **`AgentMiddleware`** — `HandleAsync(AgentContext, ChatResponseUpdateHandler, CancellationToken)` calling `next()` to chain.
+- **`AgentPipelineBuilder`** — `Use()` / `Use<TMiddleware>()` registration, `Build(IServiceProvider)` wraps middlewares in reverse around terminal `IChatClient`.
+- **`AgentContext`** — Carries `Messages`, `Options`, `SystemPrompt`, `UserInput`, `Items`, `CancellationToken`, `IServiceProvider`.
 
-`DependencyInjection.cs` defines `AddManInBlack(Action<ManInBlackOptions>)` as a C# extension method on `IServiceCollection`. It registers:
-- `AgentPipelineBuilder`, `AgentContext`, `Agent` as scoped
-- `IChatClient` as singleton (built from `ModelChoice` via `IHttpClientFactory`)
-- `ManInBlackOptions.ModelChoice` as singleton
+### Source generators
 
-### Key design points
+| Generator | Purpose |
+|-----------|---------|
+| `ToolCallerGenerator` | Dispatches `[AiTool]` method calls via `IServiceProvider` |
+| `ToolDeclarationGenerator` | Generates `AIFunctionDeclaration` + JSON Schema from `[AiTool]` methods + XML docs |
+| `ServiceRegistrationGenerator` | DI registration for `[ServiceRegister]`-attributed classes |
 
-- All adapters handle both non-streaming (`GetResponseAsync`) and streaming (`GetStreamingResponseAsync`) responses
-- Tool/function calling is supported across all three API shapes with proper serialization of `FunctionCallContent`/`FunctionResultContent`
-- Streaming adapters accumulate tool call fragments and emit them as complete `FunctionCallContent` updates
-- JSON serialization uses `System.Text.Json` with `JsonNode`/`JsonObject` for request building and typed inner classes for response parsing
-
-### Source Generators
-
-`ManInBlack.AI.SourceGenerator` (targets .NET Standard 2.0) contains three incremental generators:
-
-| Generator | Output | Purpose |
-|-----------|--------|---------|
-| `ToolCallerGenerator` | `ToolCaller.g.cs` | Generates a `ToolCaller` class that dispatches `[AiTool]` method calls at runtime via `IServiceProvider` |
-| `ToolDeclarationGenerator` | `{Type}.ToolDeclarations.g.cs` | Generates `AIFunctionDeclaration` static members and `AllToolDeclarations` array for each partial class with `[AiTool]` methods |
-| `ServiceRegistrationGenerator` | `ServiceRegistrationExtensions.g.cs` | Generates DI registration extensions for `[ServiceRegister]`-attributed classes |
-
-All emitters use **Fengb3.EasyCodeBuilder** for code generation. When generating new emitters, follow the same pattern: use `Code.Create().Using(...).Namespace(ns => ...)` with `Code.Build(option, new CodeBuilder())`.
-
-### Tool declaration pipeline
-
-1. `[AiTool]` marks methods as AI-callable tools
-2. `ToolDeclarationGenerator` extracts method signatures + XML doc comments (`<summary>`, `<param>`, `<returns>`)
-3. For each containing partial class, generates `ToolFunctionDeclaration` fields with JSON Schema for parameters/returns
-4. `ToolFunctionDeclaration` (in `ManInBlack.AI/Tools/`) is a concrete `AIFunctionDeclaration` subclass that parses JSON Schema strings at construction
+All emitters use **Fengb3.EasyCodeBuilder** (`Code.Create().Using(...).Namespace(ns => ...)` / `Code.Build(option, new CodeBuilder())`).
 
 ### Diagnostic rules
 
@@ -83,33 +60,18 @@ All emitters use **Fengb3.EasyCodeBuilder** for code generation. When generating
 |----|----------|---------|
 | MIB001 | Error | `[ServiceRegister.X.As<T>]` where type doesn't implement T |
 | MIB010 | Error | Class with `[AiTool]` methods is not `partial` |
-| MIB011 | Warning | `[AiTool]` method missing `<summary>` XML doc |
-| MIB012 | Warning | `[AiTool]` method parameter missing `<param>` XML doc |
-| MIB013 | Warning | Non-void `[AiTool]` method missing `<returns>` XML doc |
+| MIB011 | Warning | `[AiTool]` method missing `<summary>` |
+| MIB012 | Warning | `[AiTool]` parameter missing `<param>` |
+| MIB013 | Warning | Non-void `[AiTool]` missing `<returns>` |
 
-### Files with commented-out code
+### Feishu Adaptor (`demo/FeishuAdaptor`)
 
-`ServiceCollectionExtensions.cs`, `ChatClientFactory.cs`, and `AdditionalProviders.cs` are entirely commented out. They represent an older iteration of the DI/factory pattern. The active code uses the simpler `ModelProvider` + `ChatClientProviderExtensions` approach instead.
-
-## Dependencies
-
-### ManInBlack.AI
-- `Microsoft.Extensions.AI` 10.4.1 — Core `IChatClient` / `ChatMessage` / `AITool` / `AIFunctionDeclaration` abstractions
-- `Microsoft.Extensions.Http` 10.0.0 — `IHttpClientFactory` integration
-- `ModelContextProtocol` 1.2.0 — MCP protocol support
-
-### ManInBlack.AI.SourceGenerator
-- `Fengb3.EasyCodeBuilder` 0.1.6 — Fluent code generation API
-- `Microsoft.CodeAnalysis.CSharp` 4.11.0 — Roslyn API for source generation
-
-### ManInBlack.AI.Tests
-- `xunit` — Test framework
-- Test helpers: `MockHttpMessageHandler` and `SseResponseBuilder` for mocking HTTP/SSE responses
+飞书 IM bot via WebSocket + streaming cards. Flow: `FeishuCardMiddleware` maps content types to ViewModels → `CardView<T>.BindMarkdown()` wires `PropertyChanged` → `CardUpdateScheduler` (singleton, 50/sec 1000/min rate limit) batches updates to Feishu API. Cards use JSON 2.0 with snake_case serialization.
 
 ## Code Style
 
-- Comments and XML docs are in Chinese
-- C# with file-scoped namespaces, implicit usings, nullable enabled
-- Uses C# extension syntax (`extension(IServiceCollection services)`) for DI methods
-- IDE: JetBrains Rider
+- Comments and XML docs in Chinese
+- C# file-scoped namespaces, implicit usings, nullable enabled
+- C# extension syntax for DI (`extension(IServiceCollection services)`)
 - Source generator emitters must use EasyCodeBuilder, not raw StringBuilder
+- IDE: JetBrains Rider

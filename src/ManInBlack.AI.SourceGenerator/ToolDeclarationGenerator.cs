@@ -248,9 +248,7 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
     private static (string? summary, Dictionary<string, string> paramDescriptions, string? returnsDescription)
         ExtractXmlDocFromRawTrivia(MethodDeclarationSyntax methodDecl)
     {
-        string? summary = null;
         var paramDescriptions = new Dictionary<string, string>();
-        string? returnsDescription = null;
 
         // 收集所有 /// 行
         var docLines = new List<string>();

@@ -16,12 +16,16 @@ public abstract class CardViewBase
     {
         Config = new CardConfig
         {
-            StreamingMode = true, StreamingConfig = new CardStreamingConfig
+            StreamingMode = true, 
+            StreamingConfig = new CardStreamingConfig
             {
                 PrintFrequencyMs = new { @default = 30 },
-                PrintStep = new { @default = 1 },
-                PrintStrategy = "fast"
-            }
+                PrintStep = new { @default = 3 },
+                PrintStrategy = "fast",
+            },
+            WidthMode = "fill",
+            EnableForward = true,
+            EnableForwardInteraction = true,
         },
         Body = new CardBody(),
     };

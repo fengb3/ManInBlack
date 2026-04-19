@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -13,13 +14,15 @@ namespace AgentConsole.Middlewares;
 /// 会话持久化中间件，按用户 ID 恢复对话上下文
 /// </summary>
 [ServiceRegister.Scoped]
-public class ReadPersistenceMiddleware(string directoryPath = "sessions") : AgentMiddleware
+#pragma warning disable CS9113 // Parameter is unread
+public class ReadPersistenceMiddleware(string _directoryPath = "sessions") : AgentMiddleware
+#pragma warning restore CS9113 // Parameter is unread
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<SessionStorage>();
 
@@ -57,7 +60,7 @@ public class SavePersistenceMiddleware : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<SessionStorage>();
 
@@ -90,7 +93,7 @@ public class SavePersistenceMiddleware : AgentMiddleware
 [ServiceRegister.Scoped]
 public class SessionStorage(AgentContext agentContext)
 {
-    private string SessionId { get; set; }
+    private string SessionId { get; set; } = null!;
 
     private string UserId = agentContext.ParentId;
 

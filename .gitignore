@@ -484,6 +484,9 @@ $RECYCLE.BIN/
 # claude local settings
 .claude/settings.local.json
 
-
 # agent session context persistence file
 *.session
+
+# AI tools
+*/agent-workspace/
+/*/*/agent-workspace

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
@@ -10,7 +11,7 @@ namespace Playground.Middlewares;
 public class FileContextMiddleware(string directoryPath) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next, CancellationToken ct = default)
+        ChatResponseUpdateHandler next, [EnumeratorCancellation] CancellationToken ct = default)
     {
         Directory.CreateDirectory(directoryPath);
         var id = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");

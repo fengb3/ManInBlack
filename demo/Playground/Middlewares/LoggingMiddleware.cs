@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +12,7 @@ namespace Playground.Middlewares;
 public partial class LoggingMiddleware(ILogger<LoggingMiddleware> logger) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next, CancellationToken ct = default)
+        ChatResponseUpdateHandler next, [EnumeratorCancellation] CancellationToken ct = default)
     {
         Log发送Count条消息模型Model(logger, context.Messages.Count, context.Options?.ModelId ?? "unknown");
 

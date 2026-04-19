@@ -188,15 +188,15 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         // function call（assistant 消息中的工具调用）
         foreach (var fc in msg.Contents.OfType<FunctionCallContent>())
         {
-            var argsJson = fc.Arguments.Count > 0
+            var argsJson = fc.Arguments!.Count > 0
                 ? JsonSerializer.Serialize(fc.Arguments)
                 : "{}";
             parts.Add(new JsonObject
             {
                 ["functionCall"] = new JsonObject
                 {
-                    ["name"] = fc.Name,
-                    ["args"] = JsonNode.Parse(argsJson)
+                    ["name"] = fc.Name!,
+                    ["args"] = JsonNode.Parse(argsJson)!
                 }
             });
         }

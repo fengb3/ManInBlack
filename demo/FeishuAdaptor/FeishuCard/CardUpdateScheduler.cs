@@ -1,6 +1,7 @@
 using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using ManInBlack.AI.Core.Attributes;
+using Microsoft.Extensions.Logging;
 
 namespace FeishuAdaptor.FeishuCard;
 
@@ -12,6 +13,7 @@ namespace FeishuAdaptor.FeishuCard;
 public class CardUpdateScheduler : IAsyncDisposable
 {
     private readonly IFeishuTenantApi _api;
+    private readonly ILogger<CardUpdateScheduler> _logger;
     private const int MaxPerSecond = 50;
     private const int MaxPerMinute = 1000;
 
@@ -27,9 +29,10 @@ public class CardUpdateScheduler : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _processingTask;
 
-    public CardUpdateScheduler(IFeishuTenantApi api)
+    public CardUpdateScheduler(IFeishuTenantApi api, ILogger<CardUpdateScheduler> logger)
     {
         _api = api;
+        _logger = logger;
         _processingTask = ProcessLoopAsync();
     }
 
@@ -74,10 +77,10 @@ public class CardUpdateScheduler : IAsyncDisposable
             // 按限流规则逐个发送
             foreach (var item in batch)
             {
-                await WaitForRateLimitAsync(_cts.Token);
-
                 try
                 {
+                    await WaitForRateLimitAsync(_cts.Token);
+
                     await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
                         item.Key.CardId,
                         item.Key.ElementId,
@@ -92,6 +95,12 @@ public class CardUpdateScheduler : IAsyncDisposable
                 catch (OperationCanceledException)
                 {
                     return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "更新卡片元素失败 CardId={CardId} ElementId={ElementId} Sequence={Sequence}",
+                        item.Key.CardId, item.Key.ElementId, item.Update.Sequence);
                 }
             }
         }
@@ -162,6 +171,10 @@ public class CardUpdateScheduler : IAsyncDisposable
             await _processingTask;
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CardUpdateScheduler 关闭时发生异常");
+        }
 
         _cts.Dispose();
     }

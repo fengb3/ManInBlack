@@ -80,7 +80,7 @@ public class GeminiCompatibleChatClientTests
         var fcc = response.Messages[0].Contents.OfType<FunctionCallContent>().FirstOrDefault();
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
-        Assert.Equal("Beijing", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Beijing", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]
@@ -276,7 +276,7 @@ public class GeminiCompatibleChatClientTests
         var fcc = updates.SelectMany(u => u.Contents.OfType<FunctionCallContent>()).FirstOrDefault();
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
-        Assert.Equal("Beijing", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Beijing", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]

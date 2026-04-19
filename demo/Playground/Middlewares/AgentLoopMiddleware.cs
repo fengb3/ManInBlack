@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
@@ -15,7 +16,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         while (true)
         {

@@ -65,7 +65,7 @@ public class AnthropicCompatibleChatClientTests
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
         Assert.Equal("toolu_123", fcc.CallId);
-        Assert.Equal("Beijing", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Beijing", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public class AnthropicCompatibleChatClientTests
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
         Assert.Equal("toolu_abc", fcc.CallId);
-        Assert.Equal("Shanghai", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Shanghai", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]

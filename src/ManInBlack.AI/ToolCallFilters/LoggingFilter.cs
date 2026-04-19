@@ -2,22 +2,28 @@
 using ManInBlack.AI.Core.Tools;
 using Microsoft.Extensions.Logging;
 
-namespace AgentConsole.Tools;
+namespace ManInBlack.AI.ToolCallFilters;
 
 [ServiceRegister.Scoped]
-public class LoggingFilter(ILogger<LoggingFilter> logger) : ToolCallFilter
+public partial class LoggingFilter(ILogger<LoggingFilter> logger) : ToolCallFilter
 {
     public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
     {
-        var arguments = context.Arguments.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
+        var arguments = context.Arguments!.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
         
         // set console color for better visibility
         
-        logger.LogInformation("Executing {toolName} {arguments}", context.ToolName , string.Join(", ", arguments));
+        LogExecutingToolNameArguments(logger, context.ToolName, string.Join(", ", arguments));
         
         await next(context);
         
-        logger.LogInformation("Executed {toolName} {resultLength}", context.ToolName ,context.Result.ToString().Length);
+        LogExecutedToolNameResultLength(logger, context.ToolName, context.Result?.ToString()?.Length ?? 0);
        
     }
+
+    [LoggerMessage(LogLevel.Information, "Executing {toolName} {arguments}")]
+    static partial void LogExecutingToolNameArguments(ILogger<LoggingFilter> logger, string toolName, string arguments);
+
+    [LoggerMessage(LogLevel.Information, "Executed {toolName} with result have {resultLength} length")]
+    static partial void LogExecutedToolNameResultLength(ILogger<LoggingFilter> logger, string toolName, int resultLength);
 }

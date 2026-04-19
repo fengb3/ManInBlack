@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
@@ -12,7 +13,7 @@ public class SystemPromptInjectionMiddleware() : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         
         // Console.ForegroundColor = ConsoleColor.DarkGreen;
@@ -32,7 +33,7 @@ public class UserInputMiddleware() : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         // Console.ForegroundColor = ConsoleColor.DarkGreen;
         // Console.BackgroundColor = ConsoleColor.Magenta;

@@ -84,7 +84,7 @@ public class LoggingFilter : ToolCallFilter
 {
     public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
     {
-        var arguments = context.Arguments.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
+        var arguments = context.Arguments!.Select(pair => $"{pair.Key}: {pair.Value}").ToArray();
         
         // set console color for better visibility
         var originalColor = Console.ForegroundColor;

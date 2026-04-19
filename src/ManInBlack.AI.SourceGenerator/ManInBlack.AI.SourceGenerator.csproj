@@ -6,6 +6,7 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <NoWarn>RS2008</NoWarn>
     <!-- this one ensuer u have referenced packages when u build 👇 -->
     <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
   </PropertyGroup>
