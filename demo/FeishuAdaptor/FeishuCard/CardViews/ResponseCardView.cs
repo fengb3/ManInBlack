@@ -67,8 +67,8 @@ public partial class ToolExecutionCardView(
 {
     protected override void Define()
     {
-        Card.Config!.StreamingConfig!.PrintFrequencyMs = 500;
-        Card.Config!.StreamingConfig!.PrintStep = 500;
+        // Card.Config!.StreamingConfig!.PrintFrequencyMs = 100;
+        // Card.Config!.StreamingConfig!.PrintStep = 100;
 
         Card.Config!.WidthMode = "300px";
         

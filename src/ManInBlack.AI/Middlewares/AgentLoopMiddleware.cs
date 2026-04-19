@@ -4,6 +4,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Core.Tools;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
 
@@ -11,7 +12,7 @@ namespace ManInBlack.AI.Middlewares;
 /// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史
 /// </summary>
 [ServiceRegister.Scoped]
-public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
+public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContext> logger) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
@@ -74,13 +75,14 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor) : AgentMiddleware
 
                 await toolExecutor.ExecuteAsync(toolCtx, ct);
 
-                // if (toolCtx.Error != null)
-                // {
-                //     Console.BackgroundColor = ConsoleColor.Red;
-                //     Console.ForegroundColor = ConsoleColor.White;
-                //     Console.WriteLine($"Error: {toolCtx.Error}");
-                //     Console.ResetColor();
-                // }
+                if (toolCtx.Error != null)
+                {
+                    Console.BackgroundColor = ConsoleColor.Red;
+                    Console.ForegroundColor = ConsoleColor.White;
+                    // Console.WriteLine($"Error: {toolCtx.Error}");
+                    logger.LogError(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
+                    Console.ResetColor();
+                }
                 
                 var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
                 toolResults.Add(result);

@@ -7,21 +7,21 @@ namespace ManInBlack.AI.Tools;
 public partial class SkillTools(Services.SkillService skillService)
 {
     /// <summary>
-    /// Load specialized knowledge by name.
+    /// Load specialized skill content by name.
     /// </summary>
-    /// <param name="skillName">skill name to load</param>
+    /// <param name="name">skill name to load</param>
     /// <returns>skill content if success</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
-    public string LoadSkill(string skillName) => skillService.GetContent(skillName);
+    public string LoadSkill(string name) => skillService.GetContent(name);
 
-
-    /// <summary>
-    /// Install a skill from a file path. that file should have extension .skill
-    /// </summary>
-    /// <param name="skillFilePath">.skill file path</param>
-    /// <returns>result of skill installation</returns>
-    [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
-    public string InstallSkill(string skillFilePath) => skillService.InstallSkill(skillFilePath);
+    //
+    // /// <summary>
+    // /// Install a skill from a file path. that file should have extension .skill
+    // /// </summary>
+    // /// <param name="skillFilePath">.skill file path</param>
+    // /// <returns>result of skill installation</returns>
+    // [AiTool]
+    // [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    // public string InstallSkill(string skillFilePath) => skillService.InstallSkill(skillFilePath);
 }
