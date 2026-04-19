@@ -23,7 +23,7 @@ public class ReasoningCardView(LlmReasoningViewModel viewModel, CardService card
         {
             Title = new TextElement { Content = "🤔琢磨琢磨" },
             Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
-            BackgroundColor = "lime-100",
+            BackgroundColor = "lime-300",
             IconPosition = "right",
             IconExpandedAngle = -180,
         };
@@ -71,6 +71,21 @@ public partial class ToolExecutionCardView(
 
         var resultText = BindMarkdown(vm => vm.Result);
 
-        AddToBody(toolNameText, argumentsText, Hr(), resultText);
+        var panel = CollapsiblePanel(builder =>
+        {
+            builder.Element(toolNameText);
+            builder.Element(argumentsText);
+            builder.Element(resultText);
+        });
+        panel.Expanded = false;
+        panel.Header = new CollapsiblePanelHeader
+        {
+            Title = new TextElement { Content = "🔧工具执行", TextColor = "orange-700"},
+            Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
+            BackgroundColor = "indigo-100",
+            IconPosition = "right",
+            IconExpandedAngle = -180,
+        };
+        AddToBody(panel);
     }
 }

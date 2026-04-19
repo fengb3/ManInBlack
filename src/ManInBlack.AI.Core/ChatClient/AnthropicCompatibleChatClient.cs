@@ -221,10 +221,10 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
                     contentArray.Add(new JsonObject
                     {
                         ["type"] = "tool_use",
-                        ["id"] = fc.CallId,
-                        ["name"] = fc.Name,
-                        ["input"] = fc.Arguments.Count > 0
-                            ? JsonNode.Parse(JsonSerializer.Serialize(fc.Arguments))
+                        ["id"] = fc.CallId!,
+                        ["name"] = fc.Name!,
+                        ["input"] = fc.Arguments!.Count > 0
+                            ? JsonNode.Parse(JsonSerializer.Serialize(fc.Arguments))!
                             : new JsonObject()
                     });
                 }

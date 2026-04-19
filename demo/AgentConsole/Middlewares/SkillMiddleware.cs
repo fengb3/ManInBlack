@@ -1,4 +1,5 @@
-﻿using AgentConsole.Tools;
+﻿using System.Runtime.CompilerServices;
+using AgentConsole.Tools;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
@@ -13,7 +14,7 @@ public class SkillMiddleware(SkillTools skillTools) : AgentMiddleware
 {
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next, CancellationToken ct = default)
+        ChatResponseUpdateHandler next, [EnumeratorCancellation] CancellationToken ct = default)
     {
         // 有技能时才注入提示词和tool声明
         if (skillTools.HasSkills())

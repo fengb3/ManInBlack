@@ -1,14 +1,16 @@
 using System.Diagnostics;
 using System.Text;
+using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.ToolCallFilters;
 
-namespace AgentConsole.Tools;
+namespace ManInBlack.AI.Tools;
 
 /// <summary>
 /// 命令行工具，允许 AI 执行系统命令
 /// </summary>
 [ServiceRegister.Scoped]
-public partial class CommandLineTools
+public partial class CommandLineTools(IUserWorkspace workspace)
 {
     /// <summary>
     /// Run a PowerShell command and return its output.
@@ -16,12 +18,14 @@ public partial class CommandLineTools
     /// <param name="command">The PowerShell command to execute</param>
     /// <returns>The output of the executed command</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter>]
+    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string RunPowershell(string command)
     {
+        Directory.CreateDirectory(workspace.WorkingDirectory);
         var processInfo = new ProcessStartInfo
         {
             FileName               = "pwsh",
+            WorkingDirectory       = workspace.WorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
             StandardOutputEncoding = Encoding.UTF8,
@@ -50,11 +54,14 @@ public partial class CommandLineTools
     /// <param name="command">The Bash command to execute</param>
     /// <returns>The output of the executed command</returns>
     [AiTool]
+    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string RunBash(string command)
     {
+        Directory.CreateDirectory(workspace.WorkingDirectory);
         var processInfo = new ProcessStartInfo
         {
-            FileName               = "/bin/bash",
+            FileName               = "bash",
+            WorkingDirectory       = workspace.WorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
             StandardOutputEncoding = Encoding.UTF8,

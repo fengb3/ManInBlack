@@ -33,7 +33,6 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
         if (expression.Body is not MemberExpression memberExpression)
         {
             throw new ArgumentException("expression should be a member expression");
-            return;
         }
 
         // 赋初始值
@@ -52,6 +51,8 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
             if (e.PropertyName != memberExpression.Member.Name) return;
 
             var newValue = valueGetter(ViewModel);
+            
+            if (string.IsNullOrWhiteSpace(newValue)) return;
 
             var elementId = apply(ViewModel);
 
@@ -105,6 +106,15 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
     public async Task SendToUserAsync(string userIdType, string userId, CancellationToken ct = default)
     {
         await CardService.SendMessageAsync(CardId, userIdType, userId, ct);
+    }
+
+    /// <summary>
+    /// 关闭卡片流式模式，通知飞书客户端渲染最终内容。
+    /// </summary>
+    public async Task CloseStreamingAsync(CancellationToken ct = default)
+    {
+        var seq = GetNextSequence();
+        await CardService.CloseStreamingAsync(CardId, seq, ct);
     }
 
     #endregion

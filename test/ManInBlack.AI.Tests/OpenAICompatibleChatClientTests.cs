@@ -73,7 +73,7 @@ public class OpenAICompatibleChatClientTests
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
         Assert.Equal("call_123", fcc.CallId);
-        Assert.Equal("Beijing", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Beijing", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]
@@ -212,7 +212,7 @@ public class OpenAICompatibleChatClientTests
         var fcc = response.Messages[0].Contents.OfType<FunctionCallContent>().FirstOrDefault();
         Assert.NotNull(fcc);
         Assert.Equal("bad_tool", fcc.Name);
-        Assert.Empty(fcc.Arguments);
+        Assert.Empty(fcc.Arguments!);
     }
 
     #endregion
@@ -263,7 +263,7 @@ public class OpenAICompatibleChatClientTests
         Assert.NotNull(fcc);
         Assert.Equal("get_weather", fcc.Name);
         Assert.Equal("call_abc", fcc.CallId);
-        Assert.Equal("Beijing", fcc.Arguments["city"]?.ToString());
+        Assert.Equal("Beijing", fcc.Arguments!["city"]?.ToString());
     }
 
     [Fact]
@@ -382,7 +382,7 @@ public class OpenAICompatibleChatClientTests
         var fcc = updates.SelectMany(u => u.Contents.OfType<FunctionCallContent>()).FirstOrDefault();
         Assert.NotNull(fcc);
         Assert.Equal("search", fcc.Name);
-        Assert.Equal("test", fcc.Arguments["q"]?.ToString());
+        Assert.Equal("test", fcc.Arguments!["q"]?.ToString());
     }
 
     [Fact]

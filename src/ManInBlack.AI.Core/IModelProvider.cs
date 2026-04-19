@@ -31,7 +31,7 @@ public abstract class ModelProvider : IModelProvider
     #endregion
 
     #region chanage in run time
-    public string ApiKey { get; set; }
+    public string ApiKey { get; set; } = null!;
 
     #endregion
 }

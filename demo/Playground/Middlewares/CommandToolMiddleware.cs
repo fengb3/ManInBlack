@@ -1,14 +1,16 @@
-﻿using ManInBlack.AI.Core.Middleware;
+﻿using System.Runtime.CompilerServices;
+using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 // using Playground.Tools;
 
 namespace Playground.Middlewares;
-
-public class CommandToolMiddleware(ILogger<CommandToolMiddleware> logger, IServiceProvider sp) : AgentMiddleware
+#pragma warning disable CS9113 // Parameter is unread
+public class CommandToolMiddleware(ILogger<CommandToolMiddleware> _logger, IServiceProvider _sp) : AgentMiddleware
+#pragma warning restore CS9113 // Parameter is unread
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next, CancellationToken ct = default)
+        ChatResponseUpdateHandler next, [EnumeratorCancellation] CancellationToken ct = default)
     {
         // var tools = CommandLineTools.AllToolDeclarations;
         //

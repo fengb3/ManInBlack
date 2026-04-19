@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
-using AgentConsole.Tools;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Middlewares;
@@ -29,22 +29,22 @@ public class CommandToolMiddleware : AgentMiddleware
     }
 }
 
-[ServiceRegister.Scoped]
-public class SimpleMathToolMiddleware : AgentMiddleware
-{
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next,
-        [EnumeratorCancellation] CancellationToken ct = default)
-    {
-        var tools = SimpleMathTools.AllToolDeclarations;
-
-        context.Options ??= new ChatOptions();
-        context.Options.Tools ??= [];
-
-        foreach (var tool in tools)
-            context.Options.Tools!.Add(tool);
-
-        await foreach (var update in next().WithCancellation(ct))
-            yield return update;
-    }
-}
+// [ServiceRegister.Scoped]
+// public class SimpleMathToolMiddleware : AgentMiddleware
+// {
+//     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+//         ChatResponseUpdateHandler next,
+//         [EnumeratorCancellation] CancellationToken ct = default)
+//     {
+//         var tools = SimpleMathTools.AllToolDeclarations;
+//
+//         context.Options ??= new ChatOptions();
+//         context.Options.Tools ??= [];
+//
+//         foreach (var tool in tools)
+//             context.Options.Tools!.Add(tool);
+//
+//         await foreach (var update in next().WithCancellation(ct))
+//             yield return update;
+//     }
+// }

@@ -1,5 +1,6 @@
-﻿using AgentConsole.Tools;
+﻿using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Middlewares;
@@ -9,16 +10,16 @@ namespace ManInBlack.AI.Middlewares;
 /// 1. system prompt 注入提示词
 /// 2. 添加 skill tool
 /// </summary>
-public class SkillMiddleware(SkillTools skillTools) : AgentMiddleware
+public class SkillMiddleware(SkillService skillService) : AgentMiddleware
 {
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
-        ChatResponseUpdateHandler next, CancellationToken ct = default)
+        ChatResponseUpdateHandler next, [EnumeratorCancellation] CancellationToken ct = default)
     {
         // 有技能时才注入提示词和tool声明
-        if (skillTools.HasSkills())
+        if (skillService.HasSkills())
         {
-            var skillDescriptions = skillTools.GetDescriptions();
+            var skillDescriptions = skillService.GetDescriptions();
 
             context.SystemPrompt +=
                 $"""
@@ -26,7 +27,7 @@ public class SkillMiddleware(SkillTools skillTools) : AgentMiddleware
                  ## Available Skills
                  {skillDescriptions}
 
-                 When a task matches one of the skills above, call the `{nameof(skillTools.LoadSkill)}` tool first to load the full skill instructions, then follow them.
+                 When a task matches one of the skills above, call the `LoadSkill` tool first to load the full skill instructions, then follow them.
                  all the skill's scripts are located under "skills/<skill_name>/scripts/".
                  """;
 
