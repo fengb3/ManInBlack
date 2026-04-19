@@ -1,7 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
+using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
+using SkillService = ManInBlack.AI.Services.SkillService;
 
 namespace ManInBlack.AI.Middlewares;
 
@@ -10,6 +12,7 @@ namespace ManInBlack.AI.Middlewares;
 /// 1. system prompt 注入提示词
 /// 2. 添加 skill tool
 /// </summary>
+[ServiceRegister.Scoped]
 public class SkillMiddleware(SkillService skillService) : AgentMiddleware
 {
 
@@ -28,7 +31,6 @@ public class SkillMiddleware(SkillService skillService) : AgentMiddleware
                  {skillDescriptions}
 
                  When a task matches one of the skills above, call the `LoadSkill` tool first to load the full skill instructions, then follow them.
-                 all the skill's scripts are located under "skills/<skill_name>/scripts/".
                  """;
 
             // 注入 skill tool 声明

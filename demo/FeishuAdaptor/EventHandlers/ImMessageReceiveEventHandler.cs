@@ -1,4 +1,6 @@
-﻿using FeishuAdaptor.Middlewares;
+﻿using System.Text.Json;
+using FeishuAdaptor.Helper;
+using FeishuAdaptor.Middlewares;
 using FeishuNetSdk.Im.Events;
 using FeishuNetSdk.Services;
 using ManInBlack.AI;
@@ -51,11 +53,44 @@ public class ImMessageReceiveEventHandler(
         agentContext.AgentId = Guid.NewGuid().ToString();
         agentContext.ParentId = input.Event!.Sender!.SenderId!.OpenId!;
         agentContext.ParentType = "FeishuUser";
-        agentContext.UserInput = input.Event.Message!.Content!;
+        
+        var userInputContent = input.Event.Message?.Content;
+        
+        // load it into JSON
+        var userInputContentJson = JsonElement.Parse(userInputContent!);
+
+        if (!userInputContentJson.TryGetProperty("text", out var textJson))
+        {
+            // 不支持的消息类型
+            logger.LogWarning(
+                "Unsupported message type from user {userId}: {content}",
+                input.Event.Sender.SenderId.OpenId,
+                userInputContent
+            );
+            return;
+        }
+
+        agentContext.UserInput = textJson.GetString() ?? "";
 
         var updates = pipeline(agentContext);
         await foreach (var _ in updates.WithCancellation(ct))
         {
         }
+    }
+}
+
+
+public class ImMessageReadEventHandler(
+    ILogger<EventHandler> logger
+) : IEventHandler<EventV2Dto<ImMessageMessageReadV1EventBodyDto>, ImMessageMessageReadV1EventBodyDto>
+{
+    public Task ExecuteAsync(EventV2Dto<ImMessageMessageReadV1EventBodyDto> input, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation(
+            "{messageId} messages has been read",
+            input.Event?.MessageIdList?.Length.ToString() ?? "unknown"
+        );
+        
+        return Task.CompletedTask;
     }
 }

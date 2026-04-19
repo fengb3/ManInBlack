@@ -35,4 +35,8 @@
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="agent-workspace\ou_a1eef73df84a8a400da4010289610e2f\history\" />
+    </ItemGroup>
+
 </Project>

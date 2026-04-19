@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
 
@@ -9,7 +10,7 @@ namespace ManInBlack.AI.Middlewares;
 /// 注入系统提示词中间件, 系统提示次构建的其他中间件 需要再此中间件之前执行，在消息列表开头插入系统提示消息
 /// </summary>
 [ServiceRegister.Scoped]
-public class SystemPromptInjectionMiddleware() : AgentMiddleware
+public class SystemPromptInjectionMiddleware(ILogger<SystemPromptInjectionMiddleware> logger) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
@@ -21,6 +22,8 @@ public class SystemPromptInjectionMiddleware() : AgentMiddleware
         // Console.WriteLine("add system prompt to context: " + context.SystemPrompt);
         // Console.ResetColor();
         
+        var systemPromptFirst4lines = string.Join('\n', context.SystemPrompt.Split('\n').Take(4));
+        logger.LogInformation("Inject system prompt to context: {SystemPrompt} ...", systemPromptFirst4lines);
         context.Messages.Insert(0, new ChatMessage(ChatRole.System, context.SystemPrompt));
 
         await foreach (var update in next().WithCancellation(ct))

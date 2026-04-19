@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,27 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
+        
+        // 重置对话 command
+        if(UserInputCommandHelper.FetchCommand(context.UserInput, out var command, out var parameters))
+        {
+            // 如果是清除上下文的命令，直接清空持久化文件和上下文消息
+            if (command is "clear" or "reset" or "new")
+            {
+                workspace.NewSession();
+                context.Messages.Clear();
+                yield return new ChatResponseUpdate
+                {
+                    AuthorName = null,
+                    Role = ChatRole.Assistant,
+                    Contents = [new TextContent("已重置对话")],
+                    CreatedAt = DateTimeOffset.UtcNow,
+
+                };
+                yield break;
+            }
+        }
+        
 
         var messages = workspace.Initialize(); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
 
