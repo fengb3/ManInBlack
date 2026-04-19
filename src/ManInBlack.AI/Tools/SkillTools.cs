@@ -4,7 +4,7 @@ using ManInBlack.AI.ToolCallFilters;
 namespace ManInBlack.AI.Tools;
 
 [ServiceRegister.Scoped]
-public partial class SkillTools(SkillService skillService)
+public partial class SkillTools(Services.SkillService skillService)
 {
     /// <summary>
     /// Load specialized knowledge by name.

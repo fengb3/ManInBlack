@@ -488,5 +488,4 @@ $RECYCLE.BIN/
 *.session
 
 # AI tools
-*/agent-workspace/
 /*/*/agent-workspace

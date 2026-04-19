@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using ManInBlack.AI.Core.Attributes;
 
-namespace ManInBlack.AI.EventBus;
+namespace ManInBlack.AI.Services;
 
 /// <summary>
 /// 作用域标识，每个 DI Scope 内唯一

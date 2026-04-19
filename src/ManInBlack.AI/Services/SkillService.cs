@@ -1,7 +1,7 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 
-namespace ManInBlack.AI.Tools;
+namespace ManInBlack.AI.Services;
 
 [ServiceRegister.Scoped]
 public partial class SkillService
@@ -13,7 +13,7 @@ public partial class SkillService
     {
         _userWorkspace = userWorkspace;
         InitializeSkills(Path.Combine(userWorkspace.AgentRoot, "skills")); // built-in skills
-        InitializeSkills(Path.Combine(userWorkspace.UserRoot, "skills")); // user's skills
+        InitializeSkills(Path.Combine(userWorkspace.UserRoot, "workspace", ".agents", "skills")); // user's skills
     }
 
     public bool HasSkills() => _skills.Count > 0;

@@ -5,7 +5,7 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using Microsoft.Extensions.AI;
 
-namespace ManInBlack.AI.Storage;
+namespace ManInBlack.AI.Services;
 
 /// <summary>
 /// 基于文件系统的用户工作空间实现

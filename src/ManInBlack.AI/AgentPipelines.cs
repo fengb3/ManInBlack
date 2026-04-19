@@ -10,6 +10,7 @@ public static class AgentPipelineBuilderExtensions
         return builder
                 .Use<LoggingMiddleware>()
                 .Use<MessageEnrichMiddleware>()
+                .Use<SkillMiddleware>()
                 .Use<SystemPromptInjectionMiddleware>()
                 .Use<ReadPersistenceMiddleware>()
                 .Use<SavePersistenceMiddleware>()

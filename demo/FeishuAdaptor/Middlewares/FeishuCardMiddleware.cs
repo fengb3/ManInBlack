@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using FeishuAdaptor.FeishuCard.CardViews;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.EventBus;
+using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
 

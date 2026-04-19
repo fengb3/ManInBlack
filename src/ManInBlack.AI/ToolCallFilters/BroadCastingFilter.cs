@@ -1,10 +1,11 @@
 ﻿using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Tools;
+using ManInBlack.AI.Services;
 
 namespace ManInBlack.AI.ToolCallFilters;
 
 [ServiceRegister.Scoped]
-public class BroadCastingFilter(EventBus.EventBus eventBus) : ToolCallFilter
+public class BroadCastingFilter(EventBus eventBus) : ToolCallFilter
 {
     public override async Task ExecuteAsync(ToolExecuteContext context, Func<ToolExecuteContext, Task> next)
     {
