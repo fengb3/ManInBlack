@@ -1,6 +1,7 @@
 using AgentConsole;
 using AgentConsole.Middlewares;
 using AgentConsole.Tools;
+using DotNetEnv;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Core.Tools;
@@ -8,23 +9,29 @@ using ManInBlack.AI.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-// ============ 配置（替换为你自己的值） ============
-var provider = new ZhipuCodingPlanProvider()
-{
-    ApiKey = "YOUR_ZHIPU_API_KEY_HERE",
-};
-const string modelId = "glm-4.7";
-// =================================================
 
-
+// read comfiguration form the fucking .env file, which should be placed in the same directory as the executable, and contains the following variables:
+var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
+if (File.Exists(envPath))
+    Env.Load(envPath);
+else
+    Env.Load();
 
 // 构建 DI 容器
 var services = new ServiceCollection();
-services.AddManInBlackCore(opt => {
-    opt.ModelChoice = new ModelChoice { Provider = provider, ModelId = modelId };
+services.AddManInBlackCore(opt =>
+{
+    opt.ModelChoice = new ModelChoice
+    {
+        Provider = new OpenAIProvider()
+        {
+            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "",
+            BaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "",
+        },
+        ModelId = Environment.GetEnvironmentVariable("OPENAI_MODEL_ID") ?? "",
+    };
 });
-services.AddAutoRegisteredServices();
-services.AddToolExecutor();
+
 
 var rootSp = services.BuildServiceProvider();
 
@@ -77,8 +84,6 @@ agentContext.UserInput    = $"帮我查看当前磁盘使用情况";
 var updates = pipeline(agentContext);
 
 Console.WriteLine("=== ManInBlack Agent Console ===");
-Console.WriteLine($"模型: {provider.ProviderName} / {modelId}");
-Console.WriteLine($"用户: {agentContext.UserInput}");
 Console.WriteLine();
 
 await foreach (ChatResponseUpdate update in updates)
