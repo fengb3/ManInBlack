@@ -73,7 +73,7 @@ public class FeishuCardMiddleware(
 
                         toolExecVm.ToolName = fcc.Name;
                         toolExecVm.Arguments =
-                            string.Join(", ", fcc.Arguments.Select(pair => $"{pair.Key}: {pair.Value}"));
+                            string.Join(", ", fcc.Arguments?.Select(pair => $"{pair.Key}: {pair.Value} ") ?? []);
 
                         break;
                     }

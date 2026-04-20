@@ -12,9 +12,7 @@ using ManInBlack.AI.Core.Middleware;
 namespace FeishuAdaptor.EventHandlers;
 
 public class ImMessageReceiveEventHandler(
-    ILogger<EventHandler> logger,
-    AgentLauncher agentLauncher,
-    IServiceProvider sp
+    AgentLauncher agentLauncher
 )
     : IEventHandler<EventV2Dto<ImMessageReceiveV1EventBodyDto>, ImMessageReceiveV1EventBodyDto>
 {
@@ -42,7 +40,7 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
         
         logger.LogInformation(
             "Received message from user {userId}: {content}",
-            input.Event.Sender.SenderId.OpenId,
+            input.Event!.Sender!.SenderId!.OpenId,
             input.Event.Message?.Content
         );
 
@@ -83,9 +81,9 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
 
     private async Task<string> HandleMessage(IServiceProvider sp,EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken ct = default)
     {
-        var userId         = input.Event.Sender.SenderId.OpenId;
-        var messageType    = input.Event.Message.MessageType;
-        var messageContent = input.Event.Message.Content;
+        var userId         = input.Event!.Sender!.SenderId!.OpenId!;
+        var messageType    = input.Event!.Message!.MessageType!;
+        var messageContent = input.Event!.Message!.Content!;
 
         var result = "";
 
@@ -101,7 +99,7 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
                     var doc       = JsonDocument.Parse(messageContent);
                     var fileKey   = doc.RootElement.GetProperty("file_key").GetString()!;
                     var fileName  = doc.RootElement.GetProperty("file_name").GetString()!;
-                    var messageId = input.Event.Message.MessageId;
+                    var messageId = input.Event!.Message!.MessageId!;
 
                     var savePath       = Path.Combine(userWorkspace.WorkingDirectory, fileName);
 

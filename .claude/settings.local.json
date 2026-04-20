@@ -28,7 +28,9 @@
       "Bash(find C:\\\\Users\\\\fohhy\\\\source\\\\repos\\\\ManInBlack:*)",
       "Bash(findstr feishu:*)",
       "Bash(find:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(grep -E \"\\\\.\\(json|xml|html\\)$\")",
+      "Bash(git -C /c/Users/fohhy/source/repos/ManInBlack status -- src/ManInBlack.AI/Middlewares/RetryMiddleware.cs src/ManInBlack.AI.Core/DependencyInjection.cs)"
     ]
   }
 }
