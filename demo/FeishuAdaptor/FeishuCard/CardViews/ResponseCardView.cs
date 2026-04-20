@@ -16,7 +16,7 @@ public class ReasoningCardView(LlmReasoningViewModel viewModel, CardService card
 {
     protected override void Define()
     {
-        Card.Config!.WidthMode = "300px";
+        // Card.Config!.WidthMode = "300px";
         
         var reasoningMarkdown = BindMarkdown(vm => vm.Reasoning);
         var panel = CollapsiblePanel(builder => { builder.Element(reasoningMarkdown); });
@@ -70,7 +70,7 @@ public partial class ToolExecutionCardView(
         // Card.Config!.StreamingConfig!.PrintFrequencyMs = 100;
         // Card.Config!.StreamingConfig!.PrintStep = 100;
 
-        Card.Config!.WidthMode = "300px";
+        // Card.Config!.WidthMode = "300px";
         
         var toolNameText = BindMarkdown(vm => vm.ToolName);
 

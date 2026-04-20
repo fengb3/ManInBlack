@@ -17,6 +17,15 @@ public partial class CommandLineTools(IUserWorkspace workspace)
 
     private sealed record BackgroundTask(Process Process, TaskCompletionSource<string> Tcs);
 
+    private static string FindBashExecutable()
+    {
+        if (!OperatingSystem.IsWindows()) return "bash";
+
+        // 优先使用 Git Bash，避免在装有 WSL 时误用 WSL bash
+        var gitBash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "bash.exe");
+        return File.Exists(gitBash) ? gitBash : "bash";
+    }
+
     // /// <summary>
     // /// Run a PowerShell command and return its output.
     // /// </summary>
@@ -115,7 +124,7 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         Directory.CreateDirectory(workspace.WorkingDirectory);
         var processInfo = new ProcessStartInfo
         {
-            FileName               = "bash",
+            FileName               = FindBashExecutable(),
             WorkingDirectory       = workspace.WorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
