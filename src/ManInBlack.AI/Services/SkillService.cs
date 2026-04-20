@@ -1,5 +1,6 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Services;
 
@@ -9,11 +10,21 @@ public partial class SkillService
     private readonly Dictionary<string, SkillEntry> _skills = new();
     private readonly IUserWorkspace _userWorkspace;
 
-    public SkillService(IUserWorkspace userWorkspace)
+    public SkillService(IUserWorkspace userWorkspace, ILogger<SkillService> logger)
     {
         _userWorkspace = userWorkspace;
         InitializeSkills(Path.Combine(userWorkspace.AgentRoot, "skills")); // built-in skills
         InitializeSkills(Path.Combine(userWorkspace.UserRoot, "workspace", ".agents", "skills")); // user's skills
+        
+        // Log loaded skills
+        if (_skills.Count == 0)
+        {
+            logger.LogInformation("No skills loaded.");
+        }
+        else
+        {
+            logger.LogInformation("Loaded {Count} skills: {Skills}", _skills.Count, string.Join(", ", _skills.Keys));
+        }
     }
 
     public bool HasSkills() => _skills.Count > 0;
@@ -23,11 +34,7 @@ public partial class SkillService
     /// </summary>
     private void InitializeSkills(string skillsDir)
     {
-        if (!Directory.Exists(skillsDir))
-        {
-            Console.WriteLine(skillsDir);
-            return;
-        }
+        Directory.CreateDirectory(skillsDir);
 
         foreach (
             var file in Directory

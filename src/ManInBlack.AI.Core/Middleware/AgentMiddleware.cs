@@ -2,6 +2,10 @@ using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Core.Middleware;
 
+
+/// <summary>
+/// equal to <see cref="Func&lt;IAsyncEnumerable&lt;ChatResponseUpdate&gt;&gt;"/>, represents the next middleware in the pipeline that returns an async stream of chat response updates
+/// </summary>
 public delegate IAsyncEnumerable<ChatResponseUpdate> ChatResponseUpdateHandler();
 
 /// <summary>

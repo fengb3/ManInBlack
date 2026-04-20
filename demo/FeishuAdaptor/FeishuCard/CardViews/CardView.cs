@@ -110,9 +110,11 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
 
     /// <summary>
     /// 关闭卡片流式模式，通知飞书客户端渲染最终内容。
+    /// 关闭前会先刷新调度器中该卡片的所有待发送更新，确保最后一部分内容不丢失。
     /// </summary>
     public async Task CloseStreamingAsync(CancellationToken ct = default)
     {
+        await Scheduler.FlushAsync(CardId, ct);
         var seq = GetNextSequence();
         await CardService.CloseStreamingAsync(CardId, seq, ct);
     }

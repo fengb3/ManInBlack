@@ -11,12 +11,14 @@ public static class AgentPipelineBuilderExtensions
                 .Use<LoggingMiddleware>()
                 .Use<MessageEnrichMiddleware>()
                 .Use<SkillMiddleware>()
+                .Use<AgentProfileMiddleware>()
                 .Use<SystemPromptInjectionMiddleware>()
                 .Use<ReadPersistenceMiddleware>()
                 .Use<SavePersistenceMiddleware>()
                 .Use<UserInputMiddleware>()
                 .Use<ContextCompressMiddleware>()
                 .Use<CommandToolMiddleware>()
+                .Use<FileToolMiddleware>()
                 .Use<AgentLoopMiddleware>() // Agent Loop 应该在最后一个
             ;
     }
