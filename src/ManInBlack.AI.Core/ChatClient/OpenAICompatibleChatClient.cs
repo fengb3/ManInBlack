@@ -15,7 +15,10 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private readonly HttpClient _httpClient;
     private readonly string _modelId;
     private readonly string _endPoint;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
 
     public OpenAICompatibleChatClient(HttpClient httpClient, string modelId)
     {
@@ -27,7 +30,8 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     public async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var body = BuildRequestBody(messages, options, stream: false);
         var content = new StringContent(body, Encoding.UTF8, "application/json");
@@ -42,14 +46,23 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken = default
+    )
     {
         var body = BuildRequestBody(messages, options, stream: true);
         var content = new StringContent(body, Encoding.UTF8, "application/json");
 
+        // Console.WriteLine("Request body:");
+        // Console.WriteLine(body); // Debug log
+
         var request = new HttpRequestMessage(HttpMethod.Post, _endPoint) { Content = content };
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        
+        var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken
+        );
+
         // // print response body
         // Console.WriteLine("Response body:");
         // var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -64,8 +77,13 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         UsageDetails? lastUsage = null;
 
         string? line;
-        while ((line = await reader.ReadLineAsync()) is not null)
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
         {
+            // Console.ForegroundColor = ConsoleColor.Yellow;
+            // Console.BackgroundColor = ConsoleColor.DarkBlue;
+            // Console.WriteLine($"{line}"); // Debug log
+            // Console.ResetColor();
+
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                 continue;
 
@@ -74,7 +92,10 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 break;
 
             OpenAIStreamChunk? chunk = null;
-            try { chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr, JsonOptions); }
+            try
+            {
+                chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(jsonStr, JsonOptions);
+            }
             catch { }
 
             // 追踪 usage（最后一个非 null 的为最终值）
@@ -84,12 +105,13 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 {
                     InputTokenCount = chunk.Usage.PromptTokens,
                     OutputTokenCount = chunk.Usage.CompletionTokens,
-                    TotalTokenCount = chunk.Usage.PromptTokens + chunk.Usage.CompletionTokens
+                    TotalTokenCount = chunk.Usage.PromptTokens + chunk.Usage.CompletionTokens,
                 };
             }
 
             var choice = chunk?.Choices?.FirstOrDefault();
-            if (choice is null) continue;
+            if (choice is null)
+                continue;
 
             // 文本内容
             if (choice.Delta?.Content is not null)
@@ -97,17 +119,17 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 yield return new ChatResponseUpdate
                 {
                     Role = ChatRole.Assistant,
-                    Contents = [new TextContent(choice.Delta.Content)]
+                    Contents = [new TextContent(choice.Delta.Content)],
                 };
             }
 
-            // 推理内容（如 glm-4.7 的 reasoning_content）
+            // 推理内容（reasoning_content）
             if (choice.Delta?.ReasoningContent is not null)
             {
                 yield return new ChatResponseUpdate
                 {
                     Role = ChatRole.Assistant,
-                    Contents = [new TextReasoningContent(choice.Delta.ReasoningContent)]
+                    Contents = [new TextReasoningContent(choice.Delta.ReasoningContent)],
                 };
             }
 
@@ -145,10 +167,24 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                     yield return new ChatResponseUpdate
                     {
                         Role = ChatRole.Assistant,
-                        Contents = [new FunctionCallContent(tc.Id, tc.Name, args)]
+                        Contents = [new FunctionCallContent(tc.Id, tc.Name, args)],
                     };
                 }
                 toolCalls.Clear();
+            }
+        }
+
+        // 流结束后兜底输出未发送的 tool calls（部分提供商可能不发 finish_reason）
+        if (toolCalls.Count > 0)
+        {
+            foreach (var (_, tc) in toolCalls)
+            {
+                var args = ParseArguments(tc.Arguments.ToString());
+                yield return new ChatResponseUpdate
+                {
+                    Role = ChatRole.Assistant,
+                    Contents = [new FunctionCallContent(tc.Id, tc.Name, args)],
+                };
             }
         }
 
@@ -158,17 +194,21 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             yield return new ChatResponseUpdate
             {
                 Role = ChatRole.Assistant,
-                Contents = [new UsageContent(lastUsage)]
+                Contents = [new UsageContent(lastUsage)],
             };
         }
     }
 
-    private string BuildRequestBody(IEnumerable<ChatMessage> messages, ChatOptions? options, bool stream)
+    private string BuildRequestBody(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options,
+        bool stream
+    )
     {
         var body = new JsonObject
         {
             ["model"] = _modelId,
-            ["messages"] = SerializeMessages(messages)
+            ["messages"] = SerializeMessages(messages),
         };
 
         if (options?.MaxOutputTokens is not null)
@@ -205,16 +245,18 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 var calls = new JsonArray();
                 foreach (var fc in functionCalls)
                 {
-                    calls.Add(new JsonObject
-                    {
-                        ["id"] = fc.CallId,
-                        ["type"] = "function",
-                        ["function"] = new JsonObject
+                    calls.Add(
+                        new JsonObject
                         {
-                            ["name"] = fc.Name,
-                            ["arguments"] = JsonSerializer.Serialize(fc.Arguments)
+                            ["id"] = fc.CallId,
+                            ["type"] = "function",
+                            ["function"] = new JsonObject
+                            {
+                                ["name"] = fc.Name,
+                                ["arguments"] = JsonSerializer.Serialize(fc.Arguments),
+                            },
                         }
-                    });
+                    );
                 }
                 obj["tool_calls"] = calls;
                 obj["content"] = msg.Text;
@@ -224,12 +266,14 @@ public sealed class OpenAICompatibleChatClient : IChatClient
                 // 每个 FunctionResultContent 生成独立的 tool 消息
                 foreach (var result in functionResults)
                 {
-                    array.Add(new JsonObject
-                    {
-                        ["role"] = "tool",
-                        ["tool_call_id"] = result.CallId,
-                        ["content"] = result.Result?.ToString()
-                    });
+                    array.Add(
+                        new JsonObject
+                        {
+                            ["role"] = "tool",
+                            ["tool_call_id"] = result.CallId,
+                            ["content"] = result.Result?.ToString(),
+                        }
+                    );
                 }
                 // 跳过外层的 array.Add(obj)，因为已经手动添加了
                 continue;
@@ -252,33 +296,31 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             var funcObj = new JsonObject
             {
                 ["name"] = tool.Name,
-                ["description"] = tool.Description ?? ""
+                ["description"] = tool.Description ?? "",
             };
 
-            if (tool is AIFunction aiFunc)
-                funcObj["parameters"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            if (tool is AIFunctionDeclaration aiFuncDecl)
+                funcObj["parameters"] = JsonNode.Parse(aiFuncDecl.JsonSchema.GetRawText());
             else
                 funcObj["parameters"] = new JsonObject { ["type"] = "object" };
 
-            array.Add(new JsonObject
-            {
-                ["type"] = "function",
-                ["function"] = funcObj
-            });
+            array.Add(new JsonObject { ["type"] = "function", ["function"] = funcObj });
         }
         return array;
     }
 
     private ChatResponse ParseResponse(string responseJson)
     {
-        var result = JsonSerializer.Deserialize<OpenAIResponse>(responseJson, JsonOptions)
+        var result =
+            JsonSerializer.Deserialize<OpenAIResponse>(responseJson, JsonOptions)
             ?? throw new InvalidOperationException("Failed to parse OpenAI-compatible response");
 
-        var choice = result.Choices?.FirstOrDefault()
+        var choice =
+            result.Choices?.FirstOrDefault()
             ?? throw new InvalidOperationException("No choices in response");
 
-        var message = choice.Message
-            ?? throw new InvalidOperationException("No message in response");
+        var message =
+            choice.Message ?? throw new InvalidOperationException("No message in response");
 
         var contents = new List<AIContent>();
 
@@ -303,7 +345,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             {
                 InputTokenCount = result.Usage.PromptTokens,
                 OutputTokenCount = result.Usage.CompletionTokens,
-                TotalTokenCount = result.Usage.PromptTokens + result.Usage.CompletionTokens
+                TotalTokenCount = result.Usage.PromptTokens + result.Usage.CompletionTokens,
             };
         }
 
@@ -312,11 +354,18 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
     private static Dictionary<string, object?> ParseArguments(string json)
     {
-        try { return JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new(); }
-        catch { return new(); }
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
     }
 
     public void Dispose() { }
+
     public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
     #region JSON 模型
@@ -330,6 +379,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIChoice
     {
         public OpenAIMessage? Message { get; set; }
+
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
     }
@@ -337,6 +387,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIMessage
     {
         public string? Content { get; set; }
+
         [JsonPropertyName("tool_calls")]
         public List<OpenAIToolCall>? ToolCalls { get; set; }
     }
@@ -357,6 +408,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     {
         [JsonPropertyName("prompt_tokens")]
         public int PromptTokens { get; set; }
+
         [JsonPropertyName("completion_tokens")]
         public int CompletionTokens { get; set; }
     }
@@ -370,6 +422,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIStreamChoice
     {
         public OpenAIStreamDelta? Delta { get; set; }
+
         [JsonPropertyName("finish_reason")]
         public string? FinishReason { get; set; }
     }
@@ -377,8 +430,10 @@ public sealed class OpenAICompatibleChatClient : IChatClient
     private class OpenAIStreamDelta
     {
         public string? Content { get; set; }
+
         [JsonPropertyName("reasoning_content")]
         public string? ReasoningContent { get; set; }
+
         [JsonPropertyName("tool_calls")]
         public List<OpenAIStreamToolCall>? ToolCalls { get; set; }
     }

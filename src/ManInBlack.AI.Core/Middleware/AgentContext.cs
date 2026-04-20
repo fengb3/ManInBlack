@@ -12,11 +12,18 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// </summary>
     public IServiceProvider ServiceProvider { get; } = serviceProvider;
 
+    /// <summary>
+    /// Agent 标识，唯一标识一个 Agent 实例，通常是一个 GUID 字符串
+    /// </summary>
     public string AgentId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Agent 的父级标识，如果有的话，表示这个 Agent 是由哪个实体（用户或另一个 Agent）触发的
+    /// </summary>
     public string ParentId { get; set; } = string.Empty;
 
     /// <summary>
-    /// can be User or 'Agent'
+    /// Agent 的父级类型，例如 "User" 或 "Agent"，用于区分 ParentId 是用户还是另一个 Agent
     /// </summary>
     public string ParentType { get; set; } = string.Empty;
     

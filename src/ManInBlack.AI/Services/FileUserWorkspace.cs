@@ -30,7 +30,7 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
     /// <summary>
     /// 用户根目录：agent-workspace/{userId}
     /// </summary>
-    public string UserRoot => Path.Combine("agent-workspace", _userId);
+    public string UserRoot => Path.Combine("agent-workspace", "users", _userId);
 
     /// <summary>
     /// 会话目录：agent-workspace/{userId}/history
@@ -55,7 +55,7 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
         EnsureDirectoriesExist();
 
         // 获取最新的会话文件
-        var sessionFile = Directory.GetFiles(SessionsDirectory, "*.session")
+        var sessionFile = Directory.GetFiles(SessionsDirectory, "*.jsonl")
             .OrderByDescending(f => f)
             .FirstOrDefault();
 
@@ -66,13 +66,13 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
         else
         {
             _sessionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-            var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.session");
+            var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
             File.Create(newSessionFile).Dispose();
         }
 
         // 逐行读取历史消息
         var messages = new List<ChatMessage>();
-        foreach (var line in File.ReadLines(Path.Combine(SessionsDirectory, $"{_sessionId}.session")))
+        foreach (var line in File.ReadLines(Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl")))
         {
             if (string.IsNullOrWhiteSpace(line))
                 continue;
@@ -89,7 +89,7 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
         if (_sessionId == null)
             throw new InvalidOperationException("会话尚未初始化，请先调用 Initialize()。");
 
-        var sessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.session");
+        var sessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
         var json = JsonSerializer.Serialize(message, JsonOptions);
         File.AppendAllText(sessionFile, json + Environment.NewLine);
     }
@@ -101,7 +101,7 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
     {
         EnsureDirectoriesExist();
         _sessionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.session");
+        var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
         File.Create(newSessionFile).Dispose();
     }
 }

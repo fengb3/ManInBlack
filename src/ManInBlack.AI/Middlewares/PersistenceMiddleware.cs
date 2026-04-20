@@ -15,14 +15,22 @@ namespace ManInBlack.AI.Middlewares;
 [ServiceRegister.Scoped]
 public class ReadPersistenceMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
+        AgentContext context,
         ChatResponseUpdateHandler next,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default
+    )
     {
         var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
-        
+
         // 重置对话 command
-        if(UserInputCommandHelper.FetchCommand(context.UserInput, out var command, out var parameters))
+        if (
+            UserInputCommandHelper.FetchCommand(
+                context.UserInput,
+                out var command,
+                out var parameters
+            )
+        )
         {
             // 如果是清除上下文的命令，直接清空持久化文件和上下文消息
             if (command is "clear" or "reset" or "new")
@@ -35,12 +43,10 @@ public class ReadPersistenceMiddleware : AgentMiddleware
                     Role = ChatRole.Assistant,
                     Contents = [new TextContent("已重置对话")],
                     CreatedAt = DateTimeOffset.UtcNow,
-
                 };
                 yield break;
             }
         }
-        
 
         var messages = workspace.Initialize(); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
 
@@ -74,9 +80,11 @@ public class ReadPersistenceMiddleware : AgentMiddleware
 [ServiceRegister.Scoped]
 public class SavePersistenceMiddleware : AgentMiddleware
 {
-    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
+    public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
+        AgentContext context,
         ChatResponseUpdateHandler next,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default
+    )
     {
         var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
 
@@ -95,7 +103,8 @@ public class SavePersistenceMiddleware : AgentMiddleware
     /// <summary>
     /// 在消息添加到集合时自动持久化（跳过 system 角色）
     /// </summary>
-    private class PersistingMessageCollection(IList<ChatMessage> list, IUserWorkspace workspace) : Collection<ChatMessage>(list)
+    private class PersistingMessageCollection(IList<ChatMessage> list, IUserWorkspace workspace)
+        : Collection<ChatMessage>(list)
     {
         protected override void InsertItem(int index, ChatMessage item)
         {

@@ -5,9 +5,9 @@ using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using FeishuAdaptor;
 using FeishuAdaptor.FeishuCard;
-using FeishuNetSdk;
 using FeishuAdaptor.FeishuCard.Cards;
 using FeishuAdaptor.FeishuCard.CardViews;
+using FeishuNetSdk;
 using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
@@ -48,7 +48,9 @@ builder.Services.AddFeishuNetSdk(
         opts.JsonSerializeOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
-).AddFeishuWebSocket();
+)
+    // .AddFeishuWebSocket()
+;
 
 builder.Services.AddSerilog(loggerConfig =>
 {
@@ -78,22 +80,23 @@ builder.Services.AddManInBlack(opt =>
 
 builder.Services.AddAutoRegisteredServices();
 
-
 var app = builder.Build();
 
-app.MapGet("/health", () =>
-{
-    // returns random health status for demonstration purposes
-    string[] healthyTexts = ["feeling great!", "ready to serve!", "fully operational!"];
-    var random = new Random();
-    var text = healthyTexts[random.Next(healthyTexts.Length)];
-    return Results.Ok(new { status = "healthy", message = text });
-});
+app.MapGet(
+    "/health",
+    () =>
+    {
+        // returns random health status for demonstration purposes
+        string[] healthyTexts = ["feeling great!", "ready to serve!", "fully operational!"];
+        var random = new Random();
+        var text = healthyTexts[random.Next(healthyTexts.Length)];
+        return Results.Ok(new { status = "healthy", message = text });
+    }
+);
 
 app.UseFeishuEndpoint("/feishu/event/v2");
 
 app.Run();
-
 
 // ──────────── ViewModel ────────────
 

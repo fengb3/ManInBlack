@@ -17,16 +17,16 @@ public partial class LoggingMiddleware(ILogger<LoggingMiddleware> logger) : Agen
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        LogAgentAgentidReceivedInputInput(logger, context.AgentId, context.UserInput);
+        LogAgentAgentIdReceivedInputInput(logger, context.AgentId, context.UserInput);
 
         await foreach (var update in next().WithCancellation(ct)) yield return update;
         
-        LogAgentAgentidCompletedResponse(logger, context.AgentId);
+        LogAgentAgentIdCompletedResponse(logger, context.AgentId);
     }
 
     [LoggerMessage(LogLevel.Information, "Agent {agentId} received input: {input}")]
-    static partial void LogAgentAgentidReceivedInputInput(ILogger<LoggingMiddleware> logger, string agentId, string input);
+    static partial void LogAgentAgentIdReceivedInputInput(ILogger<LoggingMiddleware> logger, string agentId, string input);
 
     [LoggerMessage(LogLevel.Information, "Agent {agentId} completed response")]
-    static partial void LogAgentAgentidCompletedResponse(ILogger<LoggingMiddleware> logger, string agentId);
+    static partial void LogAgentAgentIdCompletedResponse(ILogger<LoggingMiddleware> logger, string agentId);
 }

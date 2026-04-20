@@ -56,6 +56,40 @@ public class CardUpdateScheduler : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 立即发送指定卡片的所有待发送更新，确保内容在关闭流式模式前已送达。
+    /// </summary>
+    public async Task FlushAsync(string cardId, CancellationToken ct = default)
+    {
+        List<((string CardId, string ElementId) Key, PendingUpdate Update)> toFlush;
+        lock (_pendingLock)
+        {
+            toFlush = _pending
+                .Where(kvp => kvp.Key.CardId == cardId)
+                .Select(kvp => (kvp.Key, kvp.Value))
+                .ToList();
+
+            foreach (var item in toFlush)
+                _pending.Remove(item.Key);
+        }
+
+        foreach (var item in toFlush)
+        {
+            await WaitForRateLimitAsync(ct);
+
+            await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
+                item.Key.CardId,
+                item.Key.ElementId,
+                new PutCardkitV1CardsByCardIdElementsByElementIdContentBodyDto
+                {
+                    Content = item.Update.Content,
+                    Sequence = item.Update.Sequence,
+                },
+                ct
+            );
+        }
+    }
+
     private async Task ProcessLoopAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(20));
