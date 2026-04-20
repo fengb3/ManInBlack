@@ -45,7 +45,7 @@ var pipeline = new AgentPipelineBuilder()
     .Use<SavePersistenceMiddleware>()
     .Use<UserInputMiddleware>()
     .Use<ContextCompressMiddleware>()
-    .Use<CommandToolMiddleware>()
+    .Use<CommandLineToolsMiddleware>()
     // .Use<SimpleMathToolMiddleware>()
     .Use<AgentLoopMiddleware>()// Agent Loop 应该在最后一个
     .Build(sp);

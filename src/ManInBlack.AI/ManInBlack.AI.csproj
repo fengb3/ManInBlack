@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\demo\AgentConsole\AgentConsole.csproj" />
         <ProjectReference Include="..\ManInBlack.AI.Core\ManInBlack.AI.Core.csproj"/>
         <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>

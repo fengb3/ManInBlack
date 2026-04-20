@@ -17,6 +17,7 @@ public static class DependencyInjection
             services.AddManInBlackCore(configure);
             services.AddAutoRegisteredServices();
             services.AddToolExecutor();
+            services.AddToolMiddlewares();
             return services;
         }
     }
