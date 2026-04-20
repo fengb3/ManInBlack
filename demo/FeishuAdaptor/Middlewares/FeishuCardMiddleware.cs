@@ -28,7 +28,7 @@ public class FeishuCardMiddleware(
         var toolExecutions = new Dictionary<string, LlmToolExecutionViewModel>();
 
         // 跟踪已创建的卡片视图，用于流式结束后关闭和释放
-        List<object> cardViews = [];
+        List<CardViewBase> cardViews = [];
 
         await foreach (var update in next().WithCancellation(ct))
         {
@@ -104,17 +104,12 @@ public class FeishuCardMiddleware(
         }
 
 
-        await Task.Delay(100, ct);
-
         // 流式结束 — 关闭每张卡片的流式模式并释放资源
         foreach (var view in cardViews)
         {
             try
             {
-                if (view is CardView<ViewModelBase> cv)
-                {
-                    await cv.CloseStreamingAsync(ct);
-                }
+                await view.CloseStreamingAsync(ct);
             }
             catch
             {
@@ -122,7 +117,7 @@ public class FeishuCardMiddleware(
             }
             finally
             {
-                ((IDisposable)view).Dispose();
+                view.Dispose();
             }
         }
     }

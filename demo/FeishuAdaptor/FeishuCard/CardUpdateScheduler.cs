@@ -21,6 +21,11 @@ public class CardUpdateScheduler : IAsyncDisposable
     private readonly Dictionary<(string CardId, string ElementId), PendingUpdate> _pending = new();
     private readonly object _pendingLock = new();
 
+    // 每张卡片正在由 ProcessLoopAsync 发送的请求数量，FlushAsync 需要等待其归零
+    private readonly Dictionary<string, int> _inFlightCountByCard = new();
+    private readonly object _inFlightLock = new();
+    private event Action<string>? InFlightCompleted;
+
     // 滑动窗口限流时间戳
     private readonly Queue<DateTime> _secondWindow = new();
     private readonly Queue<DateTime> _minuteWindow = new();
@@ -58,9 +63,13 @@ public class CardUpdateScheduler : IAsyncDisposable
 
     /// <summary>
     /// 立即发送指定卡片的所有待发送更新，确保内容在关闭流式模式前已送达。
+    /// 同时等待 ProcessLoopAsync 中该卡片正在发送的请求完成。
     /// </summary>
     public async Task FlushAsync(string cardId, CancellationToken ct = default)
     {
+        // 等待 ProcessLoopAsync 中该卡片正在发送的请求完成
+        await WaitForInFlightAsync(cardId, ct);
+
         List<((string CardId, string ElementId) Key, PendingUpdate Update)> toFlush;
         lock (_pendingLock)
         {
@@ -90,6 +99,49 @@ public class CardUpdateScheduler : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 等待 ProcessLoopAsync 中该卡片正在发送的请求全部完成。
+    /// </summary>
+    private async Task WaitForInFlightAsync(string cardId, CancellationToken ct)
+    {
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            lock (_inFlightLock)
+            {
+                if (!_inFlightCountByCard.TryGetValue(cardId, out var count) || count == 0)
+                    return;
+            }
+
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var reg = ct.Register(() => tcs.TrySetCanceled(ct));
+
+            void OnCompleted(string completedCardId)
+            {
+                if (completedCardId == cardId)
+                    tcs.TrySetResult();
+            }
+
+            InFlightCompleted += OnCompleted;
+            try
+            {
+                // 再次检查，避免在订阅事件前已经完成
+                lock (_inFlightLock)
+                {
+                    if (!_inFlightCountByCard.TryGetValue(cardId, out var count) || count == 0)
+                        return;
+                }
+
+                await tcs.Task;
+            }
+            finally
+            {
+                InFlightCompleted -= OnCompleted;
+            }
+        }
+    }
+
     private async Task ProcessLoopAsync()
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(20));
@@ -106,6 +158,24 @@ public class CardUpdateScheduler : IAsyncDisposable
                 foreach (var kvp in _pending)
                     batch.Add((kvp.Key, kvp.Value));
                 _pending.Clear();
+            }
+
+            // 记录每张卡片的 in-flight 数量
+            var cardCounts = new Dictionary<string, int>();
+            foreach (var item in batch)
+            {
+                if (!cardCounts.TryGetValue(item.Key.CardId, out var c))
+                    c = 0;
+                cardCounts[item.Key.CardId] = c + 1;
+            }
+
+            lock (_inFlightLock)
+            {
+                foreach (var (cardId, count) in cardCounts)
+                {
+                    _inFlightCountByCard.TryGetValue(cardId, out var existing);
+                    _inFlightCountByCard[cardId] = existing + count;
+                }
             }
 
             // 按限流规则逐个发送
@@ -135,6 +205,23 @@ public class CardUpdateScheduler : IAsyncDisposable
                     _logger.LogError(ex,
                         "更新卡片元素失败 CardId={CardId} ElementId={ElementId} Sequence={Sequence}",
                         item.Key.CardId, item.Key.ElementId, item.Update.Sequence);
+                }
+                finally
+                {
+                    var cardId = item.Key.CardId;
+                    lock (_inFlightLock)
+                    {
+                        if (_inFlightCountByCard.TryGetValue(cardId, out var c))
+                        {
+                            c--;
+                            if (c <= 0)
+                                _inFlightCountByCard.Remove(cardId);
+                            else
+                                _inFlightCountByCard[cardId] = c;
+                        }
+                    }
+
+                    InFlightCompleted?.Invoke(cardId);
                 }
             }
         }

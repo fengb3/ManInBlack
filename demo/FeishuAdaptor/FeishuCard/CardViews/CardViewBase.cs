@@ -5,8 +5,15 @@ namespace FeishuAdaptor.FeishuCard.CardViews;
 /// <summary>
 /// 非泛型的卡片视图基类 — 提供元素工厂方法和容器构建器。
 /// </summary>
-public abstract class CardViewBase
+public abstract class CardViewBase : IDisposable
 {
+    /// <summary>
+    /// 关闭卡片流式模式，由子类实现。
+    /// </summary>
+    public abstract Task CloseStreamingAsync(CancellationToken ct = default);
+
+    /// <inheritdoc />
+    public abstract void Dispose();
     private int _elementIdCounter;
 
     /// <summary>

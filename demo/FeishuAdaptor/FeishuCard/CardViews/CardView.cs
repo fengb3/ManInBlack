@@ -11,7 +11,7 @@ public abstract class ViewModelBase : ObservableObject
 }
 
 public abstract class CardView<TViewModel>(TViewModel viewModel, CardService cardService, CardUpdateScheduler scheduler)
-    : CardViewBase, IDisposable where TViewModel : ViewModelBase
+    : CardViewBase where TViewModel : ViewModelBase
 {
     private readonly List<Action> _tearDownActions = [];
     private int _sequence;
@@ -64,9 +64,10 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
     protected MarkdownElement BindMarkdown(Expression<Func<TViewModel, string>> expression)
     {
         var markdownElement = Markdown();
+        var compiledGetter = expression.Compile();
         Bind(markdownElement, expression, vm =>
         {
-             markdownElement.Content = expression.Compile()(vm);
+             markdownElement.Content = compiledGetter(vm);
              return markdownElement.ElementId!;
         });
         return markdownElement;
@@ -112,7 +113,7 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
     /// 关闭卡片流式模式，通知飞书客户端渲染最终内容。
     /// 关闭前会先刷新调度器中该卡片的所有待发送更新，确保最后一部分内容不丢失。
     /// </summary>
-    public async Task CloseStreamingAsync(CancellationToken ct = default)
+    public override async Task CloseStreamingAsync(CancellationToken ct = default)
     {
         await Scheduler.FlushAsync(CardId, ct);
         var seq = GetNextSequence();
@@ -121,7 +122,7 @@ public abstract class CardView<TViewModel>(TViewModel viewModel, CardService car
 
     #endregion
 
-    public void Dispose()
+    public override void Dispose()
     {
         _tearDownActions.ForEach(a => a());
         _tearDownActions.Clear();
