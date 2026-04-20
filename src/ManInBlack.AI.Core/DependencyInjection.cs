@@ -27,7 +27,9 @@ public static class DependencyInjection
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
 
-            services.AddHttpClient();
+            services.AddHttpClient(string.Empty)
+                .ConfigurePrimaryHttpMessageHandler(() =>
+                    new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
             services.AddSingleton(options.ModelChoice);
             services.AddSingleton<IChatClient>(sp =>
             {

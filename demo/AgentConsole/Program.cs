@@ -1,11 +1,8 @@
-using AgentConsole;
-using AgentConsole.Middlewares;
-using AgentConsole.Tools;
+
 using DotNetEnv;
+using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Tools;
-using ManInBlack.AI.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -46,36 +43,9 @@ agentContext.ParentType = "User";
 // middle ware 顺序, 系统提示, 持久会话
 
 var pipeline = new AgentPipelineBuilder()
-    .Use<MessageEnrichMiddleware>()
-    .Use<SystemPromptInjectionMiddleware>()
-    .Use<ReadPersistenceMiddleware>()
-    .Use<SavePersistenceMiddleware>()
-    .Use<UserInputMiddleware>()
-    .Use<ContextCompressMiddleware>()
-    .Use<CommandLineToolsMiddleware>()
-    // .Use<SimpleMathToolMiddleware>()
-    .Use<AgentLoopMiddleware>()// Agent Loop 应该在最后一个
+    .UseDefault()
     .Build(sp);
 
-// 构造随机数学表达式
-// var          numberCount = 8;
-// var          rng         = new Random();
-// List<int>    nums        = Enumerable.Range(0, numberCount).Select(_ => rng.Next(1, 100)).ToList();
-// List<string> ops         = ["+", "-", "*", "/"];
-// List<string> selectedOps = Enumerable.Range(0, numberCount - 1).Select(_ => ops[rng.Next(ops.Count)]).ToList();
-//
-// int bracketPos = rng.Next(0, 3);
-//
-// var expression = "";
-// for (int i = 0; i < nums.Count; i++)
-// {
-//     if (i == bracketPos) expression += "(";
-//     expression += nums[i];
-//     if (i == bracketPos + 1) expression += ")";
-//     if (i < selectedOps.Count) expression += " " + selectedOps[i] + " ";
-// }
-// agentContext.UserInput    = $"请计算以下数学表达式的结果: {expression}。请使用计算工具来计算，并在最后给出结果, 不用给出详细过程。";
-// agentContext.SystemPrompt = "你是一个有用的 AI 助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
 
 agentContext.SystemPrompt = "你是一个运维AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
 agentContext.UserInput    = $"帮我查看当前磁盘使用情况";

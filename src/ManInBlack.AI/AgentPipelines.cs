@@ -1,32 +1,38 @@
-﻿using AgentConsole.Middlewares;
-using ManInBlack.AI.Core.Middleware;
+﻿using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Middlewares;
-using AgentLoopMiddleware=ManInBlack.AI.Middlewares.AgentLoopMiddleware;
-using ContextCompressMiddleware=ManInBlack.AI.Middlewares.ContextCompressMiddleware;
-using MessageEnrichMiddleware=ManInBlack.AI.Middlewares.MessageEnrichMiddleware;
-using ReadPersistenceMiddleware=ManInBlack.AI.Middlewares.ReadPersistenceMiddleware;
-using SavePersistenceMiddleware=ManInBlack.AI.Middlewares.SavePersistenceMiddleware;
-using SkillMiddleware=ManInBlack.AI.Middlewares.SkillMiddleware;
 
 namespace ManInBlack.AI;
 
 public static class AgentPipelineBuilderExtensions
 {
-    public static AgentPipelineBuilder UseDefault(this AgentPipelineBuilder builder)
-    {
-        return builder
-                .Use<LoggingMiddleware>()
-                .Use<MessageEnrichMiddleware>()
-                .Use<SkillMiddleware>()
-                .Use<AgentProfileMiddleware>()
-                .Use<SystemPromptInjectionMiddleware>()
-                .Use<ReadPersistenceMiddleware>()
-                .Use<SavePersistenceMiddleware>()
-                .Use<UserInputMiddleware>()
-                .Use<ContextCompressMiddleware>()
-                .Use<CommandLineToolsMiddleware>()
-                .Use<FileToolsMiddleware>()
-                .Use<AgentLoopMiddleware>() // Agent Loop 应该在最后一个
-            ;
-    }
+    /// <summary>
+    /// 默认
+    /// </summary>
+    /// <param name="builder"></param>
+    /// <returns></returns>
+    public static AgentPipelineBuilder UseDefault(this AgentPipelineBuilder builder) =>
+        builder
+            .Use<ReadPersistenceMiddleware>()
+            .Use<SavePersistenceMiddleware>()
+            .Use<SkillMiddleware>()
+            .Use<AgentProfileMiddleware>()
+            .Use<ContextCompressMiddleware>()
+            .Use<CommandLineToolsMiddleware>()
+            .Use<FileToolsMiddleware>()
+            .UseSimple(); 
+    
+    
+    /// <summary>
+    /// 最小
+    /// </summary>
+    /// <param name="builder"></param>
+    /// <returns></returns>
+    public static AgentPipelineBuilder UseSimple(this AgentPipelineBuilder builder) =>
+        builder
+            .Use<LoggingMiddleware>()
+            .Use<MessageEnrichMiddleware>()
+            .Use<SystemPromptInjectionMiddleware>()
+            .Use<UserInputMiddleware>()
+            .Use<RetryMiddleware>()
+            .Use<AgentLoopMiddleware>(); // Agent Loop 应该在最后一个
 }
