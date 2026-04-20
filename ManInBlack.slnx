@@ -2,6 +2,7 @@
   <Folder Name="/Others/">
     <File Path=".gitignore" />
     <File Path="CLAUDE.md" />
+    <File Path="docs/middleware-guide.md" />
   </Folder>
   <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
   <Project Path="src/ManInBlack.AI.Core/ManInBlack.AI.Core.csproj" />

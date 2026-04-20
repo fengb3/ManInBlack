@@ -8,47 +8,51 @@ namespace ManInBlack.AI.Tools;
 [ServiceRegister.Scoped]
 public partial class FileTools(IUserWorkspace workspace)
 {
+    private string ResolvePath(string path) =>
+        Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(workspace.WorkingDirectory, path));
 
     /// <summary>
     /// Reads a file and returns its content. Supports reading the entire file or a specific range of lines.
+    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
-    /// <param name="filePath">The absolute path to the file to read.</param>
-    /// <param name="offset">The line number to start reading from (0-indexed). Defaults to 0 (beginning of file).</param>
-    /// <param name="length">The number of lines to read. Use -1 (default) to read from offset to end of file.</param>
+    /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
+    /// <param name="offset">Line number to start reading from (0-indexed). Defaults to 0.</param>
+    /// <param name="length">Number of lines to read. -1 (default) reads from offset to end of file.</param>
     /// <returns>The file content as a string, with lines joined by newline characters.</returns>
-    /// <exception cref="FileNotFoundException"></exception>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string ReadFile(string filePath, int offset = 0, int length = -1)
     {
+        filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
-        
+
         var lines = File.ReadAllLines(filePath);
         if (offset < 0 || offset >= lines.Length)
             throw new ArgumentOutOfRangeException(nameof(offset), $"Offset must be between 0 and {lines.Length - 1}");
         if (length < -1)
             throw new ArgumentOutOfRangeException(nameof(length), "Length must be -1 (for all lines) or a non-negative integer");
-        
+
         var selectedLines = length == -1
             ? lines.Skip(offset)
             : lines.Skip(offset).Take(length);
-        
+
         return string.Join(Environment.NewLine, selectedLines);
     }
-    
+
     /// <summary>
     /// Creates a new file or completely overwrites an existing file with the given content.
     /// Parent directories are created automatically if they do not exist.
-    /// Use this tool when you want to write an entire file at once.
+    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
-    /// <param name="filePath">The absolute path of the file to write.</param>
+    /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
     /// <param name="content">The complete content to write to the file.</param>
     /// <returns>A confirmation message indicating the file was written.</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string WriteFile(string filePath, string content)
     {
+        filePath = ResolvePath(filePath);
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -58,21 +62,23 @@ public partial class FileTools(IUserWorkspace workspace)
 
     /// <summary>
     /// Performs an exact string replacement in an existing file.
-    /// Finds the first occurrence of <paramref name="originalContent"/> in the file and replaces it with <paramref name="newContent"/>.
-    /// If <paramref name="originalContent"/> is not found (e.g. the file was modified by another process), the update is aborted to prevent data loss.
+    /// Finds the first occurrence of originalContent and replaces it with newContent.
+    /// If originalContent is not found, the update is aborted to prevent data loss.
     /// You must read the file with ReadFile before calling this tool to ensure you have the current content.
+    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
-    /// <param name="filePath">The absolute path of the file to update.</param>
+    /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
     /// <param name="originalContent">The exact text to find and replace. Must match the current file content exactly.</param>
-    /// <param name="newContent">The text to replace <paramref name="originalContent"/> with.</param>
+    /// <param name="newContent">The text to replace originalContent with.</param>
     /// <returns>A confirmation message on success, or an error message if the original content was not found.</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string UpdateFile(string filePath, string originalContent, string newContent)
     {
+        filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
             return $"File not found: {filePath}";
-        
+
         var currentContent = File.ReadAllText(filePath);
 
         if (!currentContent.Contains(originalContent))
@@ -85,15 +91,16 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <summary>
     /// Searches for files matching a glob pattern. Returns matching file paths sorted by last modification time.
     /// Supports patterns like "**/*.cs", "src/**/*.tsx", or "*.json".
+    /// Defaults to searching in the workspace root directory. Relative directory paths are resolved automatically.
     /// </summary>
     /// <param name="pattern">The glob pattern to match files against, e.g. "**/*.cs" or "src/**/*.tsx".</param>
-    /// <param name="directory">The directory to search in. Defaults to the workspace root.</param>
+    /// <param name="directory">The directory to search in. Can be absolute or relative to the workspace root. Defaults to workspace root.</param>
     /// <returns>The matching file paths, one per line, sorted by modification time (newest first).</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string Glob(string pattern, string? directory = null)
     {
-        var searchDir = directory ?? workspace.WorkingDirectory;
+        var searchDir = directory is null ? workspace.WorkingDirectory : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
             return $"Directory not found: {searchDir}";
 
@@ -110,16 +117,17 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <summary>
     /// Searches file contents for lines matching a regular expression pattern.
     /// Returns the matching file paths along with the matched lines and their line numbers.
+    /// Defaults to searching in the workspace root directory. Relative directory paths are resolved automatically.
     /// </summary>
     /// <param name="pattern">The regular expression pattern to search for in file contents.</param>
-    /// <param name="directory">The directory to search in. Defaults to the workspace root.</param>
+    /// <param name="directory">The directory to search in. Can be absolute or relative to the workspace root. Defaults to workspace root.</param>
     /// <param name="glob">A glob pattern to filter which files to search, e.g. "*.cs" or "*.tsx". Defaults to "*" (all files).</param>
     /// <returns>The matching lines with file paths and line numbers.</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string Grep(string pattern, string? directory = null, string glob = "*")
     {
-        var searchDir = directory ?? workspace.WorkingDirectory;
+        var searchDir = directory is null ? workspace.WorkingDirectory : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
             return $"Directory not found: {searchDir}";
 

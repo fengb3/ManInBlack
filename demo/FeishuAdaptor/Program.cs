@@ -1,20 +1,14 @@
 // Load .env from executable directory
 
-using System.Text;
 using System.Text.Json.Serialization;
-using CommunityToolkit.Mvvm.ComponentModel;
 using FeishuAdaptor;
-using FeishuAdaptor.FeishuCard;
-using FeishuAdaptor.FeishuCard.Cards;
-using FeishuAdaptor.FeishuCard.CardViews;
-using FeishuNetSdk;
 using ManInBlack.AI;
 using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Attributes;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 
+// read comfiguration form the fucking .env file, which should be placed in the same directory as the executable, and contains the following variables:
 var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
 if (File.Exists(envPath))
     Env.Load(envPath);
@@ -50,6 +44,8 @@ builder.Services.AddFeishuNetSdk(
     }
 )
     // .AddFeishuWebSocket()
+    // 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
+    // Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
 ;
 
 builder.Services.AddSerilog(loggerConfig =>
@@ -82,6 +78,7 @@ builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
 
+// 愿你健康, 开心, 美满, 幸福
 app.MapGet(
     "/health",
     () =>
@@ -94,51 +91,7 @@ app.MapGet(
     }
 );
 
+// Map Feishu event endpoint, and the FeishuAdaptor will handle incoming events according to the registered handlers
 app.UseFeishuEndpoint("/feishu/event/v2");
 
 app.Run();
-
-// ──────────── ViewModel ────────────
-
-[ServiceRegister.Transient]
-public class MyViewModel : ViewModelBase
-{
-    private readonly StringBuilder _contentBuilder = new("Initial Content");
-
-    public string Content
-    {
-        get => _contentBuilder.ToString();
-        set
-        {
-            _contentBuilder.Clear();
-            _contentBuilder.Append(value);
-            OnPropertyChanged();
-        }
-    }
-
-    public void AppendContent(char value)
-    {
-        _contentBuilder.Append(value);
-        OnPropertyChanged(nameof(Content));
-    }
-
-    public void AppendContent(string value)
-    {
-        _contentBuilder.Append(value);
-        OnPropertyChanged(nameof(Content));
-    }
-}
-
-// ──────────── CardView ────────────
-
-[ServiceRegister.Transient]
-public class MyCardView(MyViewModel viewModel, CardService sc, CardUpdateScheduler scheduler)
-    : CardView<MyViewModel>(viewModel, sc, scheduler)
-{
-    protected override void Define() =>
-        AddToBody(
-            // BindMarkdown(vm => vm.Name),
-            // Hr(),
-            BindMarkdown(vm => vm.Content)
-        );
-}
