@@ -20,10 +20,10 @@ public abstract class CardViewBase
             StreamingConfig = new CardStreamingConfig
             {
                 PrintFrequencyMs = new { @default = 30 },
-                PrintStep = new { @default = 3 },
+                PrintStep = new { @default = 10 },
                 PrintStrategy = "fast",
             },
-            WidthMode = "fill",
+            // WidthMode = "fill",
             EnableForward = true,
             EnableForwardInteraction = true,
         },

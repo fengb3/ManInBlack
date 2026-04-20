@@ -70,6 +70,15 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
         {
             logger.LogError(e, "Error processing message from user {userId}", input.Event.Sender.SenderId.OpenId);
         }
+        finally
+        {
+            logger.LogInformation(
+                "Finished processing message from user {userId}",
+                input.Event.Sender.SenderId.OpenId
+            );
+
+            await Task.Delay(1000); // Ensure all logs are flushed before the scope is disposed
+        }
     }
 
     private async Task<string> HandleMessage(IServiceProvider sp,EventV2Dto<ImMessageReceiveV1EventBodyDto> input, CancellationToken ct = default)
