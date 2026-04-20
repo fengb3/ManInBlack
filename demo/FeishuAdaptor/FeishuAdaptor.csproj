@@ -1,38 +1,51 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
-    <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <Content Include="..\..\.dockerignore">
-            <Link>.dockerignore</Link>
-        </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
-        <PackageReference Include="FeishuNetSdk" Version="4.1.2"/>
-        <PackageReference Include="FeishuNetSdk.Endpoint" Version="4.0.1"/>
-        <PackageReference Include="DotNetEnv" Version="3.1.1"/>
-        <PackageReference Include="FeishuNetSdk.WebSocket" Version="4.0.1"/>
-        <PackageReference Include="Markdig" Version="0.41.3"/>
-        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Update=".env">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj"/>
-        <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj"
-                          OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
-    </ItemGroup>
-
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="..\..\.dockerignore">
+      <Link>.dockerignore</Link>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="FeishuNetSdk" Version="4.1.2" />
+    <PackageReference Include="FeishuNetSdk.Endpoint" Version="4.0.1" />
+    <PackageReference Include="DotNetEnv" Version="3.1.1" />
+    <PackageReference Include="FeishuNetSdk.WebSocket" Version="4.0.1" />
+    <PackageReference Include="Markdig" Version="0.41.3" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update=".env">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <DefaultSkills Include="DefaultSkills\**\*.*" />
+  </ItemGroup>
+  <Target Name="CopyDefaultSkills" AfterTargets="Build">
+    <Copy
+      SourceFiles="@(DefaultSkills)"
+      DestinationFolder="$(OutputPath)\agent-workspace\skills\%(RecursiveDir)"
+      SkipUnchangedFiles="true"
+    />
+    <Copy
+      Condition="Exists('$(MSBuildProjectDirectory)\agent-workspace')"
+      SourceFiles="@(DefaultSkills)"
+      DestinationFolder="$(MSBuildProjectDirectory)\agent-workspace\skills\%(RecursiveDir)"
+      SkipUnchangedFiles="true"
+    />
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
+    <ProjectReference
+      Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+    />
+  </ItemGroup>
 </Project>
