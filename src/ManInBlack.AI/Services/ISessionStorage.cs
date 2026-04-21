@@ -20,13 +20,13 @@ public interface ISessionStorage
     /// <param name="messages"></param>
     /// <returns></returns>
     Task SaveMessage(string sessionId, ChatMessage messages);
-    
+
     /// <summary>
     /// 加载某个session下的所有消息
     /// </summary>
     /// <param name="sessionId"></param>
     /// <returns></returns>
-    Task<ICollection<ChatMessage>> LoadMessages(string sessionId);
+    Task<IList<ChatMessage>> LoadMessages(string sessionId);
 }
 
 [ServiceRegister.Singleton.As<ISessionStorage>]
@@ -51,12 +51,15 @@ public class FileSessionStorage : ISessionStorage
     public async Task SaveMessage(string sessionId, ChatMessage message)
     {
         var sessionFile = Path.Combine(SessionDir, $"{sessionId}.jsonl");
+        // using var jsonFileList = new JsonFileList<ChatMessage>(sessionFile);
+        // jsonFileList.Add(message);
+        // await Task.CompletedTask;
         var json = JsonSerializer.Serialize(message, JsonOptions);
         await File.AppendAllTextAsync(sessionFile, json + Environment.NewLine);
     }
 
     /// <inheritdoc/>
-    public async Task<ICollection<ChatMessage>> LoadMessages(string sessionId)
+    public async Task<IList<ChatMessage>> LoadMessages(string sessionId)
     {
         var messages = new List<ChatMessage>();
         var sessionFile = Path.Combine(SessionDir, $"{sessionId}.jsonl");
