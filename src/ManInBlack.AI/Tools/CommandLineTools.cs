@@ -22,7 +22,7 @@ public partial class CommandLineTools(IUserStorage userStorage, AgentContext age
 
     private static string FindBashExecutable()
     {
-        return "bash";
+        // return "bash";
 
         if (!OperatingSystem.IsWindows()) return "bash";
 
