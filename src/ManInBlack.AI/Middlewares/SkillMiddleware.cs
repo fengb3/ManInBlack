@@ -27,7 +27,7 @@ public class SkillMiddleware(SkillService skillService) : AgentMiddleware
             context.SystemPrompt +=
                 $"""
 
-                 ## Available Skills
+                 # Available Skills
                  {skillDescriptions}
 
                  When a task matches one of the skills above, call the `LoadSkill` tool first to load the full skill instructions, then follow them.

@@ -1,5 +1,7 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services.Abstraction;
 using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Services;
@@ -8,13 +10,15 @@ namespace ManInBlack.AI.Services;
 public partial class SkillService
 {
     private readonly Dictionary<string, SkillEntry> _skills = new();
-    private readonly IUserWorkspace _userWorkspace;
+    private readonly IUserStorage _userStorage;
 
-    public SkillService(IUserWorkspace userWorkspace, ILogger<SkillService> logger)
+    public SkillService(IUserStorage userStorage, ILogger<SkillService> logger, AgentContext agentContext)
     {
-        _userWorkspace = userWorkspace;
-        InitializeSkills(Path.Combine(userWorkspace.AgentRoot, "skills")); // built-in skills
-        InitializeSkills(Path.Combine(userWorkspace.UserRoot, "workspace", ".agents", "skills")); // user's skills
+        _userStorage = userStorage;
+        var skillsDir = Path.Combine(GlobalConfiguration.AppFileRoot, "skills");
+        DeployDefaultSkills(skillsDir);
+        InitializeSkills(skillsDir); // built-in skills
+        InitializeSkills(Path.Combine(userStorage.GetUserWorkingDir(agentContext.ParentId), ".agents", "skills")); // user's skills
         
         // Log loaded skills
         if (_skills.Count == 0)
@@ -23,11 +27,37 @@ public partial class SkillService
         }
         else
         {
-            logger.LogInformation("Loaded {Count} skills: {Skills}", _skills.Count, string.Join(", ", _skills.Keys));
+            logger.LogInformation("Loaded {Count} skills: {Skills} for user: {UserId}", _skills.Count, string.Join(", ", _skills.Keys), agentContext.ParentId);
         }
     }
 
     public bool HasSkills() => _skills.Count > 0;
+
+    /// <summary>
+    /// 将构建产物中的 DefaultSkills 部署到 skills 目录（仅首次，目标不存在时才复制）
+    /// </summary>
+    private static void DeployDefaultSkills(string skillsDir)
+    {
+        var defaultSkillsSource = Path.Combine(AppContext.BaseDirectory, "DefaultSkills");
+        if (!Directory.Exists(defaultSkillsSource))
+            return;
+
+        foreach (var sourceDir in Directory.EnumerateDirectories(defaultSkillsSource))
+        {
+            var targetDir = Path.Combine(skillsDir, Path.GetFileName(sourceDir));
+            if (Directory.Exists(targetDir))
+                continue;
+
+            Directory.CreateDirectory(targetDir);
+            foreach (var file in Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(sourceDir, file);
+                var destFile = Path.Combine(targetDir, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                File.Copy(file, destFile, overwrite: false);
+            }
+        }
+    }
 
     /// <summary>
     /// get skill from file to ram
@@ -181,30 +211,6 @@ public partial class SkillService
                {skill.Body}
                </skill>
                """;
-
-    /// <summary>
-    /// 安装 skill
-    /// </summary>
-    /// <param name="pathToSkillFile">.skill file path</param>
-    /// <returns></returns>
-    public string InstallSkill(string pathToSkillFile)
-    {
-        if (!File.Exists(pathToSkillFile))
-            return $"Error: File '{pathToSkillFile}' does not exist.";
-
-        var skillsDir = Path.Combine(_userWorkspace.UserRoot, "skills");
-        try
-        {
-            System.IO.Compression.ZipFile.ExtractToDirectory(pathToSkillFile, skillsDir, overwriteFiles: true);
-            InitializeSkills(skillsDir);
-            return $"Skill installed to {skillsDir}";
-        }
-        catch (Exception ex)
-        {
-            return $"Error installing skill: {ex.Message}";
-        }
-    }
-    
 
     internal record SkillEntry(Dictionary<string, string> Meta, string Body, string Path);
 

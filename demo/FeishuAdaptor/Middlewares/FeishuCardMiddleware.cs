@@ -44,6 +44,7 @@ public class FeishuCardMiddleware(
                             lastReasoning = vm1;
                             lastLlmType = nameof(LlmReasoningViewModel);
                         }
+
                         lastReasoning!.Reasoning += r.Text;
                         break;
                     case TextContent t:
@@ -57,6 +58,7 @@ public class FeishuCardMiddleware(
                             lastOutput = vm2;
                             lastLlmType = nameof(LlmOutputViewModel);
                         }
+
                         lastOutput!.Output += t.Text;
                         break;
                     case FunctionCallContent fcc:
@@ -103,23 +105,24 @@ public class FeishuCardMiddleware(
             yield return update;
         }
 
-
-        // 流式结束 — 关闭每张卡片的流式模式并释放资源
-        foreach (var view in cardViews)
-        {
-            try
-            {
-                await view.CloseStreamingAsync(ct);
-            }
-            catch
-            {
-                // 关闭失败不影响整体流程
-            }
-            finally
-            {
-                view.Dispose();
-            }
-        }
+        await Task.Delay(1000, ct);
+        //
+        // // 流式结束 — 关闭每张卡片的流式模式并释放资源
+        // foreach (var view in cardViews)
+        // {
+        //     try
+        //     {
+        //         await view.CloseStreamingAsync(ct);
+        //     }
+        //     catch
+        //     {
+        //         // 关闭失败不影响整体流程
+        //     }
+        //     finally
+        //     {
+        //         view.Dispose();
+        //     }
+        // }
     }
 
     private (T ViewModel, CardView<T> View) CreateCard<T>(string userOpenId) where T : ViewModelBase

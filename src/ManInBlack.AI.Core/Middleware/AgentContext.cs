@@ -21,6 +21,11 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// Agent 的父级标识，如果有的话，表示这个 Agent 是由哪个实体（用户或另一个 Agent）触发的
     /// </summary>
     public string ParentId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// 会话标识，表示这个 Agent 所属的对话会话，可以用来关联多个 Agent 实例到同一个对话上下文
+    /// </summary>
+    public string SessionId { get; set; } = string.Empty;
 
     /// <summary>
     /// Agent 的父级类型，例如 "User" 或 "Agent"，用于区分 ParentId 是用户还是另一个 Agent

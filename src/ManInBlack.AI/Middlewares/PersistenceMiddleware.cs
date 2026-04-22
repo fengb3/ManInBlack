@@ -4,6 +4,7 @@ using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Services;
+using ManInBlack.AI.Services.Abstraction;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,7 +22,7 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         [EnumeratorCancellation] CancellationToken ct = default
     )
     {
-        var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
+        var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
 
         // 重置对话 command
         if (
@@ -35,7 +36,9 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             // 如果是清除上下文的命令，直接清空持久化文件和上下文消息
             if (command is "clear" or "reset" or "new")
             {
-                workspace.NewSession();
+                var userStorage = context.ServiceProvider.GetRequiredService<IUserStorage>();
+                var user = await userStorage.GetOrCreateUser(context.ParentId); // 获取用户信息
+                await user.CreateNewSessionIdAsync(userStorage);
                 context.Messages.Clear();
                 yield return new ChatResponseUpdate
                 {
@@ -48,7 +51,7 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             }
         }
 
-        var messages = workspace.Initialize(); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
+        var messages = await sessionStorage.LoadMessages(context.SessionId); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
 
         // 过滤掉 TextReasoningContent，不回传给模型（持久化保留全量，回传选择性过滤）
         foreach (var message in messages)
@@ -86,11 +89,11 @@ public class SavePersistenceMiddleware : AgentMiddleware
         [EnumeratorCancellation] CancellationToken ct = default
     )
     {
-        var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
+        var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
 
         // 用包装集合替换原始 Messages，每添加一条消息立即持久化
         var original = context.Messages;
-        context.Messages = new PersistingMessageCollection(original, workspace);
+        context.Messages = new PersistingMessageCollection(original, sessionStorage, context.SessionId);
 
         await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
         {
@@ -103,14 +106,14 @@ public class SavePersistenceMiddleware : AgentMiddleware
     /// <summary>
     /// 在消息添加到集合时自动持久化（跳过 system 角色）
     /// </summary>
-    private class PersistingMessageCollection(IList<ChatMessage> list, IUserWorkspace workspace)
+    private class PersistingMessageCollection(IList<ChatMessage> list, ISessionStorage storage, string sessionId)
         : Collection<ChatMessage>(list)
     {
         protected override void InsertItem(int index, ChatMessage item)
         {
             base.InsertItem(index, item);
             if (item.Role != ChatRole.System)
-                workspace.AppendHistoryChatMessage(item);
+                storage.SaveMessage(sessionId, item).Wait();
         }
     }
 }

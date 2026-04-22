@@ -22,8 +22,7 @@ public class SystemPromptInjectionMiddleware(ILogger<SystemPromptInjectionMiddle
         // Console.WriteLine("add system prompt to context: " + context.SystemPrompt);
         // Console.ResetColor();
         
-        var systemPromptFirst4lines = string.Join('\n', context.SystemPrompt.Split('\n').Take(4));
-        logger.LogInformation("Inject system prompt to context: {SystemPrompt} ...", systemPromptFirst4lines);
+        logger.LogInformation("Inject system prompt with length of {Length} to context", context.SystemPrompt.Length);
         context.Messages.Insert(0, new ChatMessage(ChatRole.System, context.SystemPrompt));
 
         await foreach (var update in next().WithCancellation(ct))

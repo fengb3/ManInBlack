@@ -16,4 +16,8 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="DefaultSkills\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="DefaultSkills\" />
+    </ItemGroup>
+
 </Project>
