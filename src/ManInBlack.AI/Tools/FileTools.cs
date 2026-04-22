@@ -1,6 +1,8 @@
 ﻿using System.Text.RegularExpressions;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services.Abstraction;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
@@ -8,10 +10,12 @@ using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 namespace ManInBlack.AI.Tools;
 
 [ServiceRegister.Scoped]
-public partial class FileTools(IUserWorkspace workspace)
+public partial class FileTools(IUserStorage userStorage, AgentContext agentContext)
 {
+    private string _userWorkspace = userStorage.GetUserWorkingDir(agentContext.ParentId);
+    
     private string ResolvePath(string path) =>
-        Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(workspace.WorkingDirectory, path));
+        Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_userWorkspace, path));
 
     /// <summary>
     /// Reads a file and returns its content. Supports reading the entire file or a specific range of lines.
@@ -102,7 +106,7 @@ public partial class FileTools(IUserWorkspace workspace)
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string Glob(string pattern, string? directory = null)
     {
-        var searchDir = directory is null ? workspace.WorkingDirectory : ResolvePath(directory);
+        var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
             return $"Directory not found: {searchDir}";
 
@@ -132,7 +136,7 @@ public partial class FileTools(IUserWorkspace workspace)
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string Grep(string pattern, string? directory = null, string glob = "*")
     {
-        var searchDir = directory is null ? workspace.WorkingDirectory : ResolvePath(directory);
+        var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
             return $"Directory not found: {searchDir}";
 

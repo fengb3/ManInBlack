@@ -8,6 +8,7 @@ using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services.Abstraction;
 
 namespace FeishuAdaptor.EventHandlers;
 
@@ -48,12 +49,27 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
             .Use<FeishuCardMiddleware>()
             .UseDefault()
             .Build(sp);
+        
+        // var sessionStorage = scope.ServiceProvider.GetRequiredService<ISessionStorage>();
+        var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
 
         var agentContext = sp.GetRequiredService<AgentContext>();
+        
+        var user = await userStorage.GetOrCreateUser(input.Event.Sender.SenderId.OpenId!);
 
         agentContext.AgentId    = Guid.NewGuid().ToString();
         agentContext.ParentId   = input.Event!.Sender!.SenderId!.OpenId!;
-        agentContext.ParentType = "FeishuUser";
+        agentContext.ParentType = "feishu_user";
+        agentContext.SessionId = await user.GetLatestSessionIdAsync(userStorage);
+        
+        agentContext.SystemPrompt +=
+            $"""
+            <system>
+            你是运行在飞书中的智能 agent
+            你的面对的用户的 飞书 open id 是: {input.Event!.Sender!.SenderId!.OpenId!}
+            </system>
+            """;
+        
         var userLlmInput = await HandleMessage(sp, input);
 
         agentContext.UserInput = userLlmInput;

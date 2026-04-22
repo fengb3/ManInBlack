@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services.Abstraction;
 using ManInBlack.AI.ToolCallFilters;
 
 namespace ManInBlack.AI.Tools;
@@ -11,7 +14,7 @@ namespace ManInBlack.AI.Tools;
 /// 命令行工具，允许 AI 执行系统命令
 /// </summary>
 [ServiceRegister.Scoped]
-public partial class CommandLineTools(IUserWorkspace workspace)
+public partial class CommandLineTools(IUserStorage userStorage, AgentContext agentContext)
 {
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
 
@@ -24,7 +27,8 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         if (!OperatingSystem.IsWindows()) return "bash";
 
         // 优先使用 Git Bash，避免在装有 WSL 时误用 WSL bash
-        var gitBash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin", "bash.exe");
+        var gitBash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin",
+            "bash.exe");
         return File.Exists(gitBash) ? gitBash : "bash";
     }
 
@@ -96,7 +100,7 @@ public partial class CommandLineTools(IUserWorkspace workspace)
     /// and avoiding usage of cd. You may use cd if the User explicitly requests it.
     /// - You may specify an optional timeout in milliseconds (up to 600000ms / 10 minutes).
     /// By default, your command will timeout after 120000ms (2 minutes).
-    /// - You can use the run_in_background parameter to run the command in the background.
+    /// - You can use the runInBackground parameter to run the command in the background.
     /// Only use this if you don't need the result immediately and are OK being notified
     /// when the command finishes later. You do not need to check the output right away -
     /// you will be notified when it finishes.
@@ -123,17 +127,20 @@ public partial class CommandLineTools(IUserWorkspace workspace)
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
     public string RunBash(string command, int timeoutMs = 120000, bool runInBackground = false)
     {
-        Directory.CreateDirectory(workspace.WorkingDirectory);
+        var dangerCheck = CheckDangerousCommand(command);
+        if (dangerCheck != null)
+            return dangerCheck;
+
         var processInfo = new ProcessStartInfo
         {
-            FileName               = FindBashExecutable(),
-            WorkingDirectory       = workspace.WorkingDirectory,
+            FileName = FindBashExecutable(),
+            WorkingDirectory = userStorage.GetUserWorkingDir(agentContext.ParentId),
             RedirectStandardOutput = true,
-            RedirectStandardError  = true,
+            RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding  = Encoding.UTF8,
-            UseShellExecute        = false,
-            CreateNoWindow         = true,
+            StandardErrorEncoding = Encoding.UTF8,
+            UseShellExecute = false,
+            CreateNoWindow = true,
         };
         processInfo.ArgumentList.Add("-c");
         processInfo.ArgumentList.Add(command);
@@ -148,7 +155,7 @@ public partial class CommandLineTools(IUserWorkspace workspace)
             process.Exited += (_, _) =>
             {
                 var output = process.StandardOutput.ReadToEnd();
-                var error  = process.StandardError.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
                 var result = !string.IsNullOrEmpty(error)
                     ? $"Bash error: {error.Trim()}"
                     : output.Trim();
@@ -160,7 +167,7 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         }
 
         var output = process.StandardOutput.ReadToEnd();
-        var error  = process.StandardError.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
 
         if (!process.WaitForExit(TimeSpan.FromMilliseconds(timeoutMs)))
         {
@@ -193,4 +200,103 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         BackgroundTasks.TryRemove(taskId, out _);
         return task.Tcs.Task.Result;
     }
+
+    /// <summary>
+    /// check if a command is prohibited
+    /// </summary>
+    /// <param name="command">command to check</param>
+    /// <returns>prohibit message</returns>
+    private static string? CheckDangerousCommand(string command)
+    {
+        // Recursive delete root or home directory
+        if (RecursiveDeleteRootOrHomeDirRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「recursive delete root or home directory」.";
+
+        // Format filesystem
+        if (FormatFileSystemRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「format filesystem」.";
+
+        // dd overwrite block device
+        if (DdOverwriteBlockDeviceRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「dd overwrite block device」.";
+
+        // Fork bomb
+        if (ForkBombRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「fork bomb」.";
+
+        // Shutdown / reboot
+        if (ShutdownRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「shutdown/reboot」.";
+
+        // Pipe remote script to shell
+        if (PipeRemoteScriptRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「pipe remote script to shell」.";
+
+        // Redirect overwrite block device
+        if (RedirectOverwriteBlockDeviceRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「redirect overwrite block device」.";
+
+        // Flush firewall rules
+        if (FlushFirewallRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「flush firewall rules」.";
+
+        // Reverse shell / network listener
+        if (ReverseShellNetworkListener().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「reverse shell / network listener」.";
+
+        // Overwrite critical system files
+        if (OverwriteCritialSystemFilesRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「overwrite critical system files」.";
+
+        // Create or modify Linux user
+        if (CreateLinuxUserRegex().IsMatch(command))
+            return
+                "Command blocked by security policy: detected dangerous operation「create or modify Linux user」.";
+
+        return null;
+    }
+
+    [GeneratedRegex(@"rm\s+(?:-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)(?:/\s*$|/\*|~|\$HOME)", RegexOptions.IgnoreCase,
+        "zh-CN")]
+    private static partial Regex RecursiveDeleteRootOrHomeDirRegex();
+
+    [GeneratedRegex(@"\bmkfs\b", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex FormatFileSystemRegex();
+
+    [GeneratedRegex(@"\bdd\s+.*of=/dev/", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex DdOverwriteBlockDeviceRegex();
+
+    [GeneratedRegex(@":\(\)\{.*:\|:&")]
+    private static partial Regex ForkBombRegex();
+
+    [GeneratedRegex(@"\b(shutdown|reboot|poweroff|halt|init\s+[06])\b", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex ShutdownRegex();
+
+    [GeneratedRegex(@"(wget|curl)\s+.*\|\s*(ba)?sh", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex PipeRemoteScriptRegex();
+
+    [GeneratedRegex(@">\s*/dev/[sh]d", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex RedirectOverwriteBlockDeviceRegex();
+
+    [GeneratedRegex(@"\biptables\s+-F\b", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex FlushFirewallRegex();
+
+    [GeneratedRegex(@"\bnc\s+.*-[el]\b|/dev/tcp/", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex ReverseShellNetworkListener();
+
+    [GeneratedRegex(@">\s*/etc/(passwd|shadow|sudoers)\b", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex OverwriteCritialSystemFilesRegex();
+
+    [GeneratedRegex(@"\b(useradd|adduser|passwd)\b", RegexOptions.IgnoreCase, "zh-CN")]
+    private static partial Regex CreateLinuxUserRegex();
 }

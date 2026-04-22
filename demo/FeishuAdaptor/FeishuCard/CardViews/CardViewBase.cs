@@ -26,9 +26,9 @@ public abstract class CardViewBase : IDisposable
             StreamingMode = true, 
             StreamingConfig = new CardStreamingConfig
             {
-                PrintFrequencyMs = new { @default = 30 },
-                PrintStep = new { @default = 10 },
-                PrintStrategy = "fast",
+                PrintFrequencyMs = new { @default = 10 },
+                PrintStep = new { @default = 2 },
+                PrintStrategy = "delay",
             },
             // WidthMode = "fill",
             EnableForward = true,
