@@ -2,6 +2,8 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.ToolCallFilters;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 
 namespace ManInBlack.AI.Tools;
 
@@ -104,8 +106,11 @@ public partial class FileTools(IUserWorkspace workspace)
         if (!Directory.Exists(searchDir))
             return $"Directory not found: {searchDir}";
 
-        var files = Directory.EnumerateFiles(searchDir, pattern, SearchOption.AllDirectories);
-        var sorted = files
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        matcher.AddInclude(pattern);
+        var matchResult = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(searchDir)));
+        var sorted = matchResult.Files
+            .Select(f => Path.GetFullPath(Path.Combine(searchDir, f.Path)))
             .Select(f => new FileInfo(f))
             .OrderByDescending(f => f.LastWriteTimeUtc)
             .Select(f => f.FullName);
