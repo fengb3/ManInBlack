@@ -5,11 +5,11 @@ description: Install .skill files by extracting them into the project. Use this 
 
 # Skill Installer
 
-You install `.skill` files into the current project's `.agents/skills/` directory.
+You install `.skill` or `.zip` or `.gzip` files into the current project's `.agents/skills/` directory.
 
 ## What is a .skill file?
 
-A `.skill` file is a renamed `.zip` archive containing a Claude Code skill (at minimum a `SKILL.md` file, plus optional `scripts/`, `references/`, `assets/` directories).
+A `.skill` file is a renamed `.zip` or `.gzip` archive containing an agent skill (at minimum a `SKILL.md` file, plus optional `scripts/`, `references/`, `assets/` directories).
 
 ## Installation flow
 
@@ -22,7 +22,7 @@ The file may be:
 
 ### 2. Determine the skill name
 
-Extract the skill name from the zip's top-level directory structure. Most `.skill` files contain a single root folder — use that folder name as the skill name. If there's no root folder (files are at the archive root), use the `.skill` filename (without extension) as the skill name.
+Extract the skill name from the archive's top-level directory structure. Most `.skill` files contain a single root folder — use that folder name as the skill name. If there's no root folder (files are at the archive root), use the `.skill` filename (without extension) as the skill name.
 
 ### 3. Check for existing installation
 

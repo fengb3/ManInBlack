@@ -19,6 +19,8 @@ public partial class CommandLineTools(IUserWorkspace workspace)
 
     private static string FindBashExecutable()
     {
+        return "bash";
+
         if (!OperatingSystem.IsWindows()) return "bash";
 
         // 优先使用 Git Bash，避免在装有 WSL 时误用 WSL bash
