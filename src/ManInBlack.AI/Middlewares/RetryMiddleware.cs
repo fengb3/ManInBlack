@@ -14,7 +14,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
 {
     private const int MaxRetries = 3;
     private static readonly TimeSpan[] RetryDelays =
-        [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
+        [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5)];
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
         AgentContext context,
@@ -25,6 +25,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
         {
             var yielded = false;
             var shouldRetry = false;
+            var exMessage = "";
 
             var enumerator = next().GetAsyncEnumerator(ct);
             while (true)
@@ -34,8 +35,9 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                 {
                     moved = await enumerator.MoveNextAsync();
                 }
-                catch (IOException)
+                catch (Exception ex) when (ex is IOException or HttpRequestException)
                 {
+                    exMessage = ex.Message;
                     if (!yielded && attempt < MaxRetries)
                     {
                         shouldRetry = true;
@@ -61,7 +63,17 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
 
             var delay = RetryDelays[Math.Min(attempt, RetryDelays.Length - 1)];
             LogRetrying(logger, context.AgentId, attempt + 1, delay);
+            // let the outer ui display know what's happening
+            yield return new ChatResponseUpdate()
+            {
+                Contents = [
+                    new TextContent(
+                        $"Error when calling api : {exMessage}, retry {attempt + 1} times in {delay.Seconds} second(s)"
+                    )
+                ]
+            };
             await Task.Delay(delay, ct);
+
         }
     }
 
