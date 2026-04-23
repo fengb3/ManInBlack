@@ -30,18 +30,27 @@ public class ImMessageReceiveEventHandler(
 }
 
 [ServiceRegister.Singleton]
-public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLauncher> logger)
+public class AgentLauncher(
+    IServiceProvider rootServiceProvider,
+    AgentExecutionTracker executionTracker,
+    ILogger<AgentLauncher> logger
+)
 {
     public async Task LaunchAsync(
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input
     )
     {
+        var userId = input.Event!.Sender!.SenderId!.OpenId!;
+
+        // 取消该用户正在运行的旧 Agent，注册新的 CancellationTokenSource
+        var cts = executionTracker.RegisterAndCancelExisting(userId);
+
         using var scope = rootServiceProvider.CreateScope();
         var sp = scope.ServiceProvider;
-        
+
         logger.LogInformation(
             "Received message from user {userId}: {content}",
-            input.Event!.Sender!.SenderId!.OpenId,
+            userId,
             input.Event.Message?.Content
         );
 
@@ -49,16 +58,17 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
             .Use<FeishuCardMiddleware>()
             .UseDefault()
             .Build(sp);
-        
+
         // var sessionStorage = scope.ServiceProvider.GetRequiredService<ISessionStorage>();
         var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
 
         var agentContext = sp.GetRequiredService<AgentContext>();
-        
-        var user = await userStorage.GetOrCreateUser(input.Event.Sender.SenderId.OpenId!);
+        agentContext.CancellationToken = cts.Token;
+
+        var user = await userStorage.GetOrCreateUser(userId);
 
         agentContext.AgentId    = Guid.NewGuid().ToString();
-        agentContext.ParentId   = input.Event!.Sender!.SenderId!.OpenId!;
+        agentContext.ParentId   = userId;
         agentContext.ParentType = "feishu_user";
         agentContext.SessionId = await user.GetLatestSessionIdAsync(userStorage);
         
@@ -78,17 +88,22 @@ public class AgentLauncher(IServiceProvider rootServiceProvider, ILogger<AgentLa
 
         try
         {
-            await foreach (var _ in updates) {}
+            await foreach (var _ in updates) { }
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("Agent 被取消，用户 {UserId}", userId);
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Error processing message from user {userId}", input.Event.Sender.SenderId.OpenId);
+            logger.LogError(e, "Error processing message from user {userId}", userId);
         }
         finally
         {
+            executionTracker.Release(userId, cts);
             logger.LogInformation(
                 "Finished processing message from user {userId}",
-                input.Event.Sender.SenderId.OpenId
+                userId
             );
 
             await Task.Delay(1000); // Ensure all logs are flushed before the scope is disposed

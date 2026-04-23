@@ -104,25 +104,19 @@ public class FeishuCardMiddleware(
 
             yield return update;
         }
-
-        await Task.Delay(1000, ct);
-        //
-        // // 流式结束 — 关闭每张卡片的流式模式并释放资源
-        // foreach (var view in cardViews)
-        // {
-        //     try
-        //     {
-        //         await view.CloseStreamingAsync(ct);
-        //     }
-        //     catch
-        //     {
-        //         // 关闭失败不影响整体流程
-        //     }
-        //     finally
-        //     {
-        //         view.Dispose();
-        //     }
-        // }
+        
+        // 流式结束 — 关闭每张卡片的流式模式并释放资源
+        foreach (var view in cardViews)
+        {
+            try
+            {
+                await view.CloseStreamingAsync(ct);
+            }
+            catch
+            {
+                // 关闭失败不影响整体流程
+            }
+        }
     }
 
     private (T ViewModel, CardView<T> View) CreateCard<T>(string userOpenId) where T : ViewModelBase
