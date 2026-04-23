@@ -26,6 +26,7 @@ public static class DependencyInjection
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
+            services.AddSingleton<AgentExecutionTracker>();
 
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() =>

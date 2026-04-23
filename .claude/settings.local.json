@@ -36,7 +36,8 @@
       "Bash(python3 -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1776689700072/1000, tz=datetime.timezone.utc\\)\\)\")",
       "Bash(python -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1776689700072/1000, tz=datetime.timezone.utc\\)\\)\")",
       "Bash(python3 -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1776870974, tz=datetime.timezone.utc\\)\\)\")",
-      "Bash(python -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1776870974, tz=datetime.timezone.utc\\)\\)\")"
+      "Bash(python -c \"import datetime; print\\(datetime.datetime.fromtimestamp\\(1776870974, tz=datetime.timezone.utc\\)\\)\")",
+      "Bash(xargs grep *)"
     ]
   }
 }
