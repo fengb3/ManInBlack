@@ -143,6 +143,9 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
             HasDefaultValue = p.HasExplicitDefaultValue
         }).ToList();
 
+        // 检测 async 返回类型
+        var (isAsync, actualReturnType, returnsVoid) = UnwrapAsyncReturnType(methodSymbol.ReturnType, fullyQualifiedFormat);
+
         // 提取 XML 文档注释
         var (summary, paramDescriptions, returnsDescription) = ExtractXmlDoc(methodDecl);
 
@@ -153,8 +156,9 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
             ContainingTypeShortName = containingType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
             ContainingNamespace = containingNamespace,
             IsStatic = methodSymbol.IsStatic,
-            ReturnsVoid = methodSymbol.ReturnsVoid,
-            ReturnType = methodSymbol.ReturnType.ToDisplayString(fullyQualifiedFormat),
+            IsAsync = isAsync,
+            ReturnsVoid = returnsVoid,
+            ReturnType = actualReturnType,
             Parameters = parameters,
             Summary = summary,
             ParamDescriptions = paramDescriptions,
@@ -416,5 +420,32 @@ public sealed class ToolDeclarationGenerator : IIncrementalGenerator
                 group.First().ToolName = group.Key;
             }
         }
+    }
+
+    private static (bool isAsync, string returnType, bool returnsVoid) UnwrapAsyncReturnType(
+        ITypeSymbol returnType, SymbolDisplayFormat format)
+    {
+        if (returnType is not INamedTypeSymbol named)
+            return (false, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
+
+        if (!IsTaskType(named))
+            return (false, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
+
+        // Task<T> or ValueTask<T>
+        if (named.IsGenericType && named.TypeArguments.Length == 1)
+        {
+            var innerType = named.TypeArguments[0];
+            return (true, innerType.ToDisplayString(format), false);
+        }
+
+        // Task or ValueTask (non-generic)
+        return (true, "void", true);
+    }
+
+    private static bool IsTaskType(INamedTypeSymbol type)
+    {
+        var name = type.ConstructedFrom.Name;
+        var ns = type.ConstructedFrom.ContainingNamespace?.ToDisplayString();
+        return ns == "System.Threading.Tasks" && name is "Task" or "ValueTask";
     }
 }

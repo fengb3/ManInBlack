@@ -13,6 +13,7 @@ public sealed class ToolMethodModel
     public string FullyQualifiedTypeName { get; set; } = "";
     public string ToolName { get; set; } = "";
     public bool IsStatic { get; set; }
+    public bool IsAsync { get; set; }
     public bool ReturnsVoid { get; set; }
     public string ReturnType { get; set; } = "void";
     public List<ToolParameterModel> Parameters { get; set; } = [];
