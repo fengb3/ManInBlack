@@ -27,21 +27,31 @@ public partial class FileTools(IUserStorage userStorage, AgentContext agentConte
     /// <returns>The file content as a string, with lines joined by newline characters.</returns>
     [AiTool]
     [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
-    public string ReadFile(string filePath, int offset = 0, int length = -1)
+    public async Task<string> ReadFile(string filePath, int offset = 0, int length = -1)
     {
         filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
-            throw new FileNotFoundException($"File not found: {filePath}");
-
-        var lines = File.ReadAllLines(filePath);
-        if (offset < 0 || offset >= lines.Length)
-            throw new ArgumentOutOfRangeException(nameof(offset), $"Offset must be between 0 and {lines.Length - 1}");
+            return $"Error: File not found: {filePath}";
+        if (offset < 0)
+            return "Error: Offset must be non-negative";
         if (length < -1)
-            throw new ArgumentOutOfRangeException(nameof(length), "Length must be -1 (for all lines) or a non-negative integer");
+            return "Error: Length must be -1 (for all lines) or a non-negative integer";
 
-        var selectedLines = length == -1
-            ? lines.Skip(offset)
-            : lines.Skip(offset).Take(length);
+        var selectedLines = new List<string>();
+        var lineIndex = 0;
+        await foreach (var line in File.ReadLinesAsync(filePath))
+        {
+            if (lineIndex >= offset)
+            {
+                if (length != -1 && selectedLines.Count >= length)
+                    break;
+                selectedLines.Add(line);
+            }
+            lineIndex++;
+        }
+
+        if (offset >= lineIndex)
+            return $"Error: Offset {offset} exceeds file length ({lineIndex} lines)";
 
         return string.Join(Environment.NewLine, selectedLines);
     }
@@ -64,8 +74,8 @@ public partial class FileTools(IUserStorage userStorage, AgentContext agentConte
             Directory.CreateDirectory(directory);
         File.WriteAllText(filePath, content);
         return $"File written: {filePath}";
-    }
 
+    }
     /// <summary>
     /// Performs an exact string replacement in an existing file.
     /// Finds the first occurrence of originalContent and replaces it with newContent.

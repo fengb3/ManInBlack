@@ -13,6 +13,7 @@ public sealed class ToolDeclarationModel
     public string ContainingTypeShortName { get; set; } = "";
     public string ContainingNamespace { get; set; } = "";
     public bool IsStatic { get; set; }
+    public bool IsAsync { get; set; }
     public bool ReturnsVoid { get; set; }
     public string ReturnType { get; set; } = "void";
     public List<ToolDeclarationParameterModel> Parameters { get; set; } = [];

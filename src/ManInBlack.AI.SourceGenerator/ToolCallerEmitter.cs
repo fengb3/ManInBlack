@@ -170,28 +170,29 @@ public static class ToolCallerEmitter
 
         // 调用方法并设置 Result
         var argsList = string.Join(", ", tool.Parameters.Select(p => p.Name));
+        var awaitPrefix = tool.IsAsync ? "await " : "";
         if (tool.IsStatic)
         {
             if (tool.ReturnsVoid)
             {
-                lines.Add($"{tool.ContainingTypeName}.{tool.MethodName}({argsList});");
+                lines.Add($"{awaitPrefix}{tool.ContainingTypeName}.{tool.MethodName}({argsList});");
                 lines.Add($"{ctxVar}.Result = null;");
             }
             else
             {
-                lines.Add($"{ctxVar}.Result = {tool.ContainingTypeName}.{tool.MethodName}({argsList});");
+                lines.Add($"{ctxVar}.Result = {awaitPrefix}{tool.ContainingTypeName}.{tool.MethodName}({argsList});");
             }
         }
         else
         {
             if (tool.ReturnsVoid)
             {
-                lines.Add($"instance.{tool.MethodName}({argsList});");
+                lines.Add($"{awaitPrefix}instance.{tool.MethodName}({argsList});");
                 lines.Add($"{ctxVar}.Result = null;");
             }
             else
             {
-                lines.Add($"{ctxVar}.Result = instance.{tool.MethodName}({argsList});");
+                lines.Add($"{ctxVar}.Result = {awaitPrefix}instance.{tool.MethodName}({argsList});");
             }
         }
 
