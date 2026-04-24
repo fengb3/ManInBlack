@@ -91,4 +91,8 @@ batches updates to Feishu API. Cards use JSON 2.0 with snake_case serialization.
 
 ## Documentations 
 
-- middleware implementation guide: [middleware-guide](docs/middleware-guide.md)
+- 架构概览: [architecture](docs/architecture.md)
+- Provider 配置指南: [provider-guide](docs/provider-guide.md)
+- 快速开始: [quick-start](docs/quick-start.md)
+- 中间件开发指北: [middleware-guide](docs/middleware-guide.md)
+- 中间件测试指北: [testing-guide](docs/testing-guide.md)
