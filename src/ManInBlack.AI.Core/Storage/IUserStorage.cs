@@ -1,4 +1,4 @@
-﻿namespace ManInBlack.AI.Services.Abstraction;
+﻿namespace ManInBlack.AI.Core.Storage;
 
 public interface IUserStorage
 {
