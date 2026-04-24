@@ -22,13 +22,15 @@ public class FileUserStorage : IUserStorage
         Directory.CreateDirectory(UsersDirRoot);
         _userIdMap = new JsonFileDictionary<string, string>(Path.Combine(UsersDirRoot, "userIdMap.json"));
         _logger = logger;
+        
+        _currId = _userIdMap.Values.Select(int.Parse).DefaultIfEmpty(0).Max();
     }
 
-    private int _nextId;
+    private int _currId;
 
     private int GetNextId()
     {
-        return Interlocked.Increment(ref _nextId);
+        return Interlocked.Increment(ref _currId);
     }
 
     private readonly IDictionary<string, string> _userIdMap;

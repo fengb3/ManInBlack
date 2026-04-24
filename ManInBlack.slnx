@@ -8,6 +8,7 @@
   <Project Path="src/ManInBlack.AI.Core/ManInBlack.AI.Core.csproj" />
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Folder Name="/Demo/">
+    <File Path="demo/docker-compose.yml" />
     <Project Path="demo/AgentConsole/AgentConsole.csproj" />
     <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
     <Project Path="demo/Playground/Playground.csproj" />

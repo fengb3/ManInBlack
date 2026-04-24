@@ -254,7 +254,7 @@ public partial class CommandLineTools(IUserStorage userStorage, AgentContext age
                 "Command blocked by security policy: detected dangerous operation「reverse shell / network listener」.";
 
         // Overwrite critical system files
-        if (OverwriteCritialSystemFilesRegex().IsMatch(command))
+        if (OverwriteCriticalSystemFilesRegex().IsMatch(command))
             return
                 "Command blocked by security policy: detected dangerous operation「overwrite critical system files」.";
 
@@ -295,7 +295,7 @@ public partial class CommandLineTools(IUserStorage userStorage, AgentContext age
     private static partial Regex ReverseShellNetworkListener();
 
     [GeneratedRegex(@">\s*/etc/(passwd|shadow|sudoers)\b", RegexOptions.IgnoreCase, "zh-CN")]
-    private static partial Regex OverwriteCritialSystemFilesRegex();
+    private static partial Regex OverwriteCriticalSystemFilesRegex();
 
     [GeneratedRegex(@"\b(useradd|adduser|passwd)\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex CreateLinuxUserRegex();
