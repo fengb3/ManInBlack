@@ -44,7 +44,7 @@ builder.Services.AddFeishuNetSdk(
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
 )
-    // .AddFeishuWebSocket()
+    .AddFeishuWebSocket()
     // 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
     // Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
 ;

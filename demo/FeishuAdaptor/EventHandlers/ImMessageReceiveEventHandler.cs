@@ -8,6 +8,7 @@ using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Services.Abstraction;
 
 namespace FeishuAdaptor.EventHandlers;

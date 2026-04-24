@@ -12,10 +12,12 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
     <PackageReference Include="xunit" Version="*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="*" />
+    <PackageReference Include="System.Linq.Async" Version="*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ManInBlack.AI.Core\ManInBlack.AI.Core.csproj" />
+    <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
   </ItemGroup>
 
 </Project>
