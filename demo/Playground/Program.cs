@@ -6,7 +6,12 @@ using ManInBlack.AI.Core.Tools;
 using Microsoft.Extensions.AI;
 using Playground;
 // using Playground.Tools;
-Console.WriteLine("hello");
+// print every special folder
+foreach (Environment.SpecialFolder folder in Enum.GetValues<Environment.SpecialFolder>())
+{
+    var path = Environment.GetFolderPath(folder);
+    Console.WriteLine($"{folder,-30} {path}");
+}
 // // 构建 DI 容器
 // var services = new ServiceCollection();
 // services.AddTransient<SimpleMathTools>();

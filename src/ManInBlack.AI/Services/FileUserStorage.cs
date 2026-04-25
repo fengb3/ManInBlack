@@ -6,7 +6,7 @@ using ManInBlack.AI.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ManInBlack.AI.Services.Abstraction;
+namespace ManInBlack.AI.Services;
 
 [ServiceRegister.Singleton.As<IUserStorage>]
 public class FileUserStorage : IUserStorage
@@ -54,12 +54,9 @@ public class FileUserStorage : IUserStorage
     public async Task<UserEntry> GetOrCreateUser(string userId)
     {
         var selfHostUserId = GetUserId(userId);
+        var userEntryFile = Path.Combine(UsersDirRoot, $"{selfHostUserId}.json");
 
-        var userDir = Path.Combine(UsersDirRoot, selfHostUserId);
-        Directory.CreateDirectory(userDir);
-        var userEntryFile = Path.Combine(userDir, $"{selfHostUserId}.json");
-
-        _logger.LogInformation("Getting user {UserId} from directory {UserDir}", userId, userDir);
+        _logger.LogInformation("Getting user {UserId} from {UserDir}", userId, userEntryFile);
 
         if (!File.Exists(userEntryFile))
         {
@@ -90,8 +87,7 @@ public class FileUserStorage : IUserStorage
     public async Task SaveUserAsync(UserEntry userEntry)
     {
         var selfHostUserId = GetUserId(userEntry.UserId);
-        var userDir = Path.Combine(UsersDirRoot, selfHostUserId);
-        var userEntryFile = Path.Combine(userDir, $"{selfHostUserId}.json");
+        var userEntryFile = Path.Combine(UsersDirRoot, $"{selfHostUserId}.json");
         var json = JsonSerializer.Serialize(userEntry, JsonOptions);
         await File.WriteAllTextAsync(userEntryFile, json);
     }

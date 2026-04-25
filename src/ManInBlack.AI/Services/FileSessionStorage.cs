@@ -6,7 +6,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ManInBlack.AI.Services.Abstraction;
+namespace ManInBlack.AI.Services;
 
 [ServiceRegister.Singleton.As<ISessionStorage>]
 public class FileSessionStorage : ISessionStorage

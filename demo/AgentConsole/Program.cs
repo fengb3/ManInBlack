@@ -3,6 +3,7 @@ using DotNetEnv;
 using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
@@ -37,10 +38,18 @@ var rootSp = services.BuildServiceProvider();
 using var scope = rootSp.CreateScope();
 var       sp    = scope.ServiceProvider;
 
+var userId = "console";
+
+var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
+var user = await userStorage.GetOrCreateUser(userId);
+
+
 var agentContext = sp.GetRequiredService<AgentContext>();
 agentContext.AgentId    = Guid.NewGuid().ToString();
-agentContext.ParentId   = "console";
-agentContext.ParentType = "User";
+agentContext.ParentId   = userId;
+agentContext.ParentType = "Default";
+agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
+
 
 // middle ware 顺序, 系统提示, 持久会话
 
@@ -59,6 +68,7 @@ agentContext.UserInput    = $"""
                              touch /test.txt # 应失败（只读）
                              dotnet build    # 正常工作
                              """;
+
 
 
 var updates = pipeline(agentContext);

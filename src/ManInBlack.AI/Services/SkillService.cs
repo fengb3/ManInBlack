@@ -1,7 +1,9 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Storage;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Services;
 
@@ -11,13 +13,13 @@ public partial class SkillService
     private readonly Dictionary<string, SkillEntry> _skills = new();
     private readonly IUserWorkspace _workspace;
 
-    public SkillService(IUserWorkspace workspace, ILogger<SkillService> logger, AgentContext agentContext)
+    public SkillService(IUserWorkspace workspace, IOptions<AgentStorageOptions> options, ILogger<SkillService> logger, AgentContext agentContext)
     {
         _workspace = workspace;
-        var skillsDir = Path.Combine(workspace.AgentRoot, "skills");
+        var skillsDir = Path.Combine(options.Value.RootPath, "skills");
         DeployDefaultSkills(skillsDir);
         InitializeSkills(skillsDir); // built-in skills
-        InitializeSkills(Path.Combine(workspace.UserRoot, ".agents", "skills")); // user's skills
+        InitializeSkills(Path.Combine(workspace.WorkingDirectory, ".agents", "skills")); // user's skills
         
         // Log loaded skills
         if (_skills.Count == 0)

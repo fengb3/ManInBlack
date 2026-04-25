@@ -1,4 +1,5 @@
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
@@ -25,9 +26,12 @@ public class SkillMiddlewareTests
             Options = new ChatOptions(),
             Messages = [new(ChatRole.User, "hello")]
         };
+        var options = new AgentStorageOptions {  }; // 指向用户根目录，确保 skills 目录不存在
+        var iOptions = Microsoft.Extensions.Options.Options.Create(options);
 
         var skillService = new ManInBlack.AI.Services.SkillService(
             workspace,
+            iOptions,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ManInBlack.AI.Services.SkillService>.Instance,
             agentContext);
 

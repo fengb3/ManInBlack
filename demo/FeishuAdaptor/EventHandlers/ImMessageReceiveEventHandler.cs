@@ -9,7 +9,6 @@ using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Core.Storage;
-using ManInBlack.AI.Services.Abstraction;
 
 namespace FeishuAdaptor.EventHandlers;
 
@@ -23,8 +22,14 @@ public class ImMessageReceiveEventHandler(
         CancellationToken cancellationToken = new()
     )
     {
-        if (input.Event.Message.ChatType != "p2p")
+        if (input.Event?.Message?.ChatType != "p2p")
             return Task.CompletedTask; // Only handle 1-on-1 messages for now
+        
+        logger.LogInformation(
+            "Received ImMessageReceive event: {EventId}, message type: {MessageType}",
+            input.EventId,
+            input.Event.Message.MessageType
+        );
 
         _ = Task.Run(async () => await agentLauncher.LaunchAsync(input))
         // .ContinueWith(t =>
@@ -69,11 +74,12 @@ public class AgentLauncher(
 
         // var sessionStorage = scope.ServiceProvider.GetRequiredService<ISessionStorage>();
         var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
+        var user = await userStorage.GetOrCreateUser(userId);
+
 
         var agentContext = sp.GetRequiredService<AgentContext>();
         agentContext.CancellationToken = cts.Token;
 
-        var user = await userStorage.GetOrCreateUser(userId);
 
         agentContext.AgentId = Guid.NewGuid().ToString();
         agentContext.ParentId = userId;

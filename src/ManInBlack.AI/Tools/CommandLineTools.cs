@@ -14,7 +14,7 @@ namespace ManInBlack.AI.Tools;
 /// 命令行工具，允许 AI 执行系统命令
 /// </summary>
 [ServiceRegister.Scoped]
-public partial class CommandLineTools(IUserWorkspace workspace, IBashSandbox sandbox)
+public partial class CommandLineTools(IUserWorkspace workspace)
 {
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
 
@@ -31,7 +31,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IBashSandbox san
             "bash.exe");
         return File.Exists(gitBash) ? gitBash : "bash";
     }
-    
+
     /// <summary>
     /// ---
     /// Executes a given bash command and returns its output.
@@ -95,7 +95,6 @@ public partial class CommandLineTools(IUserWorkspace workspace, IBashSandbox san
         if (dangerCheck != null)
             return dangerCheck;
 
-        // var wrapped = sandbox.WrapCommand(command, workspace.WorkingDirectory);
 
         var processInfo = new ProcessStartInfo
         {
@@ -109,16 +108,10 @@ public partial class CommandLineTools(IUserWorkspace workspace, IBashSandbox san
             CreateNoWindow = true,
         };
 
-        // if (wrapped != null)
-        // {
-        //     foreach (var arg in wrapped.Value.arguments)
-        //         processInfo.ArgumentList.Add(arg);
-        // }
-        // else
-        // {
-            processInfo.ArgumentList.Add("-c");
-            processInfo.ArgumentList.Add(command);
-        // }
+
+        processInfo.ArgumentList.Add("-c");
+        processInfo.ArgumentList.Add(command);
+
         var process = Process.Start(processInfo);
         if (process == null)
             return "Failed to start Bash process.";

@@ -7,10 +7,9 @@ public class AgentStorageOptions
     public string RootPath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".man-in-black");
 
-    /// <summary>
-    /// 是否启用 Bash 命令的 bwrap 沙箱（仅 Linux 生效，默认 true）
-    /// </summary>
-    public bool SandboxEnabled { get; set; } = true;
+    // public string WorkspaceRootPath { get; set; } = Path.Combine(
+    //     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "man_in_black_workspaces"
+    // );
 }
 
 public interface ISessionStorage
