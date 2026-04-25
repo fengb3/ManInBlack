@@ -2,10 +2,11 @@ using System.Runtime.CompilerServices;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Services.Abstraction;
+using ManInBlack.AI.Core.Storage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Middlewares;
 
@@ -26,8 +27,8 @@ public class AgentProfileMiddleware(ILogger<AgentProfileMiddleware> logger) : Ag
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var workspace = context.ServiceProvider.GetRequiredService<IUserWorkspace>();
-        var agentRoot = workspace.AgentRoot;
+        var options = context.ServiceProvider.GetRequiredService<IOptions<AgentStorageOptions>>();
+        var agentRoot = options.Value.RootPath;
 
         Directory.CreateDirectory(agentRoot);
 

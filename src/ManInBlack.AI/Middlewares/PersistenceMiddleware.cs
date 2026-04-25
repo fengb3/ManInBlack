@@ -5,7 +5,6 @@ using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
 using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Services;
-using ManInBlack.AI.Services.Abstraction;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

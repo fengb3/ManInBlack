@@ -73,16 +73,12 @@ public class FakeUserStorage : IUserStorage
 /// </summary>
 public class FakeUserWorkspace : IUserWorkspace
 {
-    public string UserId { get; }
     public string AgentRoot { get; }
-    public string UserRoot { get; }
     public string WorkingDirectory { get; set; }
 
     public FakeUserWorkspace(string userId, string workingDir = "/tmp/workspace")
     {
-        UserId = userId;
         WorkingDirectory = workingDir;
         AgentRoot = Path.Combine(workingDir, ".agents");
-        UserRoot = workingDir;
     }
 }
