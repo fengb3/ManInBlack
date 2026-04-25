@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 
 namespace ManInBlack.AI.Tools;
@@ -13,7 +14,7 @@ namespace ManInBlack.AI.Tools;
 /// 命令行工具，允许 AI 执行系统命令
 /// </summary>
 [ServiceRegister.Scoped]
-public partial class CommandLineTools(IUserWorkspace workspace)
+public partial class CommandLineTools(IUserWorkspace workspace, IBashSandbox sandbox)
 {
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
 
@@ -94,6 +95,8 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         if (dangerCheck != null)
             return dangerCheck;
 
+        // var wrapped = sandbox.WrapCommand(command, workspace.WorkingDirectory);
+
         var processInfo = new ProcessStartInfo
         {
             FileName = FindBashExecutable(),
@@ -105,8 +108,17 @@ public partial class CommandLineTools(IUserWorkspace workspace)
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        processInfo.ArgumentList.Add("-c");
-        processInfo.ArgumentList.Add(command);
+
+        // if (wrapped != null)
+        // {
+        //     foreach (var arg in wrapped.Value.arguments)
+        //         processInfo.ArgumentList.Add(arg);
+        // }
+        // else
+        // {
+            processInfo.ArgumentList.Add("-c");
+            processInfo.ArgumentList.Add(command);
+        // }
         var process = Process.Start(processInfo);
         if (process == null)
             return "Failed to start Bash process.";
