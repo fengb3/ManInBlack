@@ -79,6 +79,7 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         string? line;
         while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
         {
+            // 调试用
             // Console.ForegroundColor = ConsoleColor.Yellow;
             // Console.BackgroundColor = ConsoleColor.DarkBlue;
             // Console.WriteLine($"{line}"); // Debug log

@@ -13,7 +13,7 @@ public static class SseResponseBuilder
     public static Stream Build(params string[] jsonDataChunks)
     {
         var ms = new MemoryStream();
-        var writer = new StreamWriter(ms, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true);
+        using var writer = new StreamWriter(ms, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true);
         foreach (var chunk in jsonDataChunks)
         {
             writer.Write($"data: {chunk}\n\n");
