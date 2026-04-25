@@ -25,7 +25,7 @@ public partial class FileTools
     [AiTool]
     public string CreateFile(string fileName)
     {
-        File.Create(fileName);
+        using (File.Create(fileName)) { }
         return $"File {fileName} created.";
     }
     
@@ -38,7 +38,7 @@ public partial class FileTools
     [AiTool]
     public string WriteFile(string fileName, string content)
     {
-        var file = File.CreateText(fileName);
+        using var file = File.CreateText(fileName);
         file.Write(content);
         return $"File {fileName} written.";
     }
