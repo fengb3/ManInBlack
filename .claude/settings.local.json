@@ -49,20 +49,9 @@
       "Bash(where python3:*)",
       "Read(//c/Users/fohhy/AppData/Local/Programs/Python//**)",
       "Bash(python .claude/hooks/notify.py)",
-      "Bash(git fetch:*)"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python .claude/hooks/notify.py"
-          }
-        ]
-      }
+      "Bash(git fetch:*)",
+      "Bash(bash --version)",
+      "Skill(update-config)"
     ]
   }
 }

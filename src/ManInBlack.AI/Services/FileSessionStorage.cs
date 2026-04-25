@@ -9,7 +9,8 @@ using Microsoft.Extensions.Options;
 namespace ManInBlack.AI.Services;
 
 [ServiceRegister.Singleton.As<ISessionStorage>]
-public class FileSessionStorage : ISessionStorage
+public class FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<FileSessionStorage> logger)
+    : ISessionStorage
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -17,21 +18,17 @@ public class FileSessionStorage : ISessionStorage
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    private readonly AgentStorageOptions _options;
-    private readonly ILogger<FileSessionStorage> _logger;
+    private readonly AgentStorageOptions _options = options.Value;
 
-    public FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<FileSessionStorage> logger)
-    {
-        _options = options.Value;
-        Directory.CreateDirectory(SessionDir);
-        _logger = logger;
-    }
+    // TODO 内存里存一份
+    // private Dictionary<string, List<ChatMessage>> _inMemorySessionMessages = new();
 
     private string SessionDir => Path.Combine(_options.RootPath, "sessions");
 
     /// <inheritdoc/>
     public async Task SaveMessage(string sessionId, ChatMessage message)
     {
+        Directory.CreateDirectory(SessionDir);
         var sessionFile = Path.Combine(SessionDir, $"{sessionId}.jsonl");
         var json = JsonSerializer.Serialize(message, JsonOptions);
         await File.AppendAllTextAsync(sessionFile, json + Environment.NewLine);
@@ -40,10 +37,11 @@ public class FileSessionStorage : ISessionStorage
     /// <inheritdoc/>
     public async Task<IList<ChatMessage>> LoadMessages(string sessionId)
     {
+        Directory.CreateDirectory(SessionDir);
         var messages = new List<ChatMessage>();
         var sessionFile = Path.Combine(SessionDir, $"{sessionId}.jsonl");
 
-        _logger.LogInformation("Loading session {SessionId} from file {SessionFile}", sessionId, sessionFile);
+        logger.LogInformation("Loading session {SessionId} from file {SessionFile}", sessionId, sessionFile);
 
         if (!File.Exists(sessionFile))
         {
