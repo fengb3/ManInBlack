@@ -1,8 +1,6 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Storage;
-using ManInBlack.AI.Services.Abstraction;
 using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Services;
@@ -11,15 +9,15 @@ namespace ManInBlack.AI.Services;
 public partial class SkillService
 {
     private readonly Dictionary<string, SkillEntry> _skills = new();
-    private readonly IUserStorage _userStorage;
+    private readonly IUserWorkspace _workspace;
 
-    public SkillService(IUserStorage userStorage, ILogger<SkillService> logger, AgentContext agentContext)
+    public SkillService(IUserWorkspace workspace, ILogger<SkillService> logger, AgentContext agentContext)
     {
-        _userStorage = userStorage;
-        var skillsDir = Path.Combine(GlobalConfiguration.AppFileRoot, "skills");
+        _workspace = workspace;
+        var skillsDir = Path.Combine(workspace.AgentRoot, "skills");
         DeployDefaultSkills(skillsDir);
         InitializeSkills(skillsDir); // built-in skills
-        InitializeSkills(Path.Combine(userStorage.GetUserWorkingDir(agentContext.ParentId), ".agents", "skills")); // user's skills
+        InitializeSkills(Path.Combine(workspace.UserRoot, ".agents", "skills")); // user's skills
         
         // Log loaded skills
         if (_skills.Count == 0)
@@ -113,22 +111,6 @@ public partial class SkillService
         int     blockIndent = -1;
         var     blockLines  = new List<string>();
 
-        void FlushBlock()
-        {
-            if (currentKey == null)
-                return;
-            if (isLiteral || isFolded)
-            {
-                var joined = isFolded
-                    ? string.Join(' ', blockLines).Trim()
-                    : string.Join('\n', blockLines).TrimEnd();
-                result[currentKey] = joined;
-            }
-            blockLines.Clear();
-            isLiteral   = isFolded = false;
-            blockIndent = -1;
-        }
-
         foreach (var raw in lines)
         {
             // inside a block scalar — continuation lines start with whitespace
@@ -182,6 +164,22 @@ public partial class SkillService
 
         FlushBlock();
         return result;
+        
+        void FlushBlock()
+        {
+            if (currentKey == null)
+                return;
+            if (isLiteral || isFolded)
+            {
+                var joined = isFolded
+                    ? string.Join(' ', blockLines).Trim()
+                    : string.Join('\n', blockLines).TrimEnd();
+                result[currentKey] = joined;
+            }
+            blockLines.Clear();
+            isLiteral   = isFolded = false;
+            blockIndent = -1;
+        }
     }
 
     /// <summary>Layer 1: short descriptions for the system prompt.</summary>

@@ -41,12 +41,6 @@ public class FakeSessionStorage : ISessionStorage
 public class FakeUserStorage : IUserStorage
 {
     private readonly Dictionary<string, UserEntry> _users = new();
-    private readonly string _workingDir;
-
-    public FakeUserStorage(string workingDir = "/tmp/test-user-dir")
-    {
-        _workingDir = workingDir;
-    }
 
     public Task<UserEntry> GetOrCreateUser(string userId)
     {
@@ -64,7 +58,14 @@ public class FakeUserStorage : IUserStorage
         return Task.CompletedTask;
     }
 
-    public string GetUserWorkingDir(string userId) => _workingDir;
+    public async Task<string> CreateNewSessionIdAsync(string userId)
+    {
+        var user = await GetOrCreateUser(userId);
+        var sessionId = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        user.SessionIds.Add(sessionId);
+        await SaveUserAsync(user);
+        return sessionId;
+    }
 }
 
 /// <summary>
@@ -84,10 +85,4 @@ public class FakeUserWorkspace : IUserWorkspace
         AgentRoot = Path.Combine(workingDir, ".agents");
         UserRoot = workingDir;
     }
-
-    public List<ChatMessage> Initialize() => [];
-
-    public void AppendHistoryChatMessage(ChatMessage message) { }
-
-    public void NewSession() { }
 }

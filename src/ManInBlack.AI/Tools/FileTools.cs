@@ -2,8 +2,6 @@
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Storage;
-using ManInBlack.AI.Services.Abstraction;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
@@ -11,9 +9,9 @@ using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 namespace ManInBlack.AI.Tools;
 
 [ServiceRegister.Scoped]
-public partial class FileTools(IUserStorage userStorage, AgentContext agentContext)
+public partial class FileTools(IUserWorkspace workspace)
 {
-    private string _userWorkspace = userStorage.GetUserWorkingDir(agentContext.ParentId);
+    private readonly string _userWorkspace = workspace.WorkingDirectory;
     
     private string ResolvePath(string path) =>
         Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_userWorkspace, path));

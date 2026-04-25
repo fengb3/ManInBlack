@@ -17,7 +17,7 @@ public class SkillMiddlewareTests
     public async Task HandleAsync_NoSkills_ShouldNotModifyContext()
     {
         // SkillService with empty skills directory → HasSkills() = false
-        var userStorage = new FakeUserStorage();
+        var workspace = new FakeUserWorkspace("test-user");
         var agentContext = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             ParentId = "test-user",
@@ -27,7 +27,7 @@ public class SkillMiddlewareTests
         };
 
         var skillService = new ManInBlack.AI.Services.SkillService(
-            userStorage,
+            workspace,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ManInBlack.AI.Services.SkillService>.Instance,
             agentContext);
 

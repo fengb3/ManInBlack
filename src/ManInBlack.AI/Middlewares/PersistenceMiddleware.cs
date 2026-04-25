@@ -38,8 +38,7 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             if (command is "clear" or "reset" or "new")
             {
                 var userStorage = context.ServiceProvider.GetRequiredService<IUserStorage>();
-                var user = await userStorage.GetOrCreateUser(context.ParentId); // 获取用户信息
-                await user.CreateNewSessionIdAsync(userStorage);
+                context.SessionId = await userStorage.CreateNewSessionIdAsync(context.ParentId);
                 context.Messages.Clear();
                 yield return new ChatResponseUpdate
                 {

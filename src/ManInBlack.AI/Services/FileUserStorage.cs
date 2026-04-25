@@ -1,9 +1,10 @@
-﻿using System.Text.Encodings.Web;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Storage;
 using ManInBlack.AI.Utils;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Services.Abstraction;
 
@@ -16,17 +17,19 @@ public class FileUserStorage : IUserStorage
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    private string UsersDirRoot => Path.Combine(GlobalConfiguration.AppFileRoot, "users");
+    private string UsersDirRoot => Path.Combine(_options.RootPath, "users");
 
-    public FileUserStorage(ILogger<FileUserStorage> logger)
+    public FileUserStorage(IOptions<AgentStorageOptions> options, ILogger<FileUserStorage> logger)
     {
+        _options = options.Value;
         Directory.CreateDirectory(UsersDirRoot);
         _userIdMap = new JsonFileDictionary<string, string>(Path.Combine(UsersDirRoot, "userIdMap.json"));
         _logger = logger;
-        
+
         _currId = _userIdMap.Values.Select(int.Parse).DefaultIfEmpty(0).Max();
     }
 
+    private readonly AgentStorageOptions _options;
     private int _currId;
 
     private int GetNextId()
@@ -78,7 +81,7 @@ public class FileUserStorage : IUserStorage
             {
                 throw new FileNotFoundException($"Could not find user {userId}");
             }
-            
+
             return entry;
         }
     }
@@ -92,11 +95,12 @@ public class FileUserStorage : IUserStorage
         await File.WriteAllTextAsync(userEntryFile, json);
     }
 
-    public string GetUserWorkingDir(string userId)
+    public async Task<string> CreateNewSessionIdAsync(string userId)
     {
-        var selfHostUserId = GetUserId(userId);
-        var userDir = Path.Combine(UsersDirRoot, selfHostUserId, "workspace");
-        Directory.CreateDirectory(userDir);
-        return userDir;
+        var user = await GetOrCreateUser(userId);
+        var sessionId = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        user.SessionIds.Add(sessionId);
+        await SaveUserAsync(user);
+        return sessionId;
     }
 }

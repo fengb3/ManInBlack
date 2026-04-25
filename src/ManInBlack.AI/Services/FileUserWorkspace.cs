@@ -1,9 +1,8 @@
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Attributes;
 using ManInBlack.AI.Core.Middleware;
-using Microsoft.Extensions.AI;
+using ManInBlack.AI.Core.Storage;
+using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Services;
 
@@ -11,31 +10,25 @@ namespace ManInBlack.AI.Services;
 /// 基于文件系统的用户工作空间实现
 /// </summary>
 [ServiceRegister.Scoped.As<IUserWorkspace>]
-public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
+public class FileUserWorkspace : IUserWorkspace
 {
-    private readonly string _userId = agentContext.ParentId;
-    private string? _sessionId;
+    private readonly string _userId;
+    private readonly string _rootPath;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    public FileUserWorkspace(IOptions<AgentStorageOptions> options, AgentContext agentContext)
     {
-        WriteIndented = false,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
+        _userId = agentContext.ParentId;
+        _rootPath = options.Value.RootPath;
+    }
 
     /// <inheritdoc />
     public string UserId => _userId;
 
-    public string AgentRoot => Path.Combine("agent-workspace");
+    /// <inheritdoc />
+    public string AgentRoot => _rootPath;
 
-    /// <summary>
-    /// 用户根目录：agent-workspace/{userId}
-    /// </summary>
-    public string UserRoot => Path.Combine("agent-workspace", "users", _userId);
-
-    /// <summary>
-    /// 会话目录：agent-workspace/{userId}/history
-    /// </summary>
-    public string SessionsDirectory => Path.Combine(UserRoot, "history");
+    /// <inheritdoc />
+    public string UserRoot => Path.Combine(_rootPath, "users", _userId);
 
     /// <inheritdoc />
     public string WorkingDirectory => Path.Combine(UserRoot, "workspace");
@@ -45,63 +38,6 @@ public class FileUserWorkspace(AgentContext agentContext) : IUserWorkspace
     /// </summary>
     public void EnsureDirectoriesExist()
     {
-        Directory.CreateDirectory(SessionsDirectory);
         Directory.CreateDirectory(WorkingDirectory);
-    }
-
-    /// <inheritdoc />
-    public List<ChatMessage> Initialize()
-    {
-        EnsureDirectoriesExist();
-
-        // 获取最新的会话文件
-        var sessionFile = Directory.GetFiles(SessionsDirectory, "*.jsonl")
-            .OrderByDescending(f => f)
-            .FirstOrDefault();
-
-        if (sessionFile != null)
-        {
-            _sessionId = Path.GetFileNameWithoutExtension(sessionFile);
-        }
-        else
-        {
-            _sessionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-            var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
-            File.Create(newSessionFile).Dispose();
-        }
-
-        // 逐行读取历史消息
-        var messages = new List<ChatMessage>();
-        foreach (var line in File.ReadLines(Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl")))
-        {
-            if (string.IsNullOrWhiteSpace(line))
-                continue;
-            var message = JsonSerializer.Deserialize<ChatMessage>(line, JsonOptions);
-            if (message != null) messages.Add(message);
-        }
-
-        return messages;
-    }
-
-    /// <inheritdoc />
-    public void AppendHistoryChatMessage(ChatMessage message)
-    {
-        if (_sessionId == null)
-            throw new InvalidOperationException("会话尚未初始化，请先调用 Initialize()。");
-
-        var sessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
-        var json = JsonSerializer.Serialize(message, JsonOptions);
-        File.AppendAllText(sessionFile, json + Environment.NewLine);
-    }
-
-    /// <summary>
-    /// 创建新的会话，后续读写将切换到新会话
-    /// </summary>
-    public void NewSession()
-    {
-        EnsureDirectoriesExist();
-        _sessionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        var newSessionFile = Path.Combine(SessionsDirectory, $"{_sessionId}.jsonl");
-        File.Create(newSessionFile).Dispose();
     }
 }
