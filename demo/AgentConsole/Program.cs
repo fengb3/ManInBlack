@@ -3,6 +3,8 @@ using DotNetEnv;
 using ManInBlack.AI;
 using ManInBlack.AI.Core;
 using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Services;
+using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,7 +18,7 @@ else
 
 // 构建 DI 容器
 var services = new ServiceCollection();
-services.AddManInBlackCore(opt =>
+services.AddManInBlack(opt =>
 {
     opt.ModelChoice = new ModelChoice
     {
@@ -47,14 +49,43 @@ var pipeline = new AgentPipelineBuilder()
     .Build(sp);
 
 
-agentContext.SystemPrompt = "你是一个运维AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
-agentContext.UserInput    = $"帮我查看当前磁盘使用情况";
+agentContext.SystemPrompt = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
+agentContext.UserInput    = $"""
+                             现在你正在测试运行环境
+                             请执行以下命令并告诉我。是否可以执行成功
+                             ls /home        # 应为空（tmpfs 隐藏）
+                             ls /root        # 应为空（tmpfs 隐藏）
+                             cat /etc/os-release  # 可读（系统文件）
+                             touch /test.txt # 应失败（只读）
+                             dotnet build    # 正常工作
+                             """;
 
 
 var updates = pipeline(agentContext);
 
 Console.WriteLine("=== ManInBlack Agent Console ===");
 Console.WriteLine();
+
+// register tool call
+
+var eventBus = sp.GetRequiredService<EventBus>();
+
+eventBus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine($"\n[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
+    Console.ResetColor();
+});
+
+eventBus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
+    Console.ResetColor();
+});
+
+var last = "";
+
 
 await foreach (ChatResponseUpdate update in updates)
 {
@@ -63,11 +94,26 @@ await foreach (ChatResponseUpdate update in updates)
         switch (content)
         {
             case TextReasoningContent reasoning:
+
+                if (last != "reasoning")
+                {
+                    Console.WriteLine("[Reasoning]");
+                }
+
+                last = "reasoning";
+                
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write(reasoning.Text);
                 Console.ResetColor();
                 break;
             case TextContent text:
+
+                if (last != "text")
+                {
+                    Console.WriteLine();
+                }
+                
+                last = "text";
                 Console.Write(text.Text);
                 break;
             case UsageContent:

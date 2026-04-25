@@ -67,6 +67,7 @@ public class FileUserStorage : IUserStorage
             var userEntry = new UserEntry
             {
                 UserId = userId,
+                SelfHostUserId = selfHostUserId,
             };
             var json = JsonSerializer.Serialize(userEntry, JsonOptions);
             await streamWriter.WriteAsync(json);

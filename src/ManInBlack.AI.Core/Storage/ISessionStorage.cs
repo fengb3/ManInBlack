@@ -6,6 +6,11 @@ public class AgentStorageOptions
 {
     public string RootPath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".man-in-black");
+
+    /// <summary>
+    /// 是否启用 Bash 命令的 bwrap 沙箱（仅 Linux 生效，默认 true）
+    /// </summary>
+    public bool SandboxEnabled { get; set; } = true;
 }
 
 public interface ISessionStorage
@@ -29,6 +34,8 @@ public interface ISessionStorage
 public record UserEntry
 {
     public string UserId { get; set; }
+    
+    public string SelfHostUserId { get; set; }
     
     public Dictionary<string, object> Metadata { get; set; } = new();
     
