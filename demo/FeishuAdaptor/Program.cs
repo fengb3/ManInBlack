@@ -31,7 +31,7 @@ builder.Services.AddFeishuNetSdk(
             ?? throw new InvalidOperationException(
                 "FEISHU_APP_SECRET environment variable is not set."
             );
-        options.VerificationToken = "2coDbVG2uErFAayFpYu5GfBaKTIKVGc3";
+        options.VerificationToken = "";
         options.EnableLogging = true;
         options.IgnoreStatusException = false;
     },

@@ -1,4 +1,4 @@
-﻿namespace ManInBlack.AI.Core.Storage;
+namespace ManInBlack.AI.Core.Storage;
 
 public interface IUserStorage
 {
@@ -15,11 +15,11 @@ public interface IUserStorage
     /// <param name="userEntry"></param>
     /// <returns></returns>
     Task SaveUserAsync(UserEntry userEntry);
-    
+
     /// <summary>
-    /// 用户工作空间
+    /// 为用户创建新的会话 ID
     /// </summary>
     /// <param name="userId"></param>
-    /// <returns></returns>
-    string GetUserWorkingDir(string userId);
+    /// <returns>新会话 ID</returns>
+    Task<string> CreateNewSessionIdAsync(string userId);
 }

@@ -78,7 +78,7 @@ public class AgentLauncher(
         agentContext.AgentId = Guid.NewGuid().ToString();
         agentContext.ParentId = userId;
         agentContext.ParentType = "feishu_user";
-        agentContext.SessionId = await user.GetLatestSessionIdAsync(userStorage);
+        agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
 
         agentContext.SystemPrompt += $"""
             <system>
@@ -138,7 +138,6 @@ public class AgentLauncher(
                 {
                     var tenantApi = sp.GetRequiredService<IFeishuTenantApi>();
                     var userWorkspace = sp.GetRequiredService<IUserWorkspace>();
-                    var userStorage = sp.GetRequiredService<IUserStorage>();
 
                     var doc = JsonDocument.Parse(messageContent);
                     var fileKey = doc.RootElement.GetProperty("file_key").GetString()!;
@@ -146,7 +145,7 @@ public class AgentLauncher(
                     var messageId = input.Event!.Message!.MessageId!;
 
                     var savePath = Path.Combine(
-                        userStorage.GetUserWorkingDir(context.ParentId),
+                        userWorkspace.WorkingDirectory,
                         fileName
                     );
 
