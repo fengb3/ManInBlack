@@ -12,6 +12,11 @@
   <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
   <Project Path="src/ManInBlack.AI.Core/ManInBlack.AI.Core.csproj" />
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
+  <Folder Name="/Bwarp/">
+    <Project Path="Bwarp/Bwarp.Tests/Bwarp.Tests.csproj" />
+    <Project Path="Bwarp/Bwarp/Bwarp.csproj" />
+    <Project Path="Bwarp/BwarpDemo/BwarpDemo.csproj" />
+  </Folder>
   <Folder Name="/Demo/">
     <Project Path="demo/AgentConsole/AgentConsole.csproj" />
     <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
