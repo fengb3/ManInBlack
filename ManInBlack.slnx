@@ -3,9 +3,13 @@
     <File Path="CLAUDE.md" />
     <File Path="docs/architecture.md" />
     <File Path="docs/configuration-guide.md" />
+    <File Path="docs/feishu-guide.md" />
+    <File Path="docs/middleware-guide.md" />
     <File Path="docs/provider-guide.md" />
     <File Path="docs/quick-start.md" />
+    <File Path="docs/sourcegenerator-guide.md" />
     <File Path="docs/testing-guide.md" />
+    <File Path="docs/tools-guide.md" />
   </Folder>
   <Folder Name="/Others/">
     <File Path=".gitignore" />

@@ -20,71 +20,10 @@ No linting or formatting tools are configured.
 
 ## Project Overview
 
-.NET 10 library providing unified abstractions for multiple AI chat providers (OpenAI, Anthropic, Gemini, DeepSeek,
-Qwen, Kimi, Zhipu, Yi, Baichuan, StepFun, Spark, Doubao, MiniMax) through `Microsoft.Extensions.AI`'s `IChatClient`
-interface.
+.NET 10 library providing unified abstractions for multiple AI chat providers through `Microsoft.Extensions.AI`'s
+`IChatClient` interface.
 
-## Architecture
-
-`src/` · `demo/` · `test/`
-
-### Project structure
-
-- **`ManInBlack.AI.Abstraction`** — Interfaces, abstract classes, POCOs, attributes: `IModelProvider`/`ModelProvider`,
-  `AgentMiddleware`/`AgentContext`, `ISessionStorage`/`IUserStorage`, `IToolExecutor`, `[AiTool]`/`[ServiceRegister]`.
-- **`ManInBlack.AI`** — All concrete implementations: ChatClient adapters, Provider subclasses, DI registration,
-  Configuration loading, middlewares, tools, services. References Abstraction.
-- **`ManInBlack.AI.SourceGenerator`** — Incremental generators (.NET Standard 2.0).
-
-### ChatClient layer
-
-- **`IModelProvider`** — Provider definitions with `CompatibleWith` dispatching to API shape: `"OpenAI"`, `"Anthropic"`,
-  or `"Gemini"`. Most Chinese providers are OpenAI-compatible.
-- **Three adapters** — `OpenAICompatibleChatClient` (SSE), `AnthropicCompatibleChatClient` (content_block events),
-  `GeminiCompatibleChatClient` (query-param auth). All handle streaming + non-streaming + tool calling.
-- **`ChatClientProviderExtensions.CreateChatClient()`** — Factory dispatching by `CompatibleWith`.
-
-### Configuration
-
-- **`~/.man-in-black/settings.json`** — Unified config file. Auto-created on first run.
-- **`SettingsLoader`** — Loads settings and maps `Provider` name to concrete `ModelProvider` subclass.
-- **`AddManInBlackFromSettings()`** — DI extension that reads from settings file.
-
-### Middleware pipeline
-
-- **`AgentMiddleware`** — `HandleAsync(AgentContext, ChatResponseUpdateHandler, CancellationToken)` calling `next()` to
-  chain.
-- **`AgentPipelineBuilder`** — `Use()` / `Use<TMiddleware>()` registration, `Build(IServiceProvider)` wraps middlewares
-  in reverse around terminal `IChatClient`.
-- **`AgentContext`** — Carries `Messages`, `Options`, `SystemPrompt`, `UserInput`, `Items`, `CancellationToken`,
-  `IServiceProvider`.
-
-### Source generators
-
-| Generator                      | Purpose                                                                            |
-|--------------------------------|------------------------------------------------------------------------------------|
-| `ToolCallerGenerator`          | Dispatches `[AiTool]` method calls via `IServiceProvider`                          |
-| `ToolDeclarationGenerator`     | Generates `AIFunctionDeclaration` + JSON Schema from `[AiTool]` methods + XML docs |
-| `ServiceRegistrationGenerator` | DI registration for `[ServiceRegister]`-attributed classes                         |
-
-All emitters use **Fengb3.EasyCodeBuilder** (`Code.Create().Using(...).Namespace(ns => ...)` /
-`Code.Build(option, new CodeBuilder())`).
-
-### Diagnostic rules
-
-| ID     | Severity | Trigger                                                    |
-|--------|----------|------------------------------------------------------------|
-| MIB001 | Error    | `[ServiceRegister.X.As<T>]` where type doesn't implement T |
-| MIB010 | Error    | Class with `[AiTool]` methods is not `partial`             |
-| MIB011 | Warning  | `[AiTool]` method missing `<summary>`                      |
-| MIB012 | Warning  | `[AiTool]` parameter missing `<param>`                     |
-| MIB013 | Warning  | Non-void `[AiTool]` missing `<returns>`                    |
-
-### Feishu Adaptor (`demo/FeishuAdaptor`)
-
-飞书 IM bot via WebSocket + streaming cards. Flow: `FeishuCardMiddleware` maps content types to ViewModels →
-`CardView<T>.BindMarkdown()` wires `PropertyChanged` → `CardUpdateScheduler` (singleton, 50/sec 1000/min rate limit)
-batches updates to Feishu API. Cards use JSON 2.0 with snake_case serialization.
+Layout: `src/` · `demo/` · `test/`
 
 ## Code Style
 
@@ -92,14 +31,23 @@ batches updates to Feishu API. Cards use JSON 2.0 with snake_case serialization.
 - C# file-scoped namespaces, implicit usings, nullable enabled
 - C# extension syntax for DI (`extension(IServiceCollection services)`)
 - Source generator emitters must use EasyCodeBuilder, not raw StringBuilder
-- IDE: JetBrains Rider
+- IDE: JetBrains Rider & VS Code (with C# extensions)
 
+## Documentation
 
-## Documentations
+**Agent 在修改相关模块的代码前，应先阅读对应的文档，了解该模块的架构和约束。**
 
-- 架构概览: [architecture](docs/architecture.md)
-- 配置指南: [configuration-guide](docs/configuration-guide.md)
+### Agent 参考文档
+
+- 架构概览（ChatClient 层、管道、DI、工具调用流程）: [architecture](docs/architecture.md)
+- 中间件开发指北（管道模型、AgentContext、编写模式、注册顺序）: [middleware-guide](docs/middleware-guide.md)
+- 配置指南（settings.json、DI 注册方式、校验）: [configuration-guide](docs/configuration-guide.md)
+- Source Generator & 诊断规则: [sourcegenerator-guide](docs/sourcegenerator-guide.md)
+- 工具开发指北（AiTool、ToolCallFilter、自定义工具）: [tools-guide](docs/tools-guide.md)
+- 飞书适配器: [feishu-guide](docs/feishu-guide.md)
+
+### 用户文档
+
 - Provider 配置指南: [provider-guide](docs/provider-guide.md)
 - 快速开始: [quick-start](docs/quick-start.md)
-- 中间件开发指北: [middleware-guide](docs/middleware-guide.md)
 - 中间件测试指北: [testing-guide](docs/testing-guide.md)
