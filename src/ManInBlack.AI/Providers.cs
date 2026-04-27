@@ -174,19 +174,23 @@ public static class ChatClientProviderExtensions
     public static IChatClient CreateChatClient(IHttpClientFactory httpClientFactory, ModelChoice modelChoice)
     {
         var httpClient = httpClientFactory.CreateClient();
+        var baseAddress = modelChoice.Provider.BaseUrl.EndsWith('/')
+            ? new Uri(modelChoice.Provider.BaseUrl)
+            : new Uri(modelChoice.Provider.BaseUrl + "/");
         switch (modelChoice.Provider.CompatibleWith)
         {
             case "OpenAI":
-                httpClient.BaseAddress = modelChoice.Provider.BaseUrl.EndsWith('/') ? new Uri(modelChoice.Provider.BaseUrl) : new Uri(modelChoice.Provider.BaseUrl + "/");
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", modelChoice.Provider.ApiKey);
+                httpClient.BaseAddress = baseAddress;
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", modelChoice.Provider.ApiKey);
                 return new OpenAICompatibleChatClient(httpClient, modelChoice.ModelId);
             case "Anthropic":
-                httpClient.BaseAddress = modelChoice.Provider.BaseUrl.EndsWith('/') ? new Uri(modelChoice.Provider.BaseUrl) : new Uri(modelChoice.Provider.BaseUrl + "/");
+                httpClient.BaseAddress = baseAddress;
                 httpClient.DefaultRequestHeaders.Add("x-api-key", modelChoice.Provider.ApiKey);
                 httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
                 return new AnthropicCompatibleChatClient(httpClient, modelChoice.ModelId);
             case "Gemini":
-                httpClient.BaseAddress = modelChoice.Provider.BaseUrl.EndsWith('/') ? new Uri(modelChoice.Provider.BaseUrl) : new Uri(modelChoice.Provider.BaseUrl + "/");
+                httpClient.BaseAddress = baseAddress;
                 return new GeminiCompatibleChatClient(httpClient, modelChoice.Provider.ApiKey, modelChoice.ModelId);
             default:
                 throw new NotSupportedException($"Provider {modelChoice.Provider.ProviderName} is not supported.");

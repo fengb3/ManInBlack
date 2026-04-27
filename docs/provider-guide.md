@@ -24,82 +24,91 @@
 
 这些提供商使用标准的 OpenAI Chat Completions API。
 
-| 类名                      | 提供商       | 默认 BaseUrl                                     |
-| ------------------------- | ------------ | ------------------------------------------------ |
-| `OpenAIProvider`          | OpenAI       | `https://api.openai.com`                         |
-| `DeepSeekProvider`        | DeepSeek     | `https://api.deepseek.com`                       |
-| `KimiCNProvider`          | Kimi (国内)  | `https://api.moonshot.cn`                        |
-| `KimiAIProvider`          | Kimi (国际)  | `https://api.moonshot.ai`                        |
-| `QwenProvider`            | 通义千问     | `https://dashscope.aliyuncs.com/compatible-mode` |
-| `ZhipuProvider`           | 智谱 AI      | `https://open.bigmodel.cn/api/paas/v4`           |
-| `ZhipuCodingPlanProvider` | 智谱编程计划 | `https://open.bigmodel.cn/api/coding/paas/v4`    |
-| `YiProvider`              | 零一万物     | `https://api.lingyiwanwu.com`                    |
-| `BaichuanProvider`        | 百川智能     | `https://api.baichuan-ai.com`                    |
-| `StepFunProvider`         | 阶跃星辰     | `https://api.stepfun.com`                        |
-| `SparkProvider`           | 讯飞星火     | `https://spark-api-open.xf-yun.com`              |
-| `DoubaoProvider`          | 豆包 (字节)  | `https://ark.cn-beijing.volces.com/api`          |
-| `MiniMaxProvider`         | MiniMax      | `https://api.minimax.chat`                       |
+| 类名                      | 提供商       | 默认 BaseUrl                                     | settings.json 中的 Provider 值 |
+| ------------------------- | ------------ | ------------------------------------------------ | ------------------------------ |
+| `OpenAIProvider`          | OpenAI       | `https://api.openai.com`                         | `"OpenAI"`                     |
+| `DeepSeekProvider`        | DeepSeek     | `https://api.deepseek.com`                       | `"DeepSeek"`                   |
+| `KimiCNProvider`          | Kimi (国内)  | `https://api.moonshot.cn`                        | `"KimiCN"` 或 `"Kimi-cn"`      |
+| `KimiAIProvider`          | Kimi (国际)  | `https://api.moonshot.ai`                        | `"KimiAI"` 或 `"Kimi-ai"`      |
+| `QwenProvider`            | 通义千问     | `https://dashscope.aliyuncs.com/compatible-mode` | `"Qwen"`                       |
+| `ZhipuProvider`           | 智谱 AI      | `https://open.bigmodel.cn/api/paas/v4`           | `"Zhipu"`                      |
+| `ZhipuCodingPlanProvider` | 智谱编程计划 | `https://open.bigmodel.cn/api/coding/paas/v4`    | `"ZhipuCodingPlan"`            |
+| `YiProvider`              | 零一万物     | `https://api.lingyiwanwu.com`                    | `"Yi"`                         |
+| `BaichuanProvider`        | 百川智能     | `https://api.baichuan-ai.com`                    | `"Baichuan"`                   |
+| `StepFunProvider`         | 阶跃星辰     | `https://api.stepfun.com`                        | `"StepFun"`                    |
+| `SparkProvider`           | 讯飞星火     | `https://spark-api-open.xf-yun.com`              | `"Spark"`                      |
+| `DoubaoProvider`          | 豆包 (字节)  | `https://ark.cn-beijing.volces.com/api`          | `"Doubao"`                     |
+| `MiniMaxProvider`         | MiniMax      | `https://api.minimax.chat`                       | `"MiniMax"`                    |
 
 ### Anthropic 协议兼容
 
-| 类名                | 提供商    | 默认 BaseUrl                |
-| ------------------- | --------- | --------------------------- |
-| `AnthropicProvider` | Anthropic | `https://api.anthropic.com` |
+| 类名                | 提供商    | 默认 BaseUrl                | Provider 值   |
+| ------------------- | --------- | --------------------------- | ------------- |
+| `AnthropicProvider` | Anthropic | `https://api.anthropic.com` | `"Anthropic"` |
 
 ### Gemini 协议兼容
 
-| 类名             | 提供商 | 默认 BaseUrl                                |
-| ---------------- | ------ | ------------------------------------------- |
-| `GeminiProvider` | Google | `https://generativelanguage.googleapis.com` |
+| 类名             | 提供商 | 默认 BaseUrl                                | Provider 值 |
+| ---------------- | ------ | ------------------------------------------- | ----------- |
+| `GeminiProvider` | Google | `https://generativelanguage.googleapis.com` | `"Gemini"`  |
 
 ---
 
 ## 配置方式
 
-### 方式一：直接初始化
+### 方式一：settings.json（推荐）
 
-```csharp
-var provider = new OpenAIProvider()
-{
-    ApiKey  = "sk-xxxxxxxx",
-    BaseUrl = "https://api.openai.com",  // 可选，有默认值
-};
+在 `~/.man-in-black/settings.json` 中配置：
 
-var modelChoice = new ModelChoice
+```json
 {
-    Provider = provider,
-    ModelId  = "gpt-4o",
-};
+  "Provider": "DeepSeek",
+  "ApiKey": "sk-xxxxxxxx",
+  "BaseUrl": "https://api.deepseek.com",
+  "ModelId": "deepseek-chat"
+}
 ```
 
-### 方式二：通过 .env 文件（推荐）
+`BaseUrl` 可选，每个 Provider 有默认值。使用 `AddManInBlackFromSettings()` 加载：
 
 ```csharp
-// 读取环境变量
-Env.Load();
+services.AddManInBlackFromSettings();
+```
 
-var modelChoice = new ModelChoice
+支持文件变更跟踪和 `IOptionsMonitor` 访问，详见 [配置指南](./configuration-guide.md)。
+
+### 方式二：代码配置
+
+直接在代码中创建 Provider 实例：
+
+```csharp
+services.AddManInBlack(opt =>
 {
-    Provider = new DeepSeekProvider()
+    opt.ModelChoice = new ModelChoice
     {
-        ApiKey  = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY") ?? "",
-        BaseUrl = Environment.GetEnvironmentVariable("DEEPSEEK_BASE_URL")
-                  ?? "https://api.deepseek.com",
-    },
-    ModelId = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL_ID") ?? "deepseek-chat",
-};
+        Provider = new DeepSeekProvider()
+        {
+            ApiKey = "sk-xxx",
+            BaseUrl = "https://api.deepseek.com",
+        },
+        ModelId = "deepseek-chat",
+    };
+});
 ```
+
+所有 Provider 类在 `ManInBlack.AI` 命名空间下。
 
 ### 方式三：使用代理 / 中转 API
 
 将 `BaseUrl` 指向你的代理地址：
 
-```csharp
-var provider = new OpenAIProvider()
+```json
 {
-    ApiKey  = "your-key",
-    BaseUrl = "https://proxy.example.com/v1",  // 自定义代理地址
-};
+  "Provider": "OpenAI",
+  "ApiKey": "your-key",
+  "BaseUrl": "https://proxy.example.com/v1",
+  "ModelId": "gpt-4o"
+}
 ```
 
 ---
@@ -149,9 +158,13 @@ var provider = new OpenAIProvider()
 
 ## 注册新提供商
 
-只需创建类继承 `ModelProvider`：
+只需创建类继承 `ModelProvider`（定义在 `ManInBlack.AI.Abstraction`）：
 
 ```csharp
+using ManInBlack.AI.Abstraction;
+
+namespace ManInBlack.AI;
+
 public sealed class MyProvider : ModelProvider
 {
     public override string ProviderName  => "MyProvider";
@@ -161,6 +174,12 @@ public sealed class MyProvider : ModelProvider
 ```
 
 无需编写适配器代码 —— 只要 `CompatibleWith` 指向现有协议，工厂方法会自动创建对应的 `IChatClient` 实例。
+
+如果希望通过 `settings.json` 配置，还需在 `SettingsLoader.CreateProvider()` 中添加映射：
+
+```csharp
+"MyProvider" => new MyProvider(),
+```
 
 ---
 

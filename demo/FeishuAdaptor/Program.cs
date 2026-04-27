@@ -2,39 +2,43 @@
 
 using System.Text.Json.Serialization;
 using FeishuAdaptor;
+using ManInBlack.AI;
 using ManInBlack.AI.Configuration;
 using Microsoft.Extensions.Http;
-using ManInBlack.AI;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 
-// 从 ~/.man-in-black/settings.json 读取配置
-var settings = SettingsLoader.Load();
-var feishu = settings.Feishu
-    ?? throw new InvalidOperationException("settings.json 中缺少 feishu 配置节。");
-
 var builder = WebApplication.CreateBuilder(args);
+
+// 将 ManInBlack 配置源添加到 Host Configuration（启用 reloadOnChange）
+builder.Configuration.AddManInBlackSettings();
+
+// 从统一 IConfiguration 读取飞书配置
+var feishuSettings = new FeishuSettings();
+builder.Configuration.GetSection("Feishu").Bind(feishuSettings);
+if (string.IsNullOrEmpty(feishuSettings.AppId))
+    throw new InvalidOperationException("settings.json 中缺少 feishu 配置节。");
 
 builder.Services.AddFeishuNetSdk(
     options =>
     {
-        options.AppId = feishu.AppId;
-        options.AppSecret = feishu.AppSecret;
-        options.VerificationToken = feishu.VerificationToken;
+        options.AppId = feishuSettings.AppId;
+        options.AppSecret = feishuSettings.AppSecret;
+        options.VerificationToken = feishuSettings.VerificationToken;
         options.EnableLogging = true;
         options.IgnoreStatusException = false;
     },
     opts =>
     {
-        opts.HttpHost = new Uri(feishu.ApiBaseUrl);
+        opts.HttpHost = new Uri(feishuSettings.ApiBaseUrl);
         opts.JsonSerializeOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
 )
-    .AddFeishuWebSocket()
-    // 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
-    // Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
+.AddFeishuWebSocket()
+// 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
+// Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
 ;
 
 builder.Services.AddSerilog(loggerConfig =>
@@ -55,7 +59,7 @@ builder.Services.AddSerilog(loggerConfig =>
         );
 });
 
-builder.Services.AddManInBlackFromSettings();
+builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
 
 builder.Services.AddAutoRegisteredServices();
 

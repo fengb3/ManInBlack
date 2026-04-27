@@ -1,34 +1,16 @@
-using System.Text.Json;
-
 using ManInBlack.AI.Abstraction;
+using Microsoft.Extensions.Configuration;
 
 namespace ManInBlack.AI.Configuration;
 
 public static class SettingsLoader
 {
-    static readonly string SettingsRoot = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".man-in-black");
-
-    static readonly string SettingsPath = Path.Combine(SettingsRoot, "settings.json");
-
-    static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true,
-    };
-
     public static ManInBlackSettings Load()
     {
-        if (!File.Exists(SettingsPath))
-        {
-            Directory.CreateDirectory(SettingsRoot);
-            var defaults = new ManInBlackSettings();
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(defaults, JsonOptions));
-        }
-
-        var json = File.ReadAllText(SettingsPath);
-        return JsonSerializer.Deserialize<ManInBlackSettings>(json, JsonOptions)
-               ?? throw new InvalidOperationException($"配置文件反序列化失败: {SettingsPath}");
+        var configuration = ManInBlackConfigurationBuilder.BuildConfiguration();
+        var settings = new ManInBlackSettings();
+        configuration.Bind(settings);
+        return settings;
     }
 
     public static ModelChoice ToModelChoice(this ManInBlackSettings settings)

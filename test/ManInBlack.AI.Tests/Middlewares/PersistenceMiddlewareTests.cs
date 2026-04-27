@@ -42,37 +42,38 @@ public class ReadPersistenceMiddlewareTests
         Assert.Contains(ctx.Messages, m => m.Role == ChatRole.Tool);
     }
 
-    [Fact]
-    public async Task HandleAsync_ShouldFilterOutReasoningContent()
-    {
-        var storage = new FakeSessionStorage();
-        var msgWithReasoning = new ChatMessage(ChatRole.Assistant,
-        [
-            new TextContent("hello"),
-            new TextReasoningContent("internal reasoning")
-        ]);
-        await storage.SaveMessage("s1", msgWithReasoning);
-
-        var services = new ServiceCollection()
-            .AddSingleton<ISessionStorage>(storage)
-            .AddSingleton<IUserStorage>(new FakeUserStorage())
-            .BuildServiceProvider();
-
-        var middleware = new ReadPersistenceMiddleware();
-        var ctx = new AgentContext(services)
-        {
-            SessionId = "s1",
-            ParentId = "u1",
-            UserInput = "hi",
-            Messages = []
-        };
-
-        await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
-
-        var restored = ctx.Messages.First(m => m.Role == ChatRole.Assistant);
-        Assert.Single(restored.Contents);
-        Assert.IsType<TextContent>(restored.Contents[0]);
-    }
+    // this one does not need anymore, deepseek (may be other models) require sending back reasoning content
+    // [Fact]
+    // public async Task HandleAsync_ShouldFilterOutReasoningContent()
+    // {
+    //     var storage = new FakeSessionStorage();
+    //     var msgWithReasoning = new ChatMessage(ChatRole.Assistant,
+    //     [
+    //         new TextContent("hello"),
+    //         new TextReasoningContent("internal reasoning")
+    //     ]);
+    //     await storage.SaveMessage("s1", msgWithReasoning);
+    //
+    //     var services = new ServiceCollection()
+    //         .AddSingleton<ISessionStorage>(storage)
+    //         .AddSingleton<IUserStorage>(new FakeUserStorage())
+    //         .BuildServiceProvider();
+    //
+    //     var middleware = new ReadPersistenceMiddleware();
+    //     var ctx = new AgentContext(services)
+    //     {
+    //         SessionId = "s1",
+    //         ParentId = "u1",
+    //         UserInput = "hi",
+    //         Messages = []
+    //     };
+    //
+    //     await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
+    //
+    //     var restored = ctx.Messages.First(m => m.Role == ChatRole.Assistant);
+    //     Assert.Single(restored.Contents);
+    //     Assert.IsType<TextContent>(restored.Contents[0]);
+    // }
 
     [Fact]
     public async Task HandleAsync_ClearCommand_ShouldResetAndYieldConfirmation()
