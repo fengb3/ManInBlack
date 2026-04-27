@@ -119,11 +119,11 @@ public class FeishuCardMiddleware(
         }
     }
 
-    private (T ViewModel, CardView<T> View) CreateCard<T>(string userOpenId) where T : ViewModelBase
+    private (T ViewModel, CardView<T> View) CreateCard<T>(string userUserId) where T : ViewModelBase
     {
         var view = serviceProvider.GetRequiredService<CardView<T>>();
         view.InitializeAsync().GetAwaiter().GetResult();
-        view.SendToUserAsync("open_id", userOpenId).GetAwaiter().GetResult();
+        view.SendToUserAsync("user_id", userUserId).GetAwaiter().GetResult();
         return (view.ViewModel, view);
     }
 }
