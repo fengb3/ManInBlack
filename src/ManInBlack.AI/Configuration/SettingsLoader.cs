@@ -1,18 +1,9 @@
 using ManInBlack.AI.Abstraction;
-using Microsoft.Extensions.Configuration;
 
 namespace ManInBlack.AI.Configuration;
 
 public static class SettingsLoader
 {
-    public static ManInBlackSettings Load()
-    {
-        var configuration = ManInBlackConfigurationBuilder.BuildConfiguration();
-        var settings = new ManInBlackSettings();
-        configuration.Bind(settings);
-        return settings;
-    }
-
     public static ModelChoice ToModelChoice(this ManInBlackSettings settings)
     {
         var provider = CreateProvider(settings.Provider);

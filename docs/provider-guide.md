@@ -113,49 +113,6 @@ services.AddManInBlack(opt =>
 
 ---
 
-## 各厂商常用模型 ID
-
-### OpenAI
-
-| 模型 ID       | 说明       |
-| ------------- | ---------- |
-| `gpt-4o`      | 旗舰多模态 |
-| `gpt-4o-mini` | 轻量快速   |
-| `o4-mini`     | 推理模型   |
-| `gpt-4.1`     | 最新 GPT-4 |
-
-### Anthropic
-
-| 模型 ID                     | 说明          |
-| --------------------------- | ------------- |
-| `claude-sonnet-4-6`         | Claude Sonnet |
-| `claude-opus-4-6`           | Claude Opus   |
-| `claude-haiku-4-5-20251001` | Claude Haiku  |
-
-### DeepSeek
-
-| 模型 ID             | 说明        |
-| ------------------- | ----------- |
-| `deepseek-chat`     | DeepSeek-V3 |
-| `deepseek-reasoner` | DeepSeek-R1 |
-
-### 通义千问 (Qwen)
-
-| 模型 ID      | 说明 |
-| ------------ | ---- |
-| `qwen-max`   | 旗舰 |
-| `qwen-plus`  | 均衡 |
-| `qwen-turbo` | 快速 |
-
-### 智谱 (Zhipu)
-
-| 模型 ID       | 说明  |
-| ------------- | ----- |
-| `glm-4-plus`  | GLM-4 |
-| `glm-4-flash` | 轻量  |
-
----
-
 ## 注册新提供商
 
 只需创建类继承 `ModelProvider`（定义在 `ManInBlack.AI.Abstraction`）：

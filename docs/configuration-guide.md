@@ -165,7 +165,6 @@ public double Temperature { get; set; } = 1.0;
 | `services.AddManInBlackFromSettings()`           | 便捷注册：构建配置 + 注册服务                |
 | `services.AddManInBlackFromConfiguration(IConfiguration)` | 从已有 IConfiguration 注册服务      |
 | `services.AddManInBlack(Action<ManInBlackOptions>)` | 手动配置，不读取 settings.json           |
-| `SettingsLoader.Load()`                          | 向后兼容，返回 ManInBlackSettings 实例       |
 
 ---
 
