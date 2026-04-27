@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
-using ManInBlack.AI.Core.Tools;
+using ManInBlack.AI.Abstraction.Tools;
 using Microsoft.Extensions.AI;
 using Playground;
 // using Playground.Tools;

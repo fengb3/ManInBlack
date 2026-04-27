@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Middlewares;

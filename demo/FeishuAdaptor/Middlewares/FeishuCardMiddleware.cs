@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using FeishuAdaptor.FeishuCard.CardViews;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 
 namespace FeishuAdaptor.Middlewares;

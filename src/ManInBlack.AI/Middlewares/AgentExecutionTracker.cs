@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Abstraction.Attributes;
 using Microsoft.Extensions.Logging;
 
-namespace ManInBlack.AI.Core.Middleware;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 跟踪每个用户正在运行的 Agent，支持在新消息到来时取消旧 Agent

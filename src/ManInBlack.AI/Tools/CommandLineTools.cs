@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 

@@ -14,16 +14,10 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="FeishuNetSdk" Version="4.1.2" />
     <PackageReference Include="FeishuNetSdk.Endpoint" Version="4.0.1" />
-    <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="FeishuNetSdk.WebSocket" Version="4.0.1" />
     <PackageReference Include="Markdig" Version="0.41.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Update=".env">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <DefaultSkills Include="DefaultSkills\**\*.*" />

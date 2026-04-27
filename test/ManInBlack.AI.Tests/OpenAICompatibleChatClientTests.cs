@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
-using ManInBlack.AI.Core;
+using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
 using Xunit;

@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 
 namespace Playground.Middlewares;

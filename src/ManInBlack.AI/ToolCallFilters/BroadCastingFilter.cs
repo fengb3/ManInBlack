@@ -1,5 +1,5 @@
-﻿using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Tools;
+﻿using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Services;
 
 namespace ManInBlack.AI.ToolCallFilters;

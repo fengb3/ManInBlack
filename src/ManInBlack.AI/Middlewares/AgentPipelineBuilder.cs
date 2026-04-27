@@ -1,8 +1,9 @@
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace ManInBlack.AI.Core.Middleware;
+namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// 聊天客户端中间件管道构建器，将多个 <see cref="AgentMiddleware"/> 和 <see cref="IChatClient"/> 组合为可调用的代理

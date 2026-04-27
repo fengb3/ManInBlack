@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 
-namespace ManInBlack.AI.Core;
+namespace ManInBlack.AI;
 
 /// <summary>
 /// Anthropic 兼容 API 适配器，实现 IChatClient 接口

@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using FeishuAdaptor.FeishuCard.Cards;
-using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Abstraction.Attributes;
 
 namespace FeishuAdaptor.FeishuCard.CardViews;
 

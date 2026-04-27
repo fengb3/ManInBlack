@@ -1,7 +1,7 @@
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Storage;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Abstraction.Storage;
 using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Services;

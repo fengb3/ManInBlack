@@ -1,36 +1,17 @@
-
-using DotNetEnv;
 using ManInBlack.AI;
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Storage;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Abstraction.Storage;
+using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 
-// read comfiguration form the fucking .env file, which should be placed in the same directory as the executable, and contains the following variables:
-var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
-if (File.Exists(envPath))
-    Env.Load(envPath);
-else
-    Env.Load();
-
-// 构建 DI 容器
+// 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
 var services = new ServiceCollection();
-services.AddManInBlack(opt =>
-{
-    opt.ModelChoice = new ModelChoice
-    {
-        Provider = new OpenAIProvider()
-        {
-            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "",
-            BaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "",
-        },
-        ModelId = Environment.GetEnvironmentVariable("OPENAI_MODEL_ID") ?? "",
-    };
-});
+services.AddManInBlackFromSettings();
 
 
 var rootSp = services.BuildServiceProvider();

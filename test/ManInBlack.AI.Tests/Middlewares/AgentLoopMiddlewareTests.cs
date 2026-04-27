@@ -1,5 +1,8 @@
-using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Tools;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;

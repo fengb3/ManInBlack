@@ -1,5 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 // using Playground.Tools;

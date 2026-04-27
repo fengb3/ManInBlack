@@ -16,7 +16,7 @@ namespace ManInBlack.AI.SourceGenerator;
 [Generator]
 public sealed class ToolMiddlewareGenerator : IIncrementalGenerator
 {
-    private const string ToolAttributeFullName = "ManInBlack.AI.Core.Attributes.AiToolAttribute";
+    private const string ToolAttributeFullName = "ManInBlack.AI.Abstraction.Attributes.AiToolAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {

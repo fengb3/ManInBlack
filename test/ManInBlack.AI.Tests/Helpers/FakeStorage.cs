@@ -1,5 +1,9 @@
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Storage;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Storage;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Tests.Helpers;

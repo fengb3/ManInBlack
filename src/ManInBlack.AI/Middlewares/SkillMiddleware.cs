@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 using SkillService = ManInBlack.AI.Services.SkillService;

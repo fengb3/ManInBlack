@@ -1,4 +1,4 @@
-﻿using ManInBlack.AI.Core.Attributes;
+﻿using ManInBlack.AI.Abstraction.Attributes;
 
 namespace Playground;
 
