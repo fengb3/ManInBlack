@@ -20,66 +20,59 @@ cd MyAgent
 
 ---
 
-## 第二步：安装依赖
+## 第二步：添加项目引用
 
 ```bash
-dotnet add package DotNetEnv          # .env 文件读取
 dotnet add reference <path>/src/ManInBlack.AI/ManInBlack.AI.csproj
+dotnet add reference <path>/src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj
 ```
 
 > 项目当前为本地引用模式。NuGet 包模式待后续发布。
 
 ---
 
-## 第三步：配置 .env
+## 第三步：配置 settings.json
 
-在项目根目录（生成输出目录）创建 `.env`：
+首次运行时会自动在 `~/.man-in-black/` 下创建 `settings.json`，填入实际值即可：
 
-```env
-OPENAI_API_KEY=sk-xxxxxxxx
-OPENAI_BASE_URL=https://api.openai.com
-OPENAI_MODEL_ID=gpt-4o
+```json
+{
+  "Provider": "OpenAI",
+  "ApiKey": "sk-xxxxxxxx",
+  "BaseUrl": "https://api.openai.com",
+  "ModelId": "gpt-4o"
+}
 ```
 
 对中国厂商（如 DeepSeek）：
 
-```env
-DEEPSEEK_API_KEY=sk-xxxxxxxx
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL_ID=deepseek-chat
+```json
+{
+  "Provider": "DeepSeek",
+  "ApiKey": "sk-xxxxxxxx",
+  "BaseUrl": "https://api.deepseek.com",
+  "ModelId": "deepseek-chat"
+}
 ```
+
+`BaseUrl` 可选，每个 Provider 有默认值。完整配置说明见 [配置指南](./configuration-guide.md)。
 
 ---
 
 ## 第四步：编写代码
 
 ```csharp
-using DotNetEnv;
 using ManInBlack.AI;
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-// 1. 加载 .env 配置
-Env.Load();
-
-// 2. 构建 DI 容器
+// 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
 var services = new ServiceCollection();
-services.AddManInBlackCore(opt =>
-{
-    opt.ModelChoice = new ModelChoice
-    {
-        Provider = new OpenAIProvider()
-        {
-            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "",
-            BaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "",
-        },
-        ModelId = Environment.GetEnvironmentVariable("OPENAI_MODEL_ID") ?? "",
-    };
-});
+services.AddManInBlackFromSettings();
 
-// 3. 配置 Agent
+// 配置 Agent
 var rootSp = services.BuildServiceProvider();
 using var scope = rootSp.CreateScope();
 var sp = scope.ServiceProvider;
@@ -89,16 +82,16 @@ ctx.AgentId    = Guid.NewGuid().ToString();
 ctx.ParentId   = "my-user";
 ctx.ParentType = "User";
 
-// 4. 构建管道
+// 构建管道
 var pipeline = new AgentPipelineBuilder()
     .UseDefault()
     .Build(sp);
 
-// 5. 发起对话
+// 发起对话
 ctx.SystemPrompt = "你是一个有帮助的AI助手。请用中文回复。";
 ctx.UserInput    = "帮我解释一下什么是依赖注入";
 
-// 6. 流式输出
+// 流式输出
 await foreach (var update in pipeline(ctx))
 {
     foreach (var content in update.Contents)
@@ -118,7 +111,7 @@ await foreach (var update in pipeline(ctx))
     }
 }
 
-// 7. 查看用量
+// 查看用量
 var usage = ctx.AccumulatedUsage;
 Console.WriteLine($"\nToken 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}");
 ```
@@ -143,25 +136,26 @@ Token 用量 — 输入: 42, 输出: 128
 
 ---
 
-## 使用其他提供商
+## 手动配置（不使用 settings.json）
 
-将 `OpenAIProvider()` 替换为任意 15 个提供商：
+如果需要在代码中直接配置 Provider，使用 `AddManInBlack`：
 
 ```csharp
-// DeepSeek
-Provider = new DeepSeekProvider() { ApiKey = "...", BaseUrl = "..." },
-ModelId = "deepseek-chat",
-
-// 通义千问
-Provider = new QwenProvider() { ApiKey = "...", BaseUrl = "..." },
-ModelId = "qwen-max",
-
-// Anthropic Claude
-Provider = new AnthropicProvider() { ApiKey = "...", BaseUrl = "..." },
-ModelId = "claude-sonnet-4-5-20250929",
+services.AddManInBlack(opt =>
+{
+    opt.ModelChoice = new ModelChoice
+    {
+        Provider = new DeepSeekProvider()
+        {
+            ApiKey = "sk-xxx",
+            BaseUrl = "https://api.deepseek.com",
+        },
+        ModelId = "deepseek-chat",
+    };
+});
 ```
 
-详见 [Provider 配置指南](./provider-guide.md)。
+所有 Provider 类在 `ManInBlack.AI` 命名空间下。详见 [Provider 配置指南](./provider-guide.md)。
 
 ---
 
@@ -194,6 +188,7 @@ ctx.ParentId  = "my-user";
 
 ## 下一步
 
+- 查看 [配置指南](./configuration-guide.md) 了解配置系统、IOptions 和文件变更跟踪
 - 了解 [架构概览](./architecture.md) 理解洋葱模型
 - 查看 [Middleware 开发指北](./middleware-guide.md) 学习编写自定义中间件
 - 阅读 [中间件测试指北](./testing-guide.md) 了解测试方法论

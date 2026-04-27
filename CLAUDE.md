@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 dotnet build ManInBlack.slnx                          # Build entire solution
-dotnet build src/ManInBlack.AI.Core                   # Core library (adapters + base types)
-dotnet build src/ManInBlack.AI                        # Main library (middleware implementations)
-dotnet build src/ManInBlack.AI.SourceGenerator        # Source generator
-dotnet run --project demo/AgentConsole                # Agent console demo
-dotnet run --project demo/Playground                  # M.E.AI type explorer
-dotnet run --project demo/FeishuAdaptor               # 飞书 bot demo
-dotnet test test/ManInBlack.AI.Tests                  # All tests (xunit)
+dotnet build src/ManInBlack.AI.Abstraction             # Abstraction library (interfaces + base types)
+dotnet build src/ManInBlack.AI                         # Main library (implementations + DI)
+dotnet build src/ManInBlack.AI.SourceGenerator         # Source generator
+dotnet run --project demo/AgentConsole                 # Agent console demo
+dotnet run --project demo/Playground                   # M.E.AI type explorer
+dotnet run --project demo/FeishuAdaptor                # 飞书 bot demo
+dotnet test test/ManInBlack.AI.Tests                   # All tests (xunit)
 dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Specific tests
 ```
 
@@ -30,10 +30,10 @@ interface.
 
 ### Project structure
 
-- **`ManInBlack.AI.Core`** — Base abstractions: `IChatClient` adapters, `AgentMiddleware`/`AgentContext`/
-  `AgentPipelineBuilder`, `[AiTool]`/`[ServiceRegister]` attributes, `ToolFunctionDeclaration`.
-- **`ManInBlack.AI`** — Concrete middlewares (Logging, MessageEnrich, SystemPromptInjection, Persistence,
-  ContextCompress, CommandTool, Skill, AgentLoop). References Core.
+- **`ManInBlack.AI.Abstraction`** — Interfaces, abstract classes, POCOs, attributes: `IModelProvider`/`ModelProvider`,
+  `AgentMiddleware`/`AgentContext`, `ISessionStorage`/`IUserStorage`, `IToolExecutor`, `[AiTool]`/`[ServiceRegister]`.
+- **`ManInBlack.AI`** — All concrete implementations: ChatClient adapters, Provider subclasses, DI registration,
+  Configuration loading, middlewares, tools, services. References Abstraction.
 - **`ManInBlack.AI.SourceGenerator`** — Incremental generators (.NET Standard 2.0).
 
 ### ChatClient layer
@@ -43,6 +43,12 @@ interface.
 - **Three adapters** — `OpenAICompatibleChatClient` (SSE), `AnthropicCompatibleChatClient` (content_block events),
   `GeminiCompatibleChatClient` (query-param auth). All handle streaming + non-streaming + tool calling.
 - **`ChatClientProviderExtensions.CreateChatClient()`** — Factory dispatching by `CompatibleWith`.
+
+### Configuration
+
+- **`~/.man-in-black/settings.json`** — Unified config file. Auto-created on first run.
+- **`SettingsLoader`** — Loads settings and maps `Provider` name to concrete `ModelProvider` subclass.
+- **`AddManInBlackFromSettings()`** — DI extension that reads from settings file.
 
 ### Middleware pipeline
 
@@ -89,9 +95,10 @@ batches updates to Feishu API. Cards use JSON 2.0 with snake_case serialization.
 - IDE: JetBrains Rider
 
 
-## Documentations 
+## Documentations
 
 - 架构概览: [architecture](docs/architecture.md)
+- 配置指南: [configuration-guide](docs/configuration-guide.md)
 - Provider 配置指南: [provider-guide](docs/provider-guide.md)
 - 快速开始: [quick-start](docs/quick-start.md)
 - 中间件开发指北: [middleware-guide](docs/middleware-guide.md)

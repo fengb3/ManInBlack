@@ -4,6 +4,7 @@ using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -40,7 +41,7 @@ public static class DependencyInjection
                 .ConfigurePrimaryHttpMessageHandler(() =>
                     new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
             services.AddSingleton(options.ModelChoice);
-            services.AddSingleton<IChatClient>(sp =>
+            services.AddScoped<IChatClient>(sp =>
             {
                 var choice = sp.GetRequiredService<ModelChoice>();
                 return ChatClientProviderExtensions.CreateChatClient(
@@ -54,11 +55,29 @@ public static class DependencyInjection
         }
 
         /// <summary>
-        /// 从 ~/.man-in-black/settings.json 加载配置并注册所有服务
+        /// 从 ~/.man-in-black/settings.json 加载配置并注册所有服务。
+        /// 设置文件变更会被自动跟踪；通过 IOptionsMonitor&lt;ManInBlackSettings&gt; 可获取最新值。
         /// </summary>
         public IServiceCollection AddManInBlackFromSettings(Action<ManInBlackOptions>? configure = null)
         {
-            var settings = SettingsLoader.Load();
+            var configuration = ManInBlackConfigurationBuilder.BuildConfiguration();
+            return services.AddManInBlackFromConfiguration(configuration, configure);
+        }
+
+        /// <summary>
+        /// 从给定的 IConfiguration 加载配置并注册所有服务。
+        /// 适用于已构建 WebApplicationBuilder 等场景，可复用其 Configuration。
+        /// </summary>
+        public IServiceCollection AddManInBlackFromConfiguration(
+            IConfiguration configuration,
+            Action<ManInBlackOptions>? configure = null)
+        {
+            services.Configure<ManInBlackSettings>(configuration);
+            services.AddSingleton<IValidateOptions<ManInBlackSettings>, ValidateManInBlackSettings>();
+            services.Configure<FeishuSettings>(configuration.GetSection("Feishu"));
+
+            var settings = new ManInBlackSettings();
+            configuration.Bind(settings);
             var modelChoice = settings.ToModelChoice();
 
             return services.AddManInBlack(opt =>

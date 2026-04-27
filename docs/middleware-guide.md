@@ -20,11 +20,11 @@ SavePersistence ← UserInput ← ContextCompress ← Tools ← AgentLoop ← IC
 
 ### 三个核心类型
 
-| 类型                        | 文件                               | 职责                                                          |
-| --------------------------- | ---------------------------------- | ------------------------------------------------------------- |
-| `AgentMiddleware`           | Core/Middleware/AgentMiddleware.cs | 抽象基类，定义 `HandleAsync`                                  |
-| `AgentContext`              | Core/Middleware/AgentContext.cs    | 请求上下文，在管道中传递                                      |
-| `ChatResponseUpdateHandler` | Core/Middleware/AgentMiddleware.cs | `delegate IAsyncEnumerable<ChatResponseUpdate>`，代表管道下游 |
+| 类型                        | 文件                                          | 职责                                                          |
+| --------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
+| `AgentMiddleware`           | Abstraction/Middleware/AgentMiddleware.cs      | 抽象基类，定义 `HandleAsync`                                  |
+| `AgentContext`              | Abstraction/Middleware/AgentContext.cs         | 请求上下文，在管道中传递                                      |
+| `ChatResponseUpdateHandler` | Abstraction/Middleware/AgentMiddleware.cs      | `delegate IAsyncEnumerable<ChatResponseUpdate>`，代表管道下游 |
 
 ---
 
@@ -51,8 +51,8 @@ SavePersistence ← UserInput ← ContextCompress ← Tools ← AgentLoop ← IC
 
 ```csharp
 using System.Runtime.CompilerServices;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Middleware;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 
 namespace ManInBlack.AI.Middlewares;

@@ -13,37 +13,42 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 ## 项目分层
 
 ```
-┌───────────────────────────────────────────────────┐
-│  demo/AgentConsole  demo/FeishuAdaptor  ...       │  ← 应用层
-├───────────────────────────────────────────────────┤
-│  ManInBlack.AI         中间件实现 + 工具 + 服务   │  ← 实现层
-│  ManInBlack.AI.Core    IChatClient 适配器 + 抽象  │  ← 抽象层
-│  ManInBlack.AI.SG      四个增量源生成器           │  ← 编译层
-└───────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  demo/AgentConsole  demo/FeishuAdaptor  ...                       │  ← 应用层
+├────────────────────────────────────────────────────────────────────┤
+│  ManInBlack.AI              中间件 + 工具 + ChatClient + DI + 配置 │  ← 实现层
+│  ManInBlack.AI.Abstraction  接口 + 抽象基类 + POCO + Attribute     │  ← 契约层
+│  ManInBlack.AI.SG           四个增量源生成器                        │  ← 编译层
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-### ManInBlack.AI.Core — 抽象层
+### ManInBlack.AI.Abstraction — 契约层
 
-提供整个框架的基础接口和抽象类：
+纯接口、抽象类和 POCO，不包含任何实现：
 
-| 目录          | 职责                                               |
-| ------------- | -------------------------------------------------- |
-| `ChatClient/` | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini） |
-| `Middleware/` | AgentMiddleware、AgentContext、PipelineBuilder     |
-| `Storage/`    | ISessionStorage、IUserStorage                      |
-| `Tools/`      | IToolExecutor、ToolExecuteContext、ToolCallFilter  |
-| `Attributes/` | [AiTool]、[ServiceRegister]（驱动源生成器）        |
+| 目录          | 职责                                          |
+| ------------- | --------------------------------------------- |
+| `Middleware/` | AgentMiddleware（抽象基类）、AgentContext（POCO）|
+| `Storage/`    | ISessionStorage、IUserStorage、AgentStorageOptions |
+| `Tools/`      | IToolExecutor、ToolCallFilter（抽象）、ToolExecuteContext、ToolFunctionDeclaration |
+| `Attributes/` | [AiTool]、[ServiceRegister]（驱动源生成器）     |
+
+此外还包含 `IModelProvider` 接口、`ModelProvider` 抽象基类、`IUserWorkspace` 接口。
 
 ### ManInBlack.AI — 实现层
 
-所有中间件实现 + 工具 + 服务：
+所有具体实现：
 
-| 目录               | 内容                                                 |
-| ------------------ | ---------------------------------------------------- |
-| `Middlewares/`     | 12 个中间件（Logging 到 AgentLoop）                  |
-| `Tools/`           | CommandLineTools、FileTools、SkillTools              |
-| `ToolCallFilters/` | LoggingFilter、BroadCastingFilter、LargeResultFilter |
-| `Services/`        | SkillService、EventBus、FileUserWorkspace 等         |
+| 目录               | 内容                                                     |
+| ------------------ | -------------------------------------------------------- |
+| `ChatClient/`      | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini）       |
+| `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
+| `Middlewares/`     | 12 个中间件 + AgentPipelineBuilder + AgentExecutionTracker |
+| `Tools/`           | CommandLineTools、FileTools、SkillTools                  |
+| `ToolCallFilters/` | LoggingFilter、BroadCastingFilter、LargeResultFilter    |
+| `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
+
+此外还包含所有 Provider 子类（OpenAIProvider、AnthropicProvider 等）、`ModelChoice`、`ChatClientProviderExtensions`，以及 DI 注册入口。
 
 ### ManInBlack.AI.SourceGenerator — 编译层
 
@@ -55,6 +60,14 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | ToolDeclarationGenerator     | JSON Schema 工具声明 + MIB010-013 诊断 |
 | ServiceRegistrationGenerator | `AddAutoRegisteredServices()` DI 扩展  |
 | ToolMiddlewareGenerator      | 每个工具类的 `XxxMiddleware` + DI 注册 |
+
+---
+
+## 配置系统
+
+所有配置从 `~/.man-in-black/settings.json` 统一读取，基于 .NET 标准 `IConfiguration` + `IOptions` 模式，支持文件变更跟踪和配置校验。
+
+详见 [配置指南](./configuration-guide.md)。
 
 ---
 
@@ -108,8 +121,8 @@ Logging → MessageEnrich → SystemPromptInjection → UserInput → Retry → 
 
 ```
 UserInput ──→ SystemPrompt ──→ Messages ──→ Options ──→ IChatClient
-                                                    ↓
-User ←──────────────── ChatResponseUpdate 流 ←────────┘
+                                                            ↓
+User ←──────────────── ChatResponseUpdate 流 ←──────────────┘
              ↑                    ↑
          Retry 拦截           AgentLoop 循环
 ```
@@ -123,9 +136,9 @@ User ←──────────────── ChatResponseUpdate 流 
 15 个提供商最终通过 `CompatibleWith` 字段映射到 3 种 API 协议：
 
 ```
-CompatibleWith: "OpenAI"   → OpenAICompatibleChatClient   (SSE: data: ... [DONE])
+CompatibleWith: "OpenAI"    → OpenAICompatibleChatClient   (SSE: data: ... [DONE])
 CompatibleWith: "Anthropic" → AnthropicCompatibleChatClient (SSE: content_block_start/delta/stop)
-CompatibleWith: "Gemini"   → GeminiCompatibleChatClient     (SSE + API Key in query param)
+CompatibleWith: "Gemini"    → GeminiCompatibleChatClient     (SSE + API Key in query param)
 ```
 
 ### 提供商注册表
@@ -170,21 +183,25 @@ CompatibleWith: "Gemini"   → GeminiCompatibleChatClient     (SSE + API Key in 
 ## DI 注册流程
 
 ```
-AddManInBlackCore(configure)
+AddManInBlack(configure)
     ├── AgentPipelineBuilder        (Scoped)
     ├── AgentContext                (Scoped)
     ├── AgentExecutionTracker       (Singleton)
     ├── IChatClient                 (Singleton, via CreateChatClient)
-    └── HttpClient                  (PooledConnectionLifetime: 2min)
+    ├── HttpClient                  (PooledConnectionLifetime: 2min)
+    ├── AddAutoRegisteredServices() [源生成]
+    ├── AddToolExecutor()           [源生成]
+    └── AddToolMiddlewares()        [源生成]
 
-AddAutoRegisteredServices()         [源生成]
-    └── 扫描 [ServiceRegister.*] → 注册到 DI
+AddManInBlackFromSettings(configure?)
+    ├── ManInBlackConfigurationBuilder.BuildConfiguration() (reloadOnChange)
+    └── AddManInBlackFromConfiguration() → 调用 AddManInBlack
 
-AddToolExecutor()                   [源生成]
-    └── 注册 ToolExecutor : IToolExecutor
-
-AddToolMiddlewares()                [源生成]
-    └── 注册每个工具类的 XxxMiddleware
+AddManInBlackFromConfiguration(IConfiguration, configure?)
+    ├── Configure<ManInBlackSettings>(configuration)
+    ├── Configure<FeishuSettings>(configuration.GetSection("Feishu"))
+    ├── IValidateOptions<ManInBlackSettings> 校验 ApiKey
+    └── 调用 AddManInBlack
 ```
 
 ---
@@ -233,3 +250,5 @@ AddToolMiddlewares()                [源生成]
 3. **源生成器使用 EasyCodeBuilder** — 不用原始 StringBuilder，保证代码产出格式规范、可读。
 
 4. **Scoped 生命周期** — 所有中间件注册为 Scoped，每次请求独立，共享同一作用域内的 AgentContext 和 EventBus。
+
+5. **契约与实现分离** — Abstraction 层只包含接口和 POCO，不依赖任何具体实现包（除 Microsoft.Extensions.AI），使上层可以只引用契约层编写测试和扩展。

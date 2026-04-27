@@ -73,6 +73,23 @@ Assert.Equal("response", results[0].Text);
 
 ---
 
+## 命名空间引用
+
+测试文件需要引用以下命名空间：
+
+```csharp
+using ManInBlack.AI.Abstraction;              // IModelProvider, IUserWorkspace
+using ManInBlack.AI.Abstraction.Middleware;    // AgentMiddleware, AgentContext
+using ManInBlack.AI.Abstraction.Tools;         // IToolExecutor, ToolExecuteContext
+using ManInBlack.AI.Abstraction.Storage;       // ISessionStorage, IUserStorage
+using ManInBlack.AI;                            // ModelChoice, Provider 类
+using ManInBlack.AI.Middlewares;                // 具体中间件类
+```
+
+测试项目需要引用 `ManInBlack.AI.Abstraction`（用于接口类型）和 `ManInBlack.AI`（用于具体类）。
+
+---
+
 ## 五种测试模式
 
 以下模式按复杂度递增排列，与 `docs/middleware-guide.md` 中的中间件模式一一对应。
