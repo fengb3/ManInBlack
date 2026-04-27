@@ -68,7 +68,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
             {
                 Contents = [
                     new TextContent(
-                        $"Error when calling api : {exMessage}, retry {attempt + 1} times in {delay.Seconds} second(s)"
+                        $"Error when calling api retry {attempt + 1} times in {delay.Seconds} second(s)"
                     )
                 ]
             };

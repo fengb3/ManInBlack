@@ -53,14 +53,15 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         var messages = await sessionStorage.LoadMessages(context.SessionId); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
 
         // 过滤掉 TextReasoningContent，不回传给模型（持久化保留全量，回传选择性过滤）
-        foreach (var message in messages)
-        {
-            for (int i = message.Contents.Count - 1; i >= 0; i--)
-            {
-                if (message.Contents[i] is TextReasoningContent)
-                    message.Contents.RemoveAt(i);
-            }
-        }
+        // 2026-04-27 - deepseek 要求把reasoning 回传回去 先注释掉这个过滤，保留所有内容回传模型，后续如果需要再调整过滤策略
+        // foreach (var message in messages)
+        // {
+        //     for (int i = message.Contents.Count - 1; i >= 0; i--)
+        //     {
+        //         if (message.Contents[i] is TextReasoningContent)
+        //             message.Contents.RemoveAt(i);r
+        //     }
+        // }
 
         // 将持久化消息添加到上下文中
         foreach (var message in messages)

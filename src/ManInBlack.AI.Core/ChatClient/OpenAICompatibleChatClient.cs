@@ -37,7 +37,12 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync(_endPoint, content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException(
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}");
+        }
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
         return ParseResponse(responseJson);
@@ -63,11 +68,12 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             cancellationToken
         );
 
-        // // print response body
-        // Console.WriteLine("Response body:");
-        // var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        // Console.WriteLine(responseBody);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException(
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}");
+        }
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
@@ -283,6 +289,11 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             {
                 obj["content"] = msg.Text;
             }
+
+            // 推理内容（reasoning_content）需要回传给 API，否则 thinking 模式会报错
+            var reasoningContent = msg.Contents.OfType<TextReasoningContent>().FirstOrDefault();
+            if (reasoningContent is not null)
+                obj["reasoning_content"] = reasoningContent.Text;
 
             array.Add(obj);
         }

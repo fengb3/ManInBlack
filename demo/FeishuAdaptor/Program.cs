@@ -31,7 +31,11 @@ builder.Services.AddFeishuNetSdk(
             ?? throw new InvalidOperationException(
                 "FEISHU_APP_SECRET environment variable is not set."
             );
-        options.VerificationToken = "";
+        options.VerificationToken = 
+            Environment.GetEnvironmentVariable("FEISHU_APP_VERIFICATION_TOKEN")
+            ?? throw new InvalidOperationException(
+                "FEISHU_APP_SECRET environment variable is not set."
+            );
         options.EnableLogging = true;
         options.IgnoreStatusException = false;
     },
@@ -44,7 +48,7 @@ builder.Services.AddFeishuNetSdk(
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
 )
-    .AddFeishuWebSocket()
+    // .AddFeishuWebSocket()
     // 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
     // Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
 ;
@@ -59,7 +63,12 @@ builder.Services.AddSerilog(loggerConfig =>
         .MinimumLevel.Override("Microsoft.Extensions.Http", LogEventLevel.Warning)
         .MinimumLevel.Override("FeishuNetSdk", LogEventLevel.Warning)
         .MinimumLevel.Override("OpenAI", LogEventLevel.Warning)
-        .WriteTo.Console(theme: AnsiConsoleTheme.Code);
+        .WriteTo.Console(theme: AnsiConsoleTheme.Code)
+        .WriteTo.File(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".man-in-black", "logs", "log-.log"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 7
+        );
 });
 
 builder.Services.AddManInBlack(opt =>

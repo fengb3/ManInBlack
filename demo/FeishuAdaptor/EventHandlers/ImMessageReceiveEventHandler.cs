@@ -53,7 +53,7 @@ public class AgentLauncher(
 {
     public async Task LaunchAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input)
     {
-        var userId = input.Event!.Sender!.SenderId!.OpenId!;
+        var userId = input.Event!.Sender!.SenderId!.UserId!; // user id is unique over all application, can be used as parent id for agent context
 
         // 取消该用户正在运行的旧 Agent，注册新的 CancellationTokenSource
         var cts = executionTracker.RegisterAndCancelExisting(userId);
