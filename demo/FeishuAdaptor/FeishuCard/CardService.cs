@@ -4,7 +4,7 @@ using FeishuAdaptor.Helper;
 using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using FeishuNetSdk.Im;
-using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Abstraction.Attributes;
 
 namespace FeishuAdaptor.FeishuCard;
 

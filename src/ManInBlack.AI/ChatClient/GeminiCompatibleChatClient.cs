@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
-namespace ManInBlack.AI.Core;
+namespace ManInBlack.AI;
 
 /// <summary>
 /// Google Gemini 兼容 API 适配器，实现 IChatClient 接口

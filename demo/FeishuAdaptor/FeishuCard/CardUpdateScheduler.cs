@@ -1,6 +1,6 @@
 using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
-using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Abstraction.Attributes;
 using Microsoft.Extensions.Logging;
 
 namespace FeishuAdaptor.FeishuCard;

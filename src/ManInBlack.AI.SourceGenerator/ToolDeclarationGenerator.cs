@@ -12,7 +12,7 @@ namespace ManInBlack.AI.SourceGenerator;
 [Generator]
 public sealed class ToolDeclarationGenerator : IIncrementalGenerator
 {
-    private const string ToolAttributeFullName = "ManInBlack.AI.Core.Attributes.AiToolAttribute";
+    private const string ToolAttributeFullName = "ManInBlack.AI.Abstraction.Attributes.AiToolAttribute";
 
     private static readonly DiagnosticDescriptor ClassNotPartial = new(
         id: "MIB010",

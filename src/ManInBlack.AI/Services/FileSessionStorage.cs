@@ -1,7 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Storage;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Storage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

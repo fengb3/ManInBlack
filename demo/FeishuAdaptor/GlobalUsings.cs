@@ -1,2 +1,1 @@
-﻿// Global using directives
-global using DotNetEnv;
+// Global using directives

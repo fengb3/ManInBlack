@@ -51,7 +51,12 @@
       "Bash(python .claude/hooks/notify.py)",
       "Bash(git fetch:*)",
       "Bash(bash --version)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(git restore *)",
+      "Bash(cp ManInBlack.AI.Core/Attributes/*.cs ManInBlack.AI.Abstraction/Attributes/)",
+      "Bash(cp ManInBlack.AI.Core/Tools/*.cs ManInBlack.AI.Abstraction/Tools/)",
+      "Bash(cp ManInBlack.AI.Core/Middleware/*.cs ManInBlack.AI.Abstraction/Middleware/)",
+      "Bash(cp ManInBlack.AI.Core/Storage/*.cs ManInBlack.AI.Abstraction/Storage/)"
     ]
   }
 }

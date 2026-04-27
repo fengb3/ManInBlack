@@ -1,4 +1,4 @@
-﻿using ManInBlack.AI.Core.Middleware;
+﻿using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Middlewares;
 
 namespace ManInBlack.AI;

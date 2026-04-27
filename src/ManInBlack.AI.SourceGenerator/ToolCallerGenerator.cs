@@ -13,8 +13,8 @@ namespace ManInBlack.AI.SourceGenerator;
 public sealed class ToolCallerGenerator : IIncrementalGenerator
 {
     //TODO : 用类型 type 对象获取全程而不是字符串对比，避免命名空间变更导致生成器失效
-    private const string ToolAttributeFullName = "ManInBlack.AI.Core.Attributes.AiToolAttribute";
-    private const string HasFilterAttributePrefix = "ManInBlack.AI.Core.Attributes.AiTool.HasFilterAttribute";
+    private const string ToolAttributeFullName = "ManInBlack.AI.Abstraction.Attributes.AiToolAttribute";
+    private const string HasFilterAttributePrefix = "ManInBlack.AI.Abstraction.Attributes.AiTool.HasFilterAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {

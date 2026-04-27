@@ -2,53 +2,37 @@
 
 using System.Text.Json.Serialization;
 using FeishuAdaptor;
+using ManInBlack.AI.Configuration;
 using Microsoft.Extensions.Http;
 using ManInBlack.AI;
-using ManInBlack.AI.Core;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 
-// read comfiguration form the fucking .env file, which should be placed in the same directory as the executable, and contains the following variables:
-var envPath = Path.Combine(AppContext.BaseDirectory, ".env");
-if (File.Exists(envPath))
-    Env.Load(envPath);
-else
-    Env.Load();
+// 从 ~/.man-in-black/settings.json 读取配置
+var settings = SettingsLoader.Load();
+var feishu = settings.Feishu
+    ?? throw new InvalidOperationException("settings.json 中缺少 feishu 配置节。");
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddFeishuNetSdk(
     options =>
     {
-        options.AppId =
-            Environment.GetEnvironmentVariable("FEISHU_APP_ID")
-            ?? throw new InvalidOperationException(
-                "FEISHU_APP_ID environment variable is not set."
-            );
-        options.AppSecret =
-            Environment.GetEnvironmentVariable("FEISHU_APP_SECRET")
-            ?? throw new InvalidOperationException(
-                "FEISHU_APP_SECRET environment variable is not set."
-            );
-        options.VerificationToken = 
-            Environment.GetEnvironmentVariable("FEISHU_APP_VERIFICATION_TOKEN")
-            ?? throw new InvalidOperationException(
-                "FEISHU_APP_SECRET environment variable is not set."
-            );
+        options.AppId = feishu.AppId;
+        options.AppSecret = feishu.AppSecret;
+        options.VerificationToken = feishu.VerificationToken;
         options.EnableLogging = true;
         options.IgnoreStatusException = false;
     },
     opts =>
     {
-        opts.HttpHost = new Uri(
-            Environment.GetEnvironmentVariable("FEISHU_API_BASE_URL") ?? "https://open.feishu.cn/"
-        );
+        opts.HttpHost = new Uri(feishu.ApiBaseUrl);
         opts.JsonSerializeOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
 )
-    // .AddFeishuWebSocket()
+    .AddFeishuWebSocket()
     // 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
     // Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
 ;
@@ -71,18 +55,7 @@ builder.Services.AddSerilog(loggerConfig =>
         );
 });
 
-builder.Services.AddManInBlack(opt =>
-{
-    opt.ModelChoice = new ModelChoice
-    {
-        Provider = new OpenAIProvider()
-        {
-            ApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "",
-            BaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "",
-        },
-        ModelId = Environment.GetEnvironmentVariable("OPENAI_MODEL_ID") ?? "",
-    };
-});
+builder.Services.AddManInBlackFromSettings();
 
 builder.Services.AddAutoRegisteredServices();
 

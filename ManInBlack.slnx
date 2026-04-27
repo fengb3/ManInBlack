@@ -10,7 +10,7 @@
     <File Path=".gitignore" />
   </Folder>
   <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
-  <Project Path="src/ManInBlack.AI.Core/ManInBlack.AI.Core.csproj" />
+  <Project Path="src/ManInBlack.AI.Abstraction/ManInBlack.AI.Abstraction.csproj" />
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Folder Name="/Bwarp/">
     <Project Path="Bwarp/Bwarp.Tests/Bwarp.Tests.csproj" />

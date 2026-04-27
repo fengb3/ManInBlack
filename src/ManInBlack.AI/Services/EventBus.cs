@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using ManInBlack.AI.Core.Attributes;
+using ManInBlack.AI.Abstraction.Attributes;
 
 namespace ManInBlack.AI.Services;
 

@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ManInBlack.AI.Core\ManInBlack.AI.Core.csproj" />
+    <ProjectReference Include="..\..\src\ManInBlack.AI.Abstraction\ManInBlack.AI.Abstraction.csproj" />
     <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
   </ItemGroup>
 

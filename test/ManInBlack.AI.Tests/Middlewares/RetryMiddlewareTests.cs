@@ -1,4 +1,9 @@
-using ManInBlack.AI.Core.Middleware;
+using System;
+using System.IO;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;

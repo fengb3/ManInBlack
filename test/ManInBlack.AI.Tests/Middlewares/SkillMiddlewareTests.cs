@@ -1,5 +1,7 @@
-using ManInBlack.AI.Core.Middleware;
-using ManInBlack.AI.Core.Storage;
+using System.Linq;
+using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;

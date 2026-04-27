@@ -20,7 +20,7 @@ public static class ToolMiddlewareEmitter
                 "System.Collections.Generic",
                 "System.Runtime.CompilerServices",
                 "System.Threading",
-                "ManInBlack.AI.Core.Middleware",
+                "ManInBlack.AI.Abstraction.Middleware",
                 "Microsoft.Extensions.AI",
                 "Microsoft.Extensions.DependencyInjection")
             .Namespace(ns =>

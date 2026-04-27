@@ -1,7 +1,7 @@
 ﻿using System.Text;
-using ManInBlack.AI.Core;
-using ManInBlack.AI.Core.Attributes;
-using ManInBlack.AI.Core.Tools;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Tools;
 
 namespace ManInBlack.AI.ToolCallFilters;
 
