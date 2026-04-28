@@ -58,7 +58,9 @@
       "Bash(cp ManInBlack.AI.Core/Middleware/*.cs ManInBlack.AI.Abstraction/Middleware/)",
       "Bash(cp ManInBlack.AI.Core/Storage/*.cs ManInBlack.AI.Abstraction/Storage/)",
       "Bash(xargs wc *)",
-      "Bash(wsl bash *)"
+      "Bash(wsl bash *)",
+      "Bash(python scripts/package_skill.py . /mnt/c/Users/fengb/Repos/ManInBlack/.agent/skills)",
+      "Bash(python scripts/package_skill.py . \"C:/Users/fengb/Repos/ManInBlack/.agent/skills\")"
     ]
   }
 }
