@@ -1,8 +1,10 @@
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
+using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +51,12 @@ public static class DependencyInjection
             });
 
             services.AddAutoRegisteredServices();
+
+            // Linux 使用 Bwarp 沙盒执行，Windows/macOS 直接 Process.Start
+            if (OperatingSystem.IsLinux())
+                services.AddScoped<IShellExecutor, BwarpShellExecutor>();
+            else
+                services.AddScoped<IShellExecutor, ProcessShellExecutor>();
             services.AddToolExecutor();
             services.AddToolMiddlewares();
             return services;

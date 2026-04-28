@@ -56,7 +56,9 @@
       "Bash(cp ManInBlack.AI.Core/Attributes/*.cs ManInBlack.AI.Abstraction/Attributes/)",
       "Bash(cp ManInBlack.AI.Core/Tools/*.cs ManInBlack.AI.Abstraction/Tools/)",
       "Bash(cp ManInBlack.AI.Core/Middleware/*.cs ManInBlack.AI.Abstraction/Middleware/)",
-      "Bash(cp ManInBlack.AI.Core/Storage/*.cs ManInBlack.AI.Abstraction/Storage/)"
+      "Bash(cp ManInBlack.AI.Core/Storage/*.cs ManInBlack.AI.Abstraction/Storage/)",
+      "Bash(xargs wc *)",
+      "Bash(wsl bash *)"
     ]
   }
 }

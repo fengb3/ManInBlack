@@ -1,11 +1,10 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Text;
 using System.Text.RegularExpressions;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
-using ManInBlack.AI.Services;
+using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.ToolCallFilters;
 
 namespace ManInBlack.AI.Tools;
@@ -14,26 +13,13 @@ namespace ManInBlack.AI.Tools;
 /// 命令行工具，允许 AI 执行系统命令
 /// </summary>
 [ServiceRegister.Scoped]
-public partial class CommandLineTools(IUserWorkspace workspace)
+public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor shellExecutor)
 {
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
 
     private sealed record BackgroundTask(Process Process, TaskCompletionSource<string> Tcs);
 
-    private static string FindBashExecutable()
-    {
-        // return "bash";
-
-        if (!OperatingSystem.IsWindows()) return "bash";
-
-        // 优先使用 Git Bash，避免在装有 WSL 时误用 WSL bash
-        var gitBash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "bin",
-            "bash.exe");
-        return File.Exists(gitBash) ? gitBash : "bash";
-    }
-
     /// <summary>
-    /// ---
     /// Executes a given bash command and returns its output.
     /// The working directory persists between commands, but shell state does not.
     /// The shell environment is initialized from the user's profile (bash or zsh).
@@ -95,59 +81,38 @@ public partial class CommandLineTools(IUserWorkspace workspace)
         if (dangerCheck != null)
             return dangerCheck;
 
-
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = FindBashExecutable(),
-            WorkingDirectory = workspace.WorkingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-
-
-        processInfo.ArgumentList.Add("-c");
-        processInfo.ArgumentList.Add(command);
-
-        var process = Process.Start(processInfo);
-        if (process == null)
-            return "Failed to start Bash process.";
-
         if (runInBackground)
         {
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            process.EnableRaisingEvents = true;
-            process.Exited += (_, _) =>
+            Task.Run(() =>
             {
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                var result = !string.IsNullOrEmpty(error)
-                    ? $"Bash error: {error.Trim()}"
-                    : output.Trim();
-                tcs.SetResult(result);
-                process.Dispose();
-            };
-            BackgroundTasks[process.Id] = new BackgroundTask(process, tcs);
-            return $"Background task started with ID: {process.Id}. Use GetBackgroundTaskResult to check status.";
+                try
+                {
+                    var result = shellExecutor.Execute(command, workspace.WorkingDirectory, timeoutMs);
+                    var output = !string.IsNullOrEmpty(result.StandardError)
+                        ? $"Bash error: {result.StandardError.Trim()}"
+                        : result.StandardOutput.Trim();
+                    tcs.SetResult(output);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetResult($"Bash error: {ex.Message}");
+                }
+            });
+            // 用哈希生成一个伪 task ID（不再依赖 Process.Id）
+            var taskId = Random.Shared.Next(1, int.MaxValue);
+            BackgroundTasks[taskId] = new BackgroundTask(null!, tcs);
+            return $"Background task started with ID: {taskId}. Use GetBackgroundTaskResult to check status.";
         }
 
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
+        var shellResult = shellExecutor.Execute(command, workspace.WorkingDirectory, timeoutMs);
 
-        if (!process.WaitForExit(TimeSpan.FromMilliseconds(timeoutMs)))
-        {
-            process.Kill();
-            process.WaitForExit();
+        if (shellResult.TimedOut)
             return $"Bash command timed out after {timeoutMs}ms.";
-        }
 
-        process.Dispose();
-        return !string.IsNullOrEmpty(error)
-            ? $"Bash error: {error.Trim()}"
-            : output.Trim();
+        return !string.IsNullOrEmpty(shellResult.StandardError)
+            ? $"Bash error: {shellResult.StandardError.Trim()}"
+            : shellResult.StandardOutput.Trim();
     }
 
     /// <summary>

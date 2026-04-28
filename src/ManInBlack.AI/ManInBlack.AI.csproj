@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\ManInBlack.AI.Abstraction\ManInBlack.AI.Abstraction.csproj" />
+        <ProjectReference Include="..\..\bwarp\Bwarp\Bwarp.csproj" />
         <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 

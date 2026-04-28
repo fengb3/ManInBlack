@@ -5,9 +5,11 @@ Skill Packager - Creates a distributable .skill file of a skill folder
 Usage:
     python utils/package_skill.py <path/to/skill-folder> [output-directory]
 
+    Default output directory: current working directory
+
 Example:
-    python utils/package_skill.py skills/public/my-skill
-    python utils/package_skill.py skills/public/my-skill ./dist
+    python utils/package_skill.py .agent/skills/my-skill
+    python utils/package_skill.py .agent/skills/my-skill ./dist
 """
 
 import sys
@@ -115,8 +117,8 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory]")
         print("\nExample:")
-        print("  python utils/package_skill.py skills/public/my-skill")
-        print("  python utils/package_skill.py skills/public/my-skill ./dist")
+        print("  python utils/package_skill.py .agent/skills/my-skill")
+        print("  python utils/package_skill.py .agent/skills/my-skill ./dist")
         sys.exit(1)
 
     skill_path = sys.argv[1]
