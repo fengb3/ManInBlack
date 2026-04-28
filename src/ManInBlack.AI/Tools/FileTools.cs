@@ -16,6 +16,18 @@ public partial class FileTools(IUserWorkspace workspace)
     private string ResolvePath(string path) =>
         Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_userWorkspace, path));
 
+    private bool IsInsideWorkspace(string resolvedPath)
+    {
+        var normalized = Path.GetFullPath(resolvedPath);
+        var workspaceRoot = Path.GetFullPath(_userWorkspace);
+        return normalized.StartsWith(workspaceRoot, StringComparison.OrdinalIgnoreCase) &&
+               (normalized.Length == workspaceRoot.Length ||
+                normalized[workspaceRoot.Length] == Path.DirectorySeparatorChar ||
+                normalized[workspaceRoot.Length] == Path.AltDirectorySeparatorChar);
+    }
+
+    private const string OutOfWorkspaceError = "Error: 不允许在工作空间外修改、创建或删除文件。你只能修改工作空间内的文件。";
+
     /// <summary>
     /// Reads a file and returns its content. Supports reading the entire file or a specific range of lines.
     /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
@@ -58,6 +70,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <summary>
     /// Creates a new file or completely overwrites an existing file with the given content.
     /// Parent directories are created automatically if they do not exist.
+    /// 只能在工作空间内创建或覆盖文件，不允许在工作空间外写入。
     /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
     /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
@@ -68,6 +81,8 @@ public partial class FileTools(IUserWorkspace workspace)
     public string WriteFile(string filePath, string content)
     {
         filePath = ResolvePath(filePath);
+        if (!IsInsideWorkspace(filePath))
+            return $"{OutOfWorkspaceError} Path: {filePath}";
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -80,6 +95,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// Finds the first occurrence of originalContent and replaces it with newContent.
     /// If originalContent is not found, the update is aborted to prevent data loss.
     /// You must read the file with ReadFile before calling this tool to ensure you have the current content.
+    /// 只能在工作空间内修改文件，不允许修改工作空间外的文件。
     /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
     /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
@@ -91,6 +107,8 @@ public partial class FileTools(IUserWorkspace workspace)
     public string UpdateFile(string filePath, string originalContent, string newContent)
     {
         filePath = ResolvePath(filePath);
+        if (!IsInsideWorkspace(filePath))
+            return $"{OutOfWorkspaceError} Path: {filePath}";
         if (!File.Exists(filePath))
             return $"File not found: {filePath}";
 
