@@ -266,25 +266,29 @@ At this point, it is time to actually create the skill.
 
 Skip this step only if the skill being developed already exists, and iteration or packaging is needed. In this case, continue to the next step.
 
+**所有技能必须创建在工作目录的 `.agent/skills/` 目录下。** 不要使用其他路径。
+
 When creating a new skill from scratch, always run the `init_skill.py` script. The script conveniently generates a new template skill directory that automatically includes everything a skill requires, making the skill creation process much more efficient and reliable.
 
 Usage:
 
 ```bash
-scripts/init_skill.py <skill-name> --path <output-directory> [--resources scripts,references,assets] [--examples]
+scripts/init_skill.py <skill-name> [--resources scripts,references,assets] [--examples]
 ```
+
+`--path` 参数默认为 `.agent/skills`，无需手动指定。如需覆盖，可使用 `--path <output-directory>`。
 
 Examples:
 
 ```bash
-scripts/init_skill.py my-skill --path skills/public
-scripts/init_skill.py my-skill --path skills/public --resources scripts,references
-scripts/init_skill.py my-skill --path skills/public --resources scripts --examples
+scripts/init_skill.py my-skill
+scripts/init_skill.py my-skill --resources scripts,references
+scripts/init_skill.py my-skill --resources scripts --examples
 ```
 
 The script:
 
-- Creates the skill directory at the specified path
+- Creates the skill directory at `.agent/skills/<skill-name>`
 - Generates a SKILL.md template with proper frontmatter and TODO placeholders
 - Optionally creates resource directories based on `--resources`
 - Optionally adds example files when `--examples` is set
@@ -340,10 +344,10 @@ Once development of the skill is complete, it must be packaged into a distributa
 scripts/package_skill.py <path/to/skill-folder>
 ```
 
-Optional output directory specification:
+技能目录默认位于 `.agent/skills/` 下。打包输出默认为当前工作目录。可指定输出目录：
 
 ```bash
-scripts/package_skill.py <path/to/skill-folder> ./dist
+scripts/package_skill.py .agent/skills/my-skill ./dist
 ```
 
 The packaging script will:

@@ -18,6 +18,16 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "WSL": {
+      "commandName": "WSL",
+      "commandLine": "dotnet run",
+      "distributionName": "",
+      "launchBrowser": false,
+      "applicationUrl": "http://0.0.0.0:5249",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   }
 }

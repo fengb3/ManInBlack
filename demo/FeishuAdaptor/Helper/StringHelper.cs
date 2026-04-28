@@ -7,11 +7,11 @@ namespace FeishuAdaptor.Helper;
 
 public static class StringHelper
 {
-	// static StringHelper()
-	// {
-	// 	Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-	// 	var unused = Gb2312;
-	// }
+	static StringHelper()
+	{
+		Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+		var unused = Gb2312;
+	}
 	
 	private static readonly JsonSerializerOptions? PrettyOption = new()
 	{
