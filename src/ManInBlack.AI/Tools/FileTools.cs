@@ -12,6 +12,55 @@ namespace ManInBlack.AI.Tools;
 public partial class FileTools(IUserWorkspace workspace)
 {
     private readonly string _userWorkspace = workspace.WorkingDirectory;
+
+    private static readonly HashSet<string> BinaryExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // 图片
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".tiff", ".tif",
+        // 音频
+        ".mp3", ".wav", ".ogg", ".flac", ".aac", ".wma", ".m4a",
+        // 视频
+        ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+        // 压缩包
+        ".zip", ".tar", ".gz", ".rar", ".7z", ".bz2", ".xz", ".zst",
+        // 可执行文件
+        ".exe", ".dll", ".so", ".dylib", ".bin", ".msi",
+        // 文档
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+        // 数据库
+        ".db", ".sqlite", ".sqlite3", ".mdb",
+        // 字体
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        // 编译产物
+        ".pyc", ".class", ".o", ".obj", ".pdb", ".nupkg",
+    };
+
+    private static bool IsBinaryFile(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (BinaryExtensions.Contains(ext))
+            return true;
+
+        // 对未知扩展名，探测前 8KB 内容判断是否含 null 字节
+        try
+        {
+            var probeSize = 8192;
+            using var stream = File.OpenRead(filePath);
+            var buffer = new byte[probeSize];
+            var bytesRead = stream.Read(buffer, 0, probeSize);
+            for (var i = 0; i < bytesRead; i++)
+            {
+                if (buffer[i] == 0)
+                    return true;
+            }
+        }
+        catch
+        {
+            // 读取失败时不阻止，让后续逻辑处理
+        }
+
+        return false;
+    }
     
     private string ResolvePath(string path) =>
         Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_userWorkspace, path));
@@ -43,6 +92,8 @@ public partial class FileTools(IUserWorkspace workspace)
         filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
             return $"Error: File not found: {filePath}";
+        if (IsBinaryFile(filePath))
+            return $"Error: 不支持读取二进制文件: {filePath}";
         if (offset < 0)
             return "Error: Offset must be non-negative";
         if (length < -1)
