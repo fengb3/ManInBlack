@@ -133,6 +133,35 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
         BackgroundTasks.TryRemove(taskId, out _);
         return task.Tcs.Task.Result;
     }
+    
+    /// <summary>
+    /// 终止后台任务。停止关联进程并将结果设为已取消。
+    /// </summary>
+    /// <param name="taskId">后台任务 ID</param>
+    /// <returns>终止结果</returns>
+    [AiTool]
+    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    public string KillBackgroundTask(int taskId)
+    {
+        if (!BackgroundTasks.TryGetValue(taskId, out var task))
+            return $"No background task found with ID: {taskId}.";
+
+        BackgroundTasks.TryRemove(taskId, out _);
+
+        try
+        {
+            if (task.Process is not null && !task.Process.HasExited)
+                task.Process.Kill();
+        }
+        catch (Exception ex)
+        {
+            // 进程已退出或无法终止，继续完成 TCS
+        }
+
+        task.Tcs.TrySetResult($"Background task {taskId} has been killed.");
+
+        return $"Background task {taskId} has been killed.";
+    }
 
     /// <summary>
     /// check if a command is prohibited
