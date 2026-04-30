@@ -20,8 +20,8 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
     {
         while (true)
         {
-            var functionCalls = new List<FunctionCallContent>();
-            var textBuilder = new StringBuilder();
+            var functionCalls    = new List<FunctionCallContent>();
+            var textBuilder      = new StringBuilder();
             var reasoningBuilder = new StringBuilder();
 
             await foreach (var update in next().WithCancellation(ct))
@@ -39,9 +39,9 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                         case TextReasoningContent reasoning:
                             reasoningBuilder.Append(reasoning.Text);
                             break;
-                    case UsageContent usageContent:
-                        context.AccumulatedUsage.Add(usageContent.Details);
-                        break;
+                        case UsageContent usageContent:
+                            context.AccumulatedUsage.Add(usageContent.Details);
+                            break;
                     }
                 }
 
@@ -68,8 +68,8 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             {
                 var toolCtx = new ToolExecuteContext(context.ServiceProvider)
                 {
-                    ToolName = fc.Name,
-                    CallId = fc.CallId,
+                    ToolName  = fc.Name,
+                    CallId    = fc.CallId,
                     Arguments = fc.Arguments
                 };
 
@@ -83,7 +83,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                     logger.LogError(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
                     Console.ResetColor();
                 }
-                
+
                 var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
                 toolResults.Add(result);
                 yield return new ChatResponseUpdate(ChatRole.Tool, [result]);

@@ -45,6 +45,7 @@ public class LlmOutputCardView(LlmOutputViewModel viewModel, CardService cardSer
 {
     protected override void Define()
     {
+        Card.Config!.WidthMode = "fill";
         var outputMarkdown = BindMarkdown(vm => vm.Output);
         AddToBody(outputMarkdown);
     }

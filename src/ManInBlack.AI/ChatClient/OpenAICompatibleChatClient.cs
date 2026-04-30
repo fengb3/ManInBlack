@@ -108,11 +108,20 @@ public sealed class OpenAICompatibleChatClient : IChatClient
             // 追踪 usage（最后一个非 null 的为最终值）
             if (chunk?.Usage is not null)
             {
+                var additionalCounts = new AdditionalPropertiesDictionary<long>();
+                if (chunk.Usage.PromptCacheHitTokens is int hit and > 0)
+                    additionalCounts["prompt_cache_hit_tokens"] = hit;
+                if (chunk.Usage.PromptCacheMissTokens is int miss and > 0)
+                    additionalCounts["prompt_cache_miss_tokens"] = miss;
+
                 lastUsage = new UsageDetails
                 {
                     InputTokenCount = chunk.Usage.PromptTokens,
                     OutputTokenCount = chunk.Usage.CompletionTokens,
                     TotalTokenCount = chunk.Usage.PromptTokens + chunk.Usage.CompletionTokens,
+                    CachedInputTokenCount = chunk.Usage.PromptTokensDetails?.CachedTokens is int ct and > 0 ? ct : null,
+                    ReasoningTokenCount = chunk.Usage.CompletionTokensDetails?.ReasoningTokens is int rt and > 0 ? rt : null,
+                    AdditionalCounts = additionalCounts.Count > 0 ? additionalCounts : null,
                 };
             }
 
@@ -353,11 +362,20 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
         if (result.Usage is not null)
         {
+            var additionalCounts = new AdditionalPropertiesDictionary<long>();
+            if (result.Usage.PromptCacheHitTokens is int hit and > 0)
+                additionalCounts["prompt_cache_hit_tokens"] = hit;
+            if (result.Usage.PromptCacheMissTokens is int miss and > 0)
+                additionalCounts["prompt_cache_miss_tokens"] = miss;
+
             chatResponse.Usage = new UsageDetails
             {
                 InputTokenCount = result.Usage.PromptTokens,
                 OutputTokenCount = result.Usage.CompletionTokens,
                 TotalTokenCount = result.Usage.PromptTokens + result.Usage.CompletionTokens,
+                CachedInputTokenCount = result.Usage.PromptTokensDetails?.CachedTokens is int ct and > 0 ? ct : null,
+                ReasoningTokenCount = result.Usage.CompletionTokensDetails?.ReasoningTokens is int rt and > 0 ? rt : null,
+                AdditionalCounts = additionalCounts.Count > 0 ? additionalCounts : null,
             };
         }
 
@@ -423,6 +441,30 @@ public sealed class OpenAICompatibleChatClient : IChatClient
 
         [JsonPropertyName("completion_tokens")]
         public int CompletionTokens { get; set; }
+
+        [JsonPropertyName("prompt_tokens_details")]
+        public OpenAIPromptTokensDetails? PromptTokensDetails { get; set; }
+
+        [JsonPropertyName("completion_tokens_details")]
+        public OpenAICompletionTokensDetails? CompletionTokensDetails { get; set; }
+
+        [JsonPropertyName("prompt_cache_hit_tokens")]
+        public int? PromptCacheHitTokens { get; set; }
+
+        [JsonPropertyName("prompt_cache_miss_tokens")]
+        public int? PromptCacheMissTokens { get; set; }
+    }
+
+    private class OpenAIPromptTokensDetails
+    {
+        [JsonPropertyName("cached_tokens")]
+        public int CachedTokens { get; set; }
+    }
+
+    private class OpenAICompletionTokensDetails
+    {
+        [JsonPropertyName("reasoning_tokens")]
+        public int ReasoningTokens { get; set; }
     }
 
     private class OpenAIStreamChunk

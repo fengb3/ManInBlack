@@ -98,7 +98,9 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                 {
                     InputTokenCount = result.UsageMetadata.PromptTokenCount,
                     OutputTokenCount = result.UsageMetadata.CandidatesTokenCount,
-                    TotalTokenCount = result.UsageMetadata.TotalTokenCount
+                    TotalTokenCount = result.UsageMetadata.TotalTokenCount,
+                    CachedInputTokenCount = result.UsageMetadata.CachedContentTokenCount,
+                    ReasoningTokenCount = result.UsageMetadata.ThoughtsTokenCount
                 };
             }
 
@@ -302,7 +304,9 @@ public sealed class GeminiCompatibleChatClient : IChatClient
             {
                 InputTokenCount = result.UsageMetadata.PromptTokenCount,
                 OutputTokenCount = result.UsageMetadata.CandidatesTokenCount,
-                TotalTokenCount = result.UsageMetadata.TotalTokenCount
+                TotalTokenCount = result.UsageMetadata.TotalTokenCount,
+                CachedInputTokenCount = result.UsageMetadata.CachedContentTokenCount,
+                ReasoningTokenCount = result.UsageMetadata.ThoughtsTokenCount
             };
         }
 
@@ -348,6 +352,8 @@ public sealed class GeminiCompatibleChatClient : IChatClient
         public int PromptTokenCount { get; set; }
         public int CandidatesTokenCount { get; set; }
         public int TotalTokenCount { get; set; }
+        public int? CachedContentTokenCount { get; set; }
+        public int? ThoughtsTokenCount { get; set; }
     }
 
     #endregion

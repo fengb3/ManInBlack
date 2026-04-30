@@ -70,6 +70,7 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         var toolUseBlocks = new Dictionary<int, (string Id, string Name, StringBuilder PartialJson)>();
         long? inputTokens = null;
         long? outputTokens = null;
+        long? cachedInputTokens = null;
 
         string? line;
         while ((line = await reader.ReadLineAsync()) is not null)
@@ -141,12 +142,18 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
                     toolUseBlocks.Remove(index);
                 }
             }
-            // message_start → 提取 input_tokens
+            // message_start → 提取 input_tokens 和 cache tokens
             else if (type == "message_start")
             {
                 var usage = node["message"]?["usage"];
                 if (usage is not null)
+                {
                     inputTokens = usage["input_tokens"]?.GetValue<int>();
+                    var cacheRead = usage["cache_read_input_tokens"]?.GetValue<int>();
+                    var cacheCreation = usage["cache_creation_input_tokens"]?.GetValue<int>();
+                    cachedInputTokens = (cacheRead ?? 0) + (cacheCreation ?? 0);
+                    if (cachedInputTokens == 0) cachedInputTokens = null;
+                }
             }
             // message_delta → 提取 output_tokens
             else if (type == "message_delta")
@@ -167,7 +174,8 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
                 {
                     InputTokenCount = inputTokens,
                     OutputTokenCount = outputTokens,
-                    TotalTokenCount = (inputTokens ?? 0) + (outputTokens ?? 0)
+                    TotalTokenCount = (inputTokens ?? 0) + (outputTokens ?? 0),
+                    CachedInputTokenCount = cachedInputTokens
                 })]
             };
         }
@@ -329,7 +337,8 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
             {
                 InputTokenCount = result.Usage.InputTokens,
                 OutputTokenCount = result.Usage.OutputTokens,
-                TotalTokenCount = result.Usage.InputTokens + result.Usage.OutputTokens
+                TotalTokenCount = result.Usage.InputTokens + result.Usage.OutputTokens,
+                CachedInputTokenCount = (result.Usage.CacheReadInputTokens ?? 0) + (result.Usage.CacheCreationInputTokens ?? 0) is var total && total > 0 ? total : null
             };
         }
 
@@ -370,6 +379,10 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         public int InputTokens { get; set; }
         [JsonPropertyName("output_tokens")]
         public int OutputTokens { get; set; }
+        [JsonPropertyName("cache_read_input_tokens")]
+        public int? CacheReadInputTokens { get; set; }
+        [JsonPropertyName("cache_creation_input_tokens")]
+        public int? CacheCreationInputTokens { get; set; }
     }
 
     #endregion
