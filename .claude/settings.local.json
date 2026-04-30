@@ -60,7 +60,8 @@
       "Bash(xargs wc *)",
       "Bash(wsl bash *)",
       "Bash(python scripts/package_skill.py . /mnt/c/Users/fengb/Repos/ManInBlack/.agent/skills)",
-      "Bash(python scripts/package_skill.py . \"C:/Users/fengb/Repos/ManInBlack/.agent/skills\")"
+      "Bash(python scripts/package_skill.py . \"C:/Users/fengb/Repos/ManInBlack/.agent/skills\")",
+      "Bash(nuget search *)"
     ]
   }
 }

@@ -123,6 +123,8 @@ public class AgentLauncher(
         {
             executionTracker.Release(userId, cts);
             logger.LogInformation("Finished processing message from user {userId}", userId);
+            // 打印token usage
+            logger.LogInformation($"Token usage for agent {agentContext.AgentId}: {JsonSerializer.Serialize(agentContext.AccumulatedUsage)}");
         }
     }
 
