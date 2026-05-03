@@ -61,7 +61,11 @@
       "Bash(wsl bash *)",
       "Bash(python scripts/package_skill.py . /mnt/c/Users/fengb/Repos/ManInBlack/.agent/skills)",
       "Bash(python scripts/package_skill.py . \"C:/Users/fengb/Repos/ManInBlack/.agent/skills\")",
-      "Bash(nuget search *)"
+      "Bash(nuget search *)",
+      "Bash(command -v opencode)",
+      "Bash(opencode --version)",
+      "Bash(npx oh-my-opencode *)",
+      "Bash(npm install *)"
     ]
   }
 }
