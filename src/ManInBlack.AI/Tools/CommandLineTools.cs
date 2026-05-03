@@ -16,6 +16,7 @@ namespace ManInBlack.AI.Tools;
 public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor shellExecutor)
 {
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
+    private static int _nextTaskId;
 
     private sealed record BackgroundTask(Process Process, TaskCompletionSource<string> Tcs);
 
@@ -100,7 +101,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
                 }
             });
             // 用哈希生成一个伪 task ID（不再依赖 Process.Id）
-            var taskId = Random.Shared.Next(1, int.MaxValue);
+            var taskId = Interlocked.Increment(ref _nextTaskId);
             BackgroundTasks[taskId] = new BackgroundTask(null!, tcs);
             return $"Background task started with ID: {taskId}. Use GetBackgroundTaskResult to check status.";
         }
