@@ -25,10 +25,10 @@ public class FeishuCardMiddleware(
 
         LlmOutputViewModel? lastOutput = null;
         LlmReasoningViewModel? lastReasoning = null;
-        var toolExecutions = new Dictionary<string, LlmToolExecutionViewModel>();
+        var toolExecutions = new Dictionary<string, ToolExecutionCardView>();
 
-        // 跟踪已创建的卡片视图，用于流式结束后关闭和释放
-        List<CardViewBase> cardViews = [];
+        // 跟踪已创建的流式卡片视图（Reasoning/Output），用于流式结束后关闭
+        List<CardViewBase> streamingCardViews = [];
 
         await foreach (var update in next().WithCancellation(ct))
         {
@@ -40,7 +40,7 @@ public class FeishuCardMiddleware(
                         if (lastLlmType != nameof(LlmReasoningViewModel))
                         {
                             var (vm1, view1) = CreateCard<LlmReasoningViewModel>(openId);
-                            cardViews.Add(view1);
+                            streamingCardViews.Add(view1);
                             lastReasoning = vm1;
                             lastLlmType = nameof(LlmReasoningViewModel);
                         }
@@ -54,7 +54,7 @@ public class FeishuCardMiddleware(
                         if (lastLlmType != nameof(LlmOutputViewModel))
                         {
                             var (vm2, view2) = CreateCard<LlmOutputViewModel>(openId);
-                            cardViews.Add(view2);
+                            streamingCardViews.Add(view2);
                             lastOutput = vm2;
                             lastLlmType = nameof(LlmOutputViewModel);
                         }
@@ -65,38 +65,47 @@ public class FeishuCardMiddleware(
                     {
                         lastLlmType = nameof(LlmToolExecutionViewModel);
 
-                        if (!toolExecutions.TryGetValue(fcc.CallId, out var toolExecVm))
+                        if (!toolExecutions.TryGetValue(fcc.CallId, out var toolCard))
                         {
-                            var (vm3, view3) = CreateCard<LlmToolExecutionViewModel>(openId);
-                            cardViews.Add(view3);
-                            toolExecVm = vm3;
-                            toolExecutions[fcc.CallId] = toolExecVm;
+                            // 第一次收到此 CallId — 创建卡片并发送
+                            toolCard = (ToolExecutionCardView)serviceProvider
+                                .GetRequiredService<CardView<LlmToolExecutionViewModel>>();
+                            await toolCard.InitializeAsync(ct);
+                            await toolCard.SendToUserAsync("user_id", openId, ct);
+                            toolExecutions[fcc.CallId] = toolCard;
                         }
 
-                        toolExecVm.ToolName = fcc.Name;
-                        toolExecVm.Arguments =
-                            string.Join(", ", fcc.Arguments?.Select(pair => $"{pair.Key}: {pair.Value} ") ?? []);
+                        var toolName = fcc.Name ?? "未知工具";
+                        var arguments = fcc.Arguments != null
+                            ? string.Join(", ", fcc.Arguments.Select(pair => $"{pair.Key}: {pair.Value}"))
+                            : "无参数";
 
+                        await toolCard.UpdateForToolStartAsync(toolName, arguments, ct);
                         break;
                     }
                     case FunctionResultContent frc:
                     {
                         lastLlmType = nameof(LlmToolExecutionViewModel);
 
-                        if (!toolExecutions.TryGetValue(frc.CallId, out var toolExecVm))
+                        if (!toolExecutions.TryGetValue(frc.CallId, out var toolCard))
                         {
-                            var (vm4, view4) = CreateCard<LlmToolExecutionViewModel>(openId);
-                            cardViews.Add(view4);
-                            toolExecVm = vm4;
-                            toolExecutions[frc.CallId] = toolExecVm;
+                            // 异常情况：没有对应的 FCC，创建新卡片
+                            toolCard = (ToolExecutionCardView)serviceProvider
+                                .GetRequiredService<CardView<LlmToolExecutionViewModel>>();
+                            await toolCard.InitializeAsync(ct);
+                            await toolCard.SendToUserAsync("user_id", openId, ct);
+                            toolExecutions[frc.CallId] = toolCard;
                         }
 
                         var resultText = frc.Result?.ToString() ?? "";
 
-                        if (resultText.Length > 200)
-                            resultText = string.Concat(resultText.AsSpan(0, 200), "\n...");
+                        if (resultText.Length > 500)
+                            resultText = string.Concat(resultText.AsSpan(0, 500), "\n...");
 
-                        toolExecVm.Result = resultText;
+                        await toolCard.UpdateForToolResultAsync(
+                            string.IsNullOrWhiteSpace(resultText) ? "无返回结果" : resultText,
+                            isError: frc.Exception is not null,
+                            ct);
                         break;
                     }
                 }
@@ -105,8 +114,8 @@ public class FeishuCardMiddleware(
             yield return update;
         }
         
-        // 流式结束 — 关闭每张卡片的流式模式并释放资源
-        foreach (var view in cardViews)
+        // 流式结束 — 只关闭流式卡片（工具卡片 CloseStreamingAsync 为空操作）
+        foreach (var view in streamingCardViews)
         {
             try
             {
