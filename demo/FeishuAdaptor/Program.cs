@@ -20,7 +20,7 @@ builder.Configuration.GetSection("Feishu").Bind(feishuSettings);
 if (string.IsNullOrEmpty(feishuSettings.AppId))
     throw new InvalidOperationException("settings.json 中缺少 feishu 配置节。");
 
-builder.Services.AddFeishuNetSdk(
+var feishuBuilder = builder.Services.AddFeishuNetSdk(
     options =>
     {
         options.AppId = feishuSettings.AppId;
@@ -35,11 +35,10 @@ builder.Services.AddFeishuNetSdk(
         opts.JsonSerializeOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         opts.KeyValueSerializeOptions.IgnoreNullValues = true;
     }
-)
-// .AddFeishuWebSocket()
-// 👆 un comment this line to enable WebSocket connection for receiving real-time events from Feishu, which is more efficient than HTTP polling.
-// Make sure to configure the WebSocket endpoint and authentication in FeishuNetSdk options if you enable this.
-;
+);
+
+if (feishuSettings.EnableWebSocket)
+    feishuBuilder.AddFeishuWebSocket();
 
 builder.Services.AddSerilog(loggerConfig =>
 {
@@ -79,6 +78,7 @@ app.MapGet(
 );
 
 // Map Feishu event endpoint, and the FeishuAdaptor will handle incoming events according to the registered handlers
-app.UseFeishuEndpoint("/feishu/event/v2");
+if (!string.IsNullOrEmpty(feishuSettings.WebhookEndpoint))
+    app.UseFeishuEndpoint(feishuSettings.WebhookEndpoint);
 
 app.Run();
