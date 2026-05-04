@@ -6,16 +6,15 @@ using Microsoft.Extensions.Logging;
 namespace FeishuAdaptor.FeishuCard;
 
 /// <summary>
-/// 全局卡片元素更新调度器，对所有飞书卡片元素更新进行去重和限流。
-/// 限流规则：50 次/秒、1000 次/分钟。
+/// 全局卡片流式文本更新调度器 — 对同一 (cardId, elementId) 的更新进行去重，
+/// 并通过 <see cref="CardApiLimiter"/> 执行独立限流。
 /// </summary>
 [ServiceRegister.Singleton]
 public class CardUpdateScheduler : IAsyncDisposable
 {
     private readonly IFeishuTenantApi _api;
+    private readonly CardApiLimiter _limiter;
     private readonly ILogger<CardUpdateScheduler> _logger;
-    private const int MaxPerSecond = 50;
-    private const int MaxPerMinute = 1000;
 
     // (cardId, elementId) -> 最新待发送内容
     private readonly Dictionary<(string CardId, string ElementId), PendingUpdate> _pending = new();
@@ -26,17 +25,13 @@ public class CardUpdateScheduler : IAsyncDisposable
     private readonly object _inFlightLock = new();
     private event Action<string>? InFlightCompleted;
 
-    // 滑动窗口限流时间戳
-    private readonly Queue<DateTime> _secondWindow = new();
-    private readonly Queue<DateTime> _minuteWindow = new();
-    private readonly object _rateLimitLock = new();
-
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _processingTask;
 
-    public CardUpdateScheduler(IFeishuTenantApi api, ILogger<CardUpdateScheduler> logger)
+    public CardUpdateScheduler(IFeishuTenantApi api, CardApiLimiter limiter, ILogger<CardUpdateScheduler> logger)
     {
         _api = api;
+        _limiter = limiter;
         _logger = logger;
         _processingTask = ProcessLoopAsync();
     }
@@ -84,7 +79,7 @@ public class CardUpdateScheduler : IAsyncDisposable
 
         foreach (var item in toFlush)
         {
-            await WaitForRateLimitAsync(ct);
+            await _limiter.StreamingUpdateText.WaitForSlotAsync(ct);
 
             await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
                 item.Key.CardId,
@@ -183,7 +178,7 @@ public class CardUpdateScheduler : IAsyncDisposable
             {
                 try
                 {
-                    await WaitForRateLimitAsync(_cts.Token);
+                    await _limiter.StreamingUpdateText.WaitForSlotAsync(_cts.Token);
 
                     await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
                         item.Key.CardId,
@@ -224,63 +219,6 @@ public class CardUpdateScheduler : IAsyncDisposable
                     InFlightCompleted?.Invoke(cardId);
                 }
             }
-        }
-    }
-
-    /// <summary>
-    /// 等待直到可以发送下一个请求（满足两个限流窗口）。
-    /// </summary>
-    private async Task WaitForRateLimitAsync(CancellationToken ct)
-    {
-        while (true)
-        {
-            var delay = GetRequiredDelay();
-            if (delay <= TimeSpan.Zero) break;
-
-            await Task.Delay(delay, ct);
-        }
-
-        RecordCall();
-    }
-
-    private TimeSpan GetRequiredDelay()
-    {
-        lock (_rateLimitLock)
-        {
-            var now = DateTime.UtcNow;
-
-            // 清理过期时间戳
-            var minuteAgo = now - TimeSpan.FromMinutes(1);
-            while (_minuteWindow.Count > 0 && _minuteWindow.Peek() < minuteAgo)
-                _minuteWindow.Dequeue();
-
-            var secondAgo = now - TimeSpan.FromSeconds(1);
-            while (_secondWindow.Count > 0 && _secondWindow.Peek() < secondAgo)
-                _secondWindow.Dequeue();
-
-            // 检查分钟限制
-            if (_minuteWindow.Count >= MaxPerMinute)
-            {
-                return _minuteWindow.Peek() + TimeSpan.FromMinutes(1) - now;
-            }
-
-            // 检查秒限制
-            if (_secondWindow.Count >= MaxPerSecond)
-            {
-                return _secondWindow.Peek() + TimeSpan.FromSeconds(1) - now;
-            }
-
-            return TimeSpan.Zero;
-        }
-    }
-
-    private void RecordCall()
-    {
-        var now = DateTime.UtcNow;
-        lock (_rateLimitLock)
-        {
-            _secondWindow.Enqueue(now);
-            _minuteWindow.Enqueue(now);
         }
     }
 

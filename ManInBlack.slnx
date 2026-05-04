@@ -29,4 +29,7 @@
     <Project Path="demo/Playground/Playground.csproj" />
   </Folder>
   <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
+  <Folder Name="/Test/">
+    <Project Path="test/FeishuAdaptor.Tests/FeishuAdaptor.Tests.csproj" />
+  </Folder>
 </Solution>
