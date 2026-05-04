@@ -18,6 +18,10 @@ dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Spe
 
 No linting or formatting tools are configured.
 
+## Commit Rules
+
+- **NEVER** add `Co-authored-by` or `Co-Authored-By` trailers to commit messages.
+
 ## Project Overview
 
 .NET 10 library providing unified abstractions for multiple AI chat providers through `Microsoft.Extensions.AI`'s

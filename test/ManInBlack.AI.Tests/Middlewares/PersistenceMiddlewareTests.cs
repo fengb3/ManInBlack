@@ -42,7 +42,7 @@ public class ReadPersistenceMiddlewareTests
         Assert.Contains(ctx.Messages, m => m.Role == ChatRole.Tool);
     }
 
-    // this one does not need anymore, deepseek (may be other models) require sending back reasoning content
+    // this one does not need anymore, deepseek (maybe other models) require sending back reasoning content
     // [Fact]
     // public async Task HandleAsync_ShouldFilterOutReasoningContent()
     // {
