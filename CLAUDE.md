@@ -44,6 +44,7 @@ Layout: `src/` · `demo/` · `test/`
 - 配置指南（settings.json、DI 注册方式、校验）: [configuration-guide](docs/configuration-guide.md)
 - Source Generator & 诊断规则: [sourcegenerator-guide](docs/sourcegenerator-guide.md)
 - 工具开发指北（AiTool、ToolCallFilter、自定义工具）: [tools-guide](docs/tools-guide.md)
+- Hook 开发指北（挂载点、脚本合约、配置、示例）: [hooks-guide](docs/hooks-guide.md)
 - 飞书适配器: [feishu-guide](docs/feishu-guide.md)
 
 ### 用户文档

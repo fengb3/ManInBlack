@@ -4,6 +4,7 @@
     <File Path="docs/architecture.md" />
     <File Path="docs/configuration-guide.md" />
     <File Path="docs/feishu-guide.md" />
+    <File Path="docs/hooks-guide.md" />
     <File Path="docs/middleware-guide.md" />
     <File Path="docs/provider-guide.md" />
     <File Path="docs/quick-start.md" />
