@@ -31,6 +31,7 @@ public static class AgentPipelineBuilderExtensions
         builder
             .Use<LoggingMiddleware>()
             .Use<MessageEnrichMiddleware>()
+            .Use<HookMiddleware>()
             .Use<SystemPromptInjectionMiddleware>()
             .Use<UserInputMiddleware>()
             .Use<RetryMiddleware>()
