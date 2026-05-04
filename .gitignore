@@ -490,3 +490,4 @@ $RECYCLE.BIN/
 # AI tools
 /*/*/agent-workspace
 demo/FeishuAdaptor/deploy.ps1
+/.sisyphus
