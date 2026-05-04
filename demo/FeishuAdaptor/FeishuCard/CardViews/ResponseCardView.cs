@@ -17,13 +17,13 @@ public class ReasoningCardView(LlmReasoningViewModel viewModel, CardService card
     protected override void Define()
     {
         // Card.Config!.WidthMode = "300px";
-        
+
         var reasoningMarkdown = BindMarkdown(vm => vm.Reasoning);
         var panel = CollapsiblePanel(builder => { builder.Element(reasoningMarkdown); });
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {
-            Title = new TextElement { Content = "🤔琢磨琢磨" },
+            Title = new TextElement { Content = "🤔 琢磨琢磨" },
             Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
             BackgroundColor = "lime-300",
             IconPosition = "right",
@@ -54,9 +54,17 @@ public class LlmOutputCardView(LlmOutputViewModel viewModel, CardService cardSer
 [ServiceRegister.Transient]
 public partial class LlmToolExecutionViewModel : ViewModelBase
 {
-    [ObservableProperty] public partial string ToolName { get; set; } = "\n";
-    [ObservableProperty] public partial string Arguments { get; set; } = "\n";
-    [ObservableProperty] public partial string Result { get; set; } = "\n";
+    /// <summary>
+    /// 用于存储工具名称，供中间件在 FRC 到达时使用
+    /// </summary>
+    public string ToolName { get; set; } = "";
+
+    /// <summary>
+    /// 用于存储参数，供中间件在 FRC 到达时使用
+    /// </summary>
+    public string Arguments { get; set; } = "";
+
+    public string Result { get; set; } = "";
 }
 
 [ServiceRegister.Transient.As<CardView<LlmToolExecutionViewModel>>]
@@ -66,34 +74,147 @@ public partial class ToolExecutionCardView(
     CardUpdateScheduler scheduler)
     : CardView<LlmToolExecutionViewModel>(viewModel, cardService, scheduler)
 {
+    private int _updateSequence;
+    private const string PanelElementId = "toolPanel";
+    private const string ArgsMarkdownElementId = "toolArgs";
+    private const string ResultMarkdownElementId = "toolResult";
+
+    /// <summary>
+    /// 工具方法名 → 中文显示名映射
+    /// </summary>
+    private static readonly Dictionary<string, string> ToolDisplayNameMap = new()
+    {
+        // CommandLineTools
+        { "RunBash", "💻 执行命令" },
+        { "GetBackgroundTaskResult", "📥 获取后台任务结果" },
+        { "KillBackgroundTask", "🛑 终止后台任务" },
+        // FileTools
+        { "ReadFile", "📖 读取文件" },
+        { "WriteFile", "✍️ 写入文件" },
+        { "UpdateFile", "📝 更新文件" },
+        { "Glob", "🔎 搜索文件" },
+        { "Grep", "🔍 搜索内容" },
+        // SkillTools
+        { "LoadSkill", "🧠 加载技能" },
+    };
+
+    /// <summary>
+    /// 根据工具方法名获取中文显示名，未映射时返回原始名称
+    /// </summary>
+    private static string GetToolDisplayName(string? toolName)
+        => toolName is not null && ToolDisplayNameMap.TryGetValue(toolName, out var displayName)
+            ? displayName
+            : toolName ?? "未知工具";
+
     protected override void Define()
     {
-        // Card.Config!.StreamingConfig!.PrintFrequencyMs = 100;
-        // Card.Config!.StreamingConfig!.PrintStep = 100;
+        Card.Config!.StreamingMode = false;
+        Card.Config.StreamingConfig = null;
 
-        // Card.Config!.WidthMode = "300px";
-        
-        var toolNameText = BindMarkdown(vm => vm.ToolName);
+        var argsMarkdown = Markdown(ArgsMarkdownElementId);
+        argsMarkdown.Content = "";
 
-        var argumentsText = BindMarkdown(vm => vm.Arguments);
-
-        var resultText = BindMarkdown(vm => vm.Result);
-
-        var panel = CollapsiblePanel(builder =>
-        {
-            builder.Element(toolNameText);
-            builder.Element(argumentsText);
-            builder.Element(resultText);
-        });
+        var panel = CollapsiblePanel(builder => { builder.Element(argsMarkdown); }, PanelElementId);
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {
-            Title = new TextElement { Content = "🔧工具执行", TextColor = "orange-700"},
+            Title = new TextElement { Content = "🔧 正在调用..." },
             Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
             BackgroundColor = "indigo-100",
             IconPosition = "right",
             IconExpandedAngle = -180,
         };
         AddToBody(panel);
+    }
+
+    /// <summary>
+    /// 更新卡片为"工具调用中"状态 — 更新标题为工具名，更新参数显示
+    /// </summary>
+    public async Task UpdateForToolStartAsync(string toolName, string arguments, CancellationToken ct = default)
+    {
+        ViewModel.ToolName = toolName;
+        ViewModel.Arguments = arguments;
+
+        var displayName = GetToolDisplayName(toolName);
+        var argsMarkdown = Markdown(ArgsMarkdownElementId);
+        argsMarkdown.Content = string.IsNullOrWhiteSpace(arguments) ? "无参数" : arguments;
+
+        var panel = CollapsiblePanel(builder => { builder.Element(argsMarkdown); }, PanelElementId);
+        panel.Expanded = false;
+        panel.Header = new CollapsiblePanelHeader
+        {
+            Title = new TextElement { Content = $"{displayName} 中..." },
+            Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
+            BackgroundColor = "indigo-100",
+            IconPosition = "right",
+            IconExpandedAngle = -180,
+        };
+
+        var card = BuildCard(panel);
+        var seq = Interlocked.Increment(ref _updateSequence);
+        await CardService.FullUpdateAsync(CardId, card, seq, ct);
+    }
+
+    /// <summary>
+    /// 更新卡片为"工具完成"状态 — 折叠面板默认折叠，添加结果
+    /// </summary>
+    /// <param name="result">工具返回结果</param>
+    /// <param name="isError">工具执行是否失败</param>
+    /// <param name="ct">取消令牌</param>
+    public async Task UpdateForToolResultAsync(string result, bool isError = false, CancellationToken ct = default)
+    {
+        var displayName = GetToolDisplayName(ViewModel.ToolName);
+        var argsMarkdown = Markdown(ArgsMarkdownElementId);
+        argsMarkdown.Content = string.IsNullOrWhiteSpace(ViewModel.Arguments) ? "无参数" : ViewModel.Arguments;
+
+        var resultMarkdown = Markdown(ResultMarkdownElementId);
+        resultMarkdown.Content = string.IsNullOrWhiteSpace(result) ? "无返回结果" : result;
+
+        var panel = CollapsiblePanel(builder =>
+        {
+            builder.Element(argsMarkdown);
+            builder.Hr();
+            builder.Element(resultMarkdown);
+        }, PanelElementId);
+        panel.Expanded = false;
+        panel.Header = new CollapsiblePanelHeader
+        {
+            Title = new TextElement
+            {
+                Content = isError ? $"{displayName} 失败" : $"{displayName} 完成",
+            },
+            Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
+            BackgroundColor = isError ? "red-100" : "green-100",
+            IconPosition = "right",
+            IconExpandedAngle = -180,
+        };
+
+        var card = BuildCard(panel);
+        var seq = Interlocked.Increment(ref _updateSequence);
+        await CardService.FullUpdateAsync(CardId, card, seq, ct);
+    }
+
+    /// <summary>
+    /// 非流式卡片无需关闭流式模式，空操作
+    /// </summary>
+    public override Task CloseStreamingAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// 构建全量更新用的 Card 对象
+    /// </summary>
+    private static Card BuildCard(CollapsiblePanelElement panel)
+    {
+        var card = new Card
+        {
+            Config = new CardConfig
+            {
+                StreamingMode = false,
+                EnableForward = true,
+                EnableForwardInteraction = true,
+            },
+            Body = new CardBody(),
+        };
+        card.Body!.Elements.Add(panel);
+        return card;
     }
 }
