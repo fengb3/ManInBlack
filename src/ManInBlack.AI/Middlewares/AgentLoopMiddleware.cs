@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Tools;
 using Microsoft.Extensions.AI;
@@ -9,10 +10,11 @@ using Microsoft.Extensions.Logging;
 namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
-/// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史
+/// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史。
+/// 支持在 LLM 调用后（AfterLlmCall）和所有工具执行完毕后（AllToolsCompleted）触发钩子。
 /// </summary>
 [ServiceRegister.Scoped]
-public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContext> logger) : AgentMiddleware
+public class AgentLoopMiddleware(IToolExecutor toolExecutor, IHookExecutor hookExecutor, ILogger<AgentContext> logger) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
@@ -59,6 +61,16 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             if (assistantContents.Count > 0)
                 context.Messages.Add(new ChatMessage(ChatRole.Assistant, assistantContents));
 
+            // ── AfterLlmCall：LLM 响应流结束后触发 ──
+            var afterLlmCtx = new HookContext
+            {
+                HookPoint    = HookPoint.AfterLlmCall.ToString(),
+                AgentId      = context.AgentId,
+                SystemPrompt = context.SystemPrompt,
+                UserInput    = context.UserInput,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AfterLlmCall, afterLlmCtx, ct);
+
             if (functionCalls.Count == 0)
                 yield break;
 
@@ -90,6 +102,14 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             }
 
             context.Messages.Add(new ChatMessage(ChatRole.Tool, toolResults));
+
+            // ── AllToolsCompleted：本批次所有工具执行完毕后触发 ──
+            var allToolsCtx = new HookContext
+            {
+                HookPoint = HookPoint.AllToolsCompleted.ToString(),
+                AgentId   = context.AgentId,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AllToolsCompleted, allToolsCtx, ct);
         }
     }
 }
