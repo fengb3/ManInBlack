@@ -6,6 +6,7 @@ using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace ManInBlack.AI.Tests.Middlewares;
@@ -17,7 +18,7 @@ public class HookMiddlewareTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-1",
@@ -45,7 +46,7 @@ public class HookMiddlewareTests
         {
             Result = new HookResult { Succeeded = true, InjectedText = "附加规则：请用中文回答" }
         };
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-2",
@@ -74,7 +75,7 @@ public class HookMiddlewareTests
                 InjectTarget = "SystemPrompt"
             }
         };
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-3",
@@ -95,7 +96,7 @@ public class HookMiddlewareTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-4",
@@ -124,7 +125,7 @@ public class HookMiddlewareTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-5",
@@ -157,7 +158,7 @@ public class HookMiddlewareTests
         {
             Result = new HookResult { Succeeded = true, InjectedText = "" }
         };
-        var middleware = new HookMiddleware(fakeExecutor);
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "agent-6",

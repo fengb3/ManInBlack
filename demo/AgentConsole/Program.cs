@@ -40,15 +40,7 @@ var pipeline = new AgentPipelineBuilder()
 
 
 agentContext.SystemPrompt = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
-agentContext.UserInput    = $"""
-                             现在你正在测试运行环境
-                             请执行以下命令并告诉我。是否可以执行成功
-                             ls /home        # 应为空（tmpfs 隐藏）
-                             ls /root        # 应为空（tmpfs 隐藏）
-                             cat /etc/os-release  # 可读（系统文件）
-                             touch /test.txt # 应失败（只读）
-                             dotnet build    # 正常工作
-                             """;
+agentContext.UserInput = args[0];
 
 
 
@@ -119,5 +111,5 @@ Console.WriteLine();
 var usage = agentContext.AccumulatedUsage;
 if (usage.InputTokenCount is not null || usage.OutputTokenCount is not null)
 {
-    Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}");
+    Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}, 缓存: {usage.CachedInputTokenCount}");
 }

@@ -5,6 +5,7 @@ using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Tests.Helpers;
 using ManInBlack.AI.ToolCallFilters;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace ManInBlack.AI.Tests.Middlewares;
@@ -16,7 +17,7 @@ public class HookFilterTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "GetWeather",
@@ -47,7 +48,7 @@ public class HookFilterTests
         {
             Result = new HookResult { IsBlocked = true, BlockReason = "禁止访问" }
         };
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "DangerousTool",
@@ -76,7 +77,7 @@ public class HookFilterTests
         {
             Result = new HookResult { IsBlocked = true, BlockReason = "权限不足" }
         };
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "RestrictedTool",
@@ -101,7 +102,7 @@ public class HookFilterTests
         {
             Result = new HookResult { IsBlocked = false }
         };
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "SafeTool",
@@ -127,7 +128,7 @@ public class HookFilterTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "QueryData",
@@ -158,7 +159,7 @@ public class HookFilterTests
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
-        var filter = new HookFilter(fakeExecutor);
+        var filter = new HookFilter(fakeExecutor, NullLogger<HookFilter>.Instance);
         var ctx = new ToolExecuteContext(TestHelpers.EmptyServiceProvider)
         {
             ToolName = "FailingTool",

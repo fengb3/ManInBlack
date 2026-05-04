@@ -17,24 +17,24 @@ Hook 系统基于 **挂载点（HookPoint）** 和 **脚本合约（HookContext 
 
 Hook 通过两个集成层接入框架：
 
-| 集成层 | 类 | 触发的挂载点 |
-| ------ | -- | ------------ |
-| 中间件层 | `HookMiddleware` | `BeforeLlmCall`、`AgentCompleted` |
-| 工具过滤器层 | `HookFilter` | `BeforeToolExecute`、`AfterToolExecute` |
-| 循环中间件层 | `AgentLoopMiddleware` | `AfterLlmCall`、`AllToolsCompleted` |
+| 集成层    | 类                     | 触发的挂载点                                 |
+|--------|-----------------------|----------------------------------------|
+| 中间件层   | `HookMiddleware`      | `BeforeLlmCall`、`AgentCompleted`       |
+| 工具过滤器层 | `HookFilter`          | `BeforeToolExecute`、`AfterToolExecute` |
+| 循环中间件层 | `AgentLoopMiddleware` | `AfterLlmCall`、`AllToolsCompleted`     |
 
 ---
 
 ## 挂载点一览
 
-| 挂载点 | 触发时机 | 实现者 | 可执行的操作 |
-| ------ | -------- | ------ | ------------ |
-| `BeforeLlmCall` | 首次 LLM 调用前 | `HookMiddleware` | 注入 SystemPrompt、修改上下文 |
-| `AfterLlmCall` | LLM 响应流结束后 | `AgentLoopMiddleware` | 检查响应内容、记录日志 |
-| `BeforeToolExecute` | 单个工具执行前 | `HookFilter` | 阻断执行、检查参数 |
-| `AfterToolExecute` | 单个工具执行后 | `HookFilter` | 检查结果、审计日志 |
-| `AllToolsCompleted` | 本批次所有工具执行完毕后 | `AgentLoopMiddleware` | 批量后处理 |
-| `AgentCompleted` | Agent 循环结束（无更多 function call）时 | `HookMiddleware` | 最终处理、清理资源 |
+| 挂载点                 | 触发时机                           | 实现者                   | 可执行的操作                |
+|---------------------|--------------------------------|-----------------------|-----------------------|
+| `BeforeLlmCall`     | 首次 LLM 调用前                     | `HookMiddleware`      | 注入 SystemPrompt、修改上下文 |
+| `AfterLlmCall`      | LLM 响应流结束后                     | `AgentLoopMiddleware` | 检查响应内容、记录日志           |
+| `BeforeToolExecute` | 单个工具执行前                        | `HookFilter`          | 阻断执行、检查参数             |
+| `AfterToolExecute`  | 单个工具执行后                        | `HookFilter`          | 检查结果、审计日志             |
+| `AllToolsCompleted` | 本批次所有工具执行完毕后                   | `AgentLoopMiddleware` | 批量后处理                 |
+| `AgentCompleted`    | Agent 循环结束（无更多 function call）时 | `HookMiddleware`      | 最终处理、清理资源             |
 
 ---
 
@@ -56,7 +56,9 @@ Hook 配置分为全局配置和用户级配置两个层级。
       "Name": "安全检查",
       "HookPoint": "BeforeToolExecute",
       "Script": "python security_check.py",
-      "ToolNames": [ "RunBash" ],
+      "ToolNames": [
+        "RunBash"
+      ],
       "TimeoutMs": 5000,
       "Enabled": true
     }
@@ -91,14 +93,14 @@ Hook 配置分为全局配置和用户级配置两个层级。
 
 ### 字段说明
 
-| 字段 | 类型 | 说明 |
-| ---- | ---- | ---- |
-| `Name` | `string` | 钩子名称，用于日志和调试 |
-| `HookPoint` | `string` | 挂载点名称，对应 `HookPoint` 枚举值 |
-| `Script` | `string` | 脚本命令，需包含解释器前缀（如 `python script.py`） |
+| 字段          | 类型         | 说明                                                                |
+|-------------|------------|-------------------------------------------------------------------|
+| `Name`      | `string`   | 钩子名称，用于日志和调试                                                      |
+| `HookPoint` | `string`   | 挂载点名称，对应 `HookPoint` 枚举值                                          |
+| `Script`    | `string`   | 脚本命令，需包含解释器前缀（如 `python script.py`）                               |
 | `ToolNames` | `string[]` | 仅对指定工具名生效（仅 `BeforeToolExecute` / `AfterToolExecute` 有效），为空表示所有工具 |
-| `TimeoutMs` | `int` | 脚本执行超时时间（毫秒），默认 10000 |
-| `Enabled` | `bool` | 是否启用，默认 true |
+| `TimeoutMs` | `int`      | 脚本执行超时时间（毫秒），默认 10000                                             |
+| `Enabled`   | `bool`     | 是否启用，默认 true                                                      |
 
 ---
 
@@ -130,35 +132,35 @@ Hook 配置分为全局配置和用户级配置两个层级。
 
 **通用字段**：
 
-| 字段 | 类型 | 说明 |
-| ---- | ---- | ---- |
+| 字段          | 类型       | 说明          |
+|-------------|----------|-------------|
 | `HookPoint` | `string` | 触发此钩子的挂载点名称 |
-| `AgentId` | `string` | Agent 实例标识 |
+| `AgentId`   | `string` | Agent 实例标识  |
 
 **按挂载点分组的可用字段**：
 
-| 字段 | `BeforeLlmCall` | `AfterLlmCall` | `BeforeToolExecute` | `AfterToolExecute` | `AllToolsCompleted` | `AgentCompleted` |
-| ---- | --------------- | -------------- | ------------------- | ------------------ | ------------------- | ---------------- |
-| `SystemPrompt` | 可用 | 可用 | - | - | - | 可用 |
-| `UserInput` | 可用 | 可用 | - | - | - | - |
-| `ToolName` | - | - | 可用 | 可用 | - | - |
-| `CallId` | - | - | 可用 | 可用 | - | - |
-| `ArgumentsJson` | - | - | 可用 | 可用 | - | - |
-| `ResultJson` | - | - | - | 可用 | - | - |
-| `Error` | - | - | - | 可用 | - | - |
+| 字段              | `BeforeLlmCall` | `AfterLlmCall` | `BeforeToolExecute` | `AfterToolExecute` | `AllToolsCompleted` | `AgentCompleted` |
+|-----------------|-----------------|----------------|---------------------|--------------------|---------------------|------------------|
+| `SystemPrompt`  | 可用              | 可用             | -                   | -                  | -                   | 可用               |
+| `UserInput`     | 可用              | 可用             | -                   | -                  | -                   | -                |
+| `ToolName`      | -               | -              | 可用                  | 可用                 | -                   | -                |
+| `CallId`        | -               | -              | 可用                  | 可用                 | -                   | -                |
+| `ArgumentsJson` | -               | -              | 可用                  | 可用                 | -                   | -                |
+| `ResultJson`    | -               | -              | -                   | 可用                 | -                   | -                |
+| `Error`         | -               | -              | -                   | 可用                 | -                   | -                |
 
 ### HookResult 输出
 
 脚本将 `HookResult` 以 JSON 格式输出到 stdout。如果 stdout 为空或空白，视为无操作（no-op）。
 
-| 字段 | 类型 | 说明 |
-| ---- | ---- | ---- |
-| `IsBlocked` | `bool` | 是否阻断执行（仅 `BeforeToolExecute` 有效） |
-| `BlockReason` | `string?` | 阻断原因，会作为 `FunctionResultContent` 返回给模型 |
-| `InjectedText` | `string?` | 注入到上下文的额外文本 |
+| 字段             | 类型        | 说明                                                       |
+|----------------|-----------|----------------------------------------------------------|
+| `IsBlocked`    | `bool`    | 是否阻断执行（仅 `BeforeToolExecute` 有效）                         |
+| `BlockReason`  | `string?` | 阻断原因，会作为 `FunctionResultContent` 返回给模型                   |
+| `InjectedText` | `string?` | 注入到上下文的额外文本                                              |
 | `InjectTarget` | `string?` | 注入目标：`"SystemPrompt"` / `"UserMessage"` / `"ToolResult"` |
-| `Succeeded` | `bool` | 脚本是否成功执行（false 表示脚本本身出错），默认 true |
-| `ErrorMessage` | `string?` | 脚本错误信息（`Succeeded=false` 时） |
+| `Succeeded`    | `bool`    | 脚本是否成功执行（false 表示脚本本身出错），默认 true                         |
+| `ErrorMessage` | `string?` | 脚本错误信息（`Succeeded=false` 时）                              |
 
 ### Script 字段说明
 
@@ -186,12 +188,12 @@ Hook 配置分为全局配置和用户级配置两个层级。
 
 ## 安全机制
 
-| 机制 | 说明 |
-| ---- | ---- |
-| **超时** | 每个脚本有独立的 `TimeoutMs`（默认 10 秒），超时后强制终止 |
-| **容错** | 脚本异常不会向上传播，只会记录警告日志并返回 `Succeeded=false` |
-| **零开销** | 没有配置任何钩子时，`HookExecutor.ExecuteAsync` 直接返回空结果，不执行任何脚本 |
-| **临时文件清理** | HookContext JSON 临时文件在执行完毕后自动删除，清理失败仅记录调试日志 |
+| 机制         | 说明                                                    |
+|------------|-------------------------------------------------------|
+| **超时**     | 每个脚本有独立的 `TimeoutMs`（默认 10 秒），超时后强制终止                 |
+| **容错**     | 脚本异常不会向上传播，只会记录警告日志并返回 `Succeeded=false`              |
+| **零开销**    | 没有配置任何钩子时，`HookExecutor.ExecuteAsync` 直接返回空结果，不执行任何脚本 |
+| **临时文件清理** | HookContext JSON 临时文件在执行完毕后自动删除，清理失败仅记录调试日志           |
 
 ---
 
@@ -205,6 +207,7 @@ Hook 配置分为全局配置和用户级配置两个层级。
 # security_check.py
 import json
 import sys
+
 
 def main():
     context_path = sys.argv[1]
@@ -227,6 +230,7 @@ def main():
     # 不输出任何内容 = no-op
     pass
 
+
 if __name__ == "__main__":
     main()
 ```
@@ -240,6 +244,7 @@ if __name__ == "__main__":
 import json
 import sys
 
+
 def main():
     context_path = sys.argv[1]
     with open(context_path, "r", encoding="utf-8") as f:
@@ -251,6 +256,7 @@ def main():
         "InjectedText": extra,
         "InjectTarget": "SystemPrompt"
     }))
+
 
 if __name__ == "__main__":
     main()
@@ -265,6 +271,7 @@ if __name__ == "__main__":
 import json
 import sys
 from datetime import datetime
+
 
 def main():
     context_path = sys.argv[1]
@@ -283,6 +290,7 @@ def main():
         f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
     # 不需要返回任何内容
+
 
 if __name__ == "__main__":
     main()
@@ -334,25 +342,28 @@ HookFilter                     ← BeforeToolExecute → AfterToolExecute
 
 ## 新增文件清单
 
-| 文件 | 层 | 说明 |
-| ---- | -- | ---- |
-| `ManInBlack.AI.Abstraction/Hooks/HookPoint.cs` | Abstraction | 挂载点枚举，定义 6 个生命周期节点 |
-| `ManInBlack.AI.Abstraction/Hooks/HookContext.cs` | Abstraction | 传递给钩子脚本的上下文数据 |
-| `ManInBlack.AI.Abstraction/Hooks/HookResult.cs` | Abstraction | 钩子脚本的返回结果 |
-| `ManInBlack.AI.Abstraction/Hooks/IHookExecutor.cs` | Abstraction | 钩子执行器接口 |
-| `ManInBlack.AI/Configuration/HookSettings.cs` | AI | 单条钩子配置模型 |
-| `ManInBlack.AI/Services/HookExecutor.cs` | AI | 钩子执行引擎实现 |
-| `ManInBlack.AI/Middlewares/HookMiddleware.cs` | AI | 中间件层钩子，处理 BeforeLlmCall / AgentCompleted |
-| `ManInBlack.AI/ToolCallFilters/HookFilter.cs` | AI | 工具过滤器层钩子，处理 BeforeToolExecute / AfterToolExecute |
-| `ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs` | AI | 循环中间件，处理 AfterLlmCall / AllToolsCompleted |
+| 文件                                                 | 层           | 说明                                               |
+|----------------------------------------------------|-------------|--------------------------------------------------|
+| `ManInBlack.AI.Abstraction/Hooks/HookPoint.cs`     | Abstraction | 挂载点枚举，定义 6 个生命周期节点                               |
+| `ManInBlack.AI.Abstraction/Hooks/HookContext.cs`   | Abstraction | 传递给钩子脚本的上下文数据                                    |
+| `ManInBlack.AI.Abstraction/Hooks/HookResult.cs`    | Abstraction | 钩子脚本的返回结果                                        |
+| `ManInBlack.AI.Abstraction/Hooks/IHookExecutor.cs` | Abstraction | 钩子执行器接口                                          |
+| `ManInBlack.AI/Configuration/HookSettings.cs`      | AI          | 单条钩子配置模型                                         |
+| `ManInBlack.AI/Services/HookExecutor.cs`           | AI          | 钩子执行引擎实现                                         |
+| `ManInBlack.AI/Middlewares/HookMiddleware.cs`      | AI          | 中间件层钩子，处理 BeforeLlmCall / AgentCompleted         |
+| `ManInBlack.AI/ToolCallFilters/HookFilter.cs`      | AI          | 工具过滤器层钩子，处理 BeforeToolExecute / AfterToolExecute |
+| `ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs` | AI          | 循环中间件，处理 AfterLlmCall / AllToolsCompleted        |
 
 ---
 
 ## 注意事项
 
-- **Script 必须包含解释器前缀**：`Script` 字段是原始 shell 命令，不是文件路径。必须写 `"python script.py"` 而不是 `"script.py"`
-- **IAsyncEnumerable 不阻塞流**：`HookMiddleware` 和 `AgentLoopMiddleware` 通过 `yield return` 流式转发 LLM 响应，钩子执行不会阻塞流式输出
-- **Hooks 配置每个 Scope 缓存一次**：`HookExecutor` 使用懒加载缓存 `_cachedHooks`，在首次调用 `ExecuteAsync` 时加载全局和用户钩子，后续调用直接使用缓存
+- **Script 必须包含解释器前缀**：`Script` 字段是原始 shell 命令，不是文件路径。必须写 `"python script.py"` 而不是
+  `"script.py"`
+- **IAsyncEnumerable 不阻塞流**：`HookMiddleware` 和 `AgentLoopMiddleware` 通过 `yield return` 流式转发 LLM
+  响应，钩子执行不会阻塞流式输出
+- **Hooks 配置每个 Scope 缓存一次**：`HookExecutor` 使用懒加载缓存 `_cachedHooks`，在首次调用 `ExecuteAsync`
+  时加载全局和用户钩子，后续调用直接使用缓存
 - **全局钩子工作目录**：全局钩子的工作目录为 `{RootPath}/hooks/`，用户钩子的工作目录为 `{workspace}/`
 - **AfterToolExecute 不阻断流程**：`HookFilter` 中 `AfterToolExecute` 的返回结果被忽略，不会影响后续流程
 - **ToolNames 过滤仅对工具级挂载点生效**：`BeforeToolExecute` 和 `AfterToolExecute` 会按 `ToolNames` 过滤，其他挂载点忽略此字段
