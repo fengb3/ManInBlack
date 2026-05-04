@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Middlewares;
@@ -17,8 +18,9 @@ public class AgentLoopMiddlewareTests
     public async Task HandleAsync_NoToolCall_ShouldPassthrough()
     {
         var executor = new FakeToolExecutor();
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             Messages = [new(ChatRole.User, "what's 2+2?")]
@@ -32,14 +34,18 @@ public class AgentLoopMiddlewareTests
         Assert.Single(results);
         Assert.Equal("The answer is 4", results[0].Text);
         Assert.Equal(0, executor.ExecuteCount);
+        // AfterLlmCall 应触发一次
+        Assert.Single(hookExecutor.ExecutedHooks);
+        Assert.Equal(HookPoint.AfterLlmCall, hookExecutor.ExecutedHooks[0].Point);
     }
 
     [Fact]
     public async Task HandleAsync_WithToolCall_ShouldExecuteAndLoop()
     {
         var executor = new FakeToolExecutor { Result = "file contents" };
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             Messages = [new(ChatRole.User, "read file test.txt")]
@@ -77,14 +83,21 @@ public class AgentLoopMiddlewareTests
         // 最终输出应包含 "done reading"
         var finalText = results.Last().Contents.OfType<TextContent>().LastOrDefault();
         Assert.Contains("done", finalText?.Text ?? "");
+
+        // AfterLlmCall（2次 LLM 调用）+ AllToolsCompleted（1次工具批次）
+        Assert.Equal(3, hookExecutor.ExecutedHooks.Count);
+        Assert.Equal(HookPoint.AfterLlmCall, hookExecutor.ExecutedHooks[0].Point);
+        Assert.Equal(HookPoint.AllToolsCompleted, hookExecutor.ExecutedHooks[1].Point);
+        Assert.Equal(HookPoint.AfterLlmCall, hookExecutor.ExecutedHooks[2].Point);
     }
 
     [Fact]
     public async Task HandleAsync_MultipleToolCalls_ShouldExecuteAll()
     {
         var executor = new FakeToolExecutor { Result = "result" };
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             Messages = [new(ChatRole.User, "do stuff")]
@@ -117,8 +130,9 @@ public class AgentLoopMiddlewareTests
     public async Task HandleAsync_ShouldAccumulateUsage()
     {
         var executor = new FakeToolExecutor();
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { Messages = [] };
 
         var updateWithUsage = new ChatResponseUpdate(ChatRole.Assistant,
@@ -136,8 +150,9 @@ public class AgentLoopMiddlewareTests
     public async Task HandleAsync_ShouldIncludeReasoningInAssistantMessage()
     {
         var executor = new FakeToolExecutor();
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             Messages = [new(ChatRole.User, "think through this")]
@@ -160,8 +175,9 @@ public class AgentLoopMiddlewareTests
     public async Task HandleAsync_ToolError_ShouldBeRecorded()
     {
         var executor = new FakeToolExecutor { Error = new InvalidOperationException("tool failed") };
+        var hookExecutor = new FakeHookExecutor();
         var logger = NullLogger<AgentContext>.Instance;
-        var middleware = new AgentLoopMiddleware(executor, logger);
+        var middleware = new AgentLoopMiddleware(executor, hookExecutor, logger);
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { Messages = [] };
 
         var callCount = 0;
