@@ -86,7 +86,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <param name="length">Number of lines to read. -1 (default) reads from offset to end of file.</param>
     /// <returns>The file content as a string, with lines joined by newline characters.</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public async Task<string> ReadFile(string filePath, int offset = 0, int length = -1)
     {
         filePath = ResolvePath(filePath);
@@ -128,7 +128,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <param name="content">The complete content to write to the file.</param>
     /// <returns>A confirmation message indicating the file was written.</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string WriteFile(string filePath, string content)
     {
         filePath = ResolvePath(filePath);
@@ -154,7 +154,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <param name="newContent">The text to replace originalContent with.</param>
     /// <returns>A confirmation message on success, or an error message if the original content was not found.</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string UpdateFile(string filePath, string originalContent, string newContent)
     {
         filePath = ResolvePath(filePath);
@@ -181,7 +181,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <param name="directory">The directory to search in. Can be absolute or relative to the workspace root. Defaults to workspace root.</param>
     /// <returns>The matching file paths, one per line, sorted by modification time (newest first).</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string Glob(string pattern, string? directory = null)
     {
         var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
@@ -211,7 +211,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <param name="glob">A glob pattern to filter which files to search, e.g. "*.cs" or "*.tsx". Defaults to "*" (all files).</param>
     /// <returns>The matching lines with file paths and line numbers.</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string Grep(string pattern, string? directory = null, string glob = "*")
     {
         var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);

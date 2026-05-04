@@ -75,7 +75,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="runInBackground">Run the command in the background and return immediately</param>
     /// <returns>The output of the executed command, or a background task ID</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string RunBash(string command, int timeoutMs = 120000, bool runInBackground = false)
     {
         var dangerCheck = CheckDangerousCommand(command);
@@ -122,7 +122,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="taskId">The background task ID returned by RunBash</param>
     /// <returns>The task output if completed, or running status</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string GetBackgroundTaskResult(int taskId)
     {
         if (!BackgroundTasks.TryGetValue(taskId, out var task))
@@ -141,7 +141,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="taskId">后台任务 ID</param>
     /// <returns>终止结果</returns>
     [AiTool]
-    [AiTool.HasFilter<LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string KillBackgroundTask(int taskId)
     {
         if (!BackgroundTasks.TryGetValue(taskId, out var task))
