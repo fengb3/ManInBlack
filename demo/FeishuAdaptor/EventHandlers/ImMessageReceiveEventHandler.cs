@@ -29,19 +29,25 @@ public partial class ImMessageReceiveEventHandler(
         LogMessageReceived(logger, input.EventId, input.Event.Message.MessageType);
 
         _ = Task.Run(async () => await agentLauncher.LaunchAsync(input))
-                .ContinueWith(t =>
+            .ContinueWith(t =>
+            {
+                if (t.IsFaulted)
                 {
-                    if (t.IsFaulted)
-                    {
-                        logger.LogError(t.Exception, "error when launch agent");
-                    }
-                })
-            ;
+                    logger.LogError(t.Exception, "error when launch agent");
+                }
+            });
         return Task.CompletedTask;
     }
 
-    [LoggerMessage(LogLevel.Information, "Received ImMessageReceive event: {eventId}, message type: {messageType}")]
-    static partial void LogMessageReceived(ILogger<ImMessageReceiveEventHandler> logger, string eventId, string messageType);
+    [LoggerMessage(
+        LogLevel.Information,
+        "Received ImMessageReceive event: {eventId}, message type: {messageType}"
+    )]
+    static partial void LogMessageReceived(
+        ILogger<ImMessageReceiveEventHandler> logger,
+        string eventId,
+        string messageType
+    );
 }
 
 [ServiceRegister.Singleton]
@@ -53,9 +59,7 @@ public class AgentLauncher(
 {
     public async Task LaunchAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input)
     {
-        var userId =
-            input.Event!.Sender!.SenderId!
-                .UserId!; // user id is unique over all application, can be used as parent id for agent context
+        var userId = input.Event!.Sender!.SenderId!.UserId!; // user id is unique over all application, can be used as parent id for agent context
 
         // logger.LogInformation("{input}", JsonSerializer.Serialize(input));
 
@@ -80,22 +84,21 @@ public class AgentLauncher(
         var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
         var user = await userStorage.GetOrCreateUser(userId);
 
-
         var agentContext = sp.GetRequiredService<AgentContext>();
         agentContext.CancellationToken = cts.Token;
-
 
         agentContext.AgentId = Guid.NewGuid().ToString();
         agentContext.ParentId = userId;
         agentContext.ParentType = "feishu_user";
-        agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
+        agentContext.SessionId =
+            user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
 
         agentContext.SystemPrompt += $"""
-                                      <system>
-                                      你是运行在飞书中的智能 agent
-                                      你的面对的用户的 飞书 open id 是: {input.Event!.Sender!.SenderId!.OpenId!}
-                                      </system>
-                                      """;
+            <system>
+            你是运行在飞书中的智能 agent
+            你的面对的用户的 飞书 open id 是: {input.Event!.Sender!.SenderId!.OpenId!}
+            </system>
+            """;
 
         var userLlmInput = await HandleMessage(sp, input, agentContext, cts.Token);
 
@@ -105,9 +108,7 @@ public class AgentLauncher(
 
         try
         {
-            await foreach (var _ in updates)
-            {
-            }
+            await foreach (var _ in updates) { }
         }
         catch (OperationCanceledException)
         {
@@ -127,12 +128,12 @@ public class AgentLauncher(
             executionTracker.Release(userId, cts);
             // 打印日志
             logger.LogInformation(
-                "Finished processing message from user {userId} " + 
-                "Token usage for agent {AgentContextAgentId} with " +
-                "InputTokenCount={inputTokenCount}, " +
-                "TotalTokenCount={totalTokenCount}, " +
-                "ReasoningTokenCount={reasoningTokenCount}, " +
-                "CachedInputTokenCount={cachedInputTokenCount}",
+                "Finished processing message from user {userId} "
+                    + "Token usage for agent {AgentContextAgentId} with "
+                    + "InputTokenCount={inputTokenCount}, "
+                    + "TotalTokenCount={totalTokenCount}, "
+                    + "ReasoningTokenCount={reasoningTokenCount}, "
+                    + "CachedInputTokenCount={cachedInputTokenCount}",
                 userId,
                 agentContext.AgentId,
                 agentContext.AccumulatedUsage.InputTokenCount,
@@ -160,6 +161,7 @@ public class AgentLauncher(
         {
             // Handle file uploads — download and save to user workspace
             case "file":
+            {
                 try
                 {
                     var tenantApi = sp.GetRequiredService<IFeishuTenantApi>();
@@ -170,10 +172,7 @@ public class AgentLauncher(
                     var fileName = doc.RootElement.GetProperty("file_name").GetString()!;
                     var messageId = input.Event!.Message!.MessageId!;
 
-                    var savePath = Path.Combine(
-                        userWorkspace.WorkingDirectory,
-                        fileName
-                    );
+                    var savePath = Path.Combine(userWorkspace.WorkingDirectory, fileName);
 
                     using var response =
                         await tenantApi.GetImV1MessagesByMessageIdResourcesByFileKeyAsync(
@@ -207,14 +206,24 @@ public class AgentLauncher(
                     logger.LogError(ex, "Failed to download file for user {userId}", userId);
                     result = "[User uploaded a file but the download failed.]";
                 }
-
                 break;
+            }
             // Handle text messages
             case "text":
             {
                 var doc = JsonDocument.Parse(messageContent);
                 var text = doc.RootElement.GetProperty("text").GetString()!;
                 result = text;
+                break;
+            }
+            case default:
+            {
+                logger.LogWarning(
+                    "Received unsupported message type {messageType} from user {userId}",
+                    messageType,
+                    userId
+                );
+                result = $"[Received unsupported message type: {messageType}, content: {messageContent}]";
                 break;
             }
         }
