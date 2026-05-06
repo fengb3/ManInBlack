@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
-using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.ToolCallFilters;
 
@@ -26,11 +25,11 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     private static int _nextTaskId;
 
     /// <summary>
-    /// BackgroundTask 记录类型，包含一个可选的 Process 对象（如果需要终止进程）和一个 TaskCompletionSource<string> 用于存储命令输出结果。
+    /// BackgroundTask 记录类型，包含一个可选的 <c>Process</c> 对象（如果需要终止进程）和一个 <c>TaskCompletionSource&lt;string&gt;</c> 用于存储命令输出结果。
     /// </summary>
     /// <param name="Process"></param>
     /// <param name="Tcs"></param>
-    private sealed record BackgroundTask(Process Process, TaskCompletionSource<string> Tcs);
+    private sealed record BackgroundTask(Process? Process, TaskCompletionSource<string> Tcs);
 
     /// <summary>
     /// Executes a given bash command and returns its output.
@@ -54,6 +53,8 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     ///
     /// Instructions:
     ///
+    /// - The first line of your command must be a single comment starting with # that explains in one sentence what the command does.
+    /// - After that comment line, put the actual command on the following line.
     /// - If your command will create new directories or files, first use this
     /// tool to run ls to verify the parent directory exists and is the correct
     /// location.
@@ -75,7 +76,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// - If the commands depend on each other and must run sequentially, use a single Bash call
     /// with &amp;&amp; to chain them together.
     /// - Only use ; when you need to run commands sequentially but don't care if earlier commands fail.
-    /// - DO NOT use newlines to separate commands (newlines are ok in quoted strings).
+    /// - Do not use additional newlines to separate commands beyond the required first-line comment (newlines are ok in quoted strings).
     /// - Avoid unnecessary sleep commands:
     ///   - Do not sleep between commands that can run immediately - just run them.
     ///   - If you must poll an external process, use GetBackgroundTaskResult to check status
@@ -166,7 +167,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
             if (task.Process is not null && !task.Process.HasExited)
                 task.Process.Kill();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // 进程已退出或无法终止，继续完成 TCS
         }
