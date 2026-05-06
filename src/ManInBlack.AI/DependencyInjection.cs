@@ -36,13 +36,15 @@ public static class DependencyInjection
             });
 
             services.AddScoped<AgentPipelineBuilder>();
-            services.AddScoped<AgentContext>();
+            services.AddTransient<AgentContext>();
             services.AddSingleton<AgentExecutionTracker>();
 
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() =>
                     new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
+            
             services.AddSingleton(options.ModelChoice);
+            
             services.AddScoped<IChatClient>(sp =>
             {
                 var choice = sp.GetRequiredService<ModelChoice>();

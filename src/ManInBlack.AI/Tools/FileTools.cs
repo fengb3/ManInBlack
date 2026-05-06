@@ -12,6 +12,7 @@ namespace ManInBlack.AI.Tools;
 public partial class FileTools(IUserWorkspace workspace)
 {
     private readonly string _userWorkspace = workspace.WorkingDirectory;
+    private readonly string _tempDirectory = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
     private static readonly HashSet<string> BinaryExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -75,7 +76,33 @@ public partial class FileTools(IUserWorkspace workspace)
                 normalized[workspaceRoot.Length] == Path.AltDirectorySeparatorChar);
     }
 
-    private const string OutOfWorkspaceError = "Error: 不允许在工作空间外修改、创建或删除文件。你只能修改工作空间内的文件。";
+    private bool IsInsideTempDirectory(string resolvedPath)
+    {
+        var normalized = Path.GetFullPath(resolvedPath);
+        var tempRoot = Path.GetFullPath(_tempDirectory);
+        return normalized.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase) &&
+               (normalized.Length == tempRoot.Length ||
+                normalized[tempRoot.Length] == Path.DirectorySeparatorChar ||
+                normalized[tempRoot.Length] == Path.AltDirectorySeparatorChar);
+    }
+
+    private bool IsInsideAllowedDirectory(string resolvedPath)
+    {
+        // 根目录本身不允许操作（防止删除工作空间/临时目录根）
+        if (IsExactPath(resolvedPath, _userWorkspace) || IsExactPath(resolvedPath, _tempDirectory))
+            return false;
+
+        return IsInsideWorkspace(resolvedPath) || IsInsideTempDirectory(resolvedPath);
+    }
+
+    private static bool IsExactPath(string resolvedPath, string root)
+    {
+        var normalized = Path.GetFullPath(resolvedPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return string.Equals(normalized, normalizedRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private const string OutOfAllowedDirectoryError = "Error: 不允许在工作空间和临时目录外修改、创建或删除文件。你只能修改工作空间内或临时目录内的文件。";
 
     /// <summary>
     /// Reads a file and returns its content. Supports reading the entire file or a specific range of lines.
@@ -121,7 +148,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <summary>
     /// Creates a new file or completely overwrites an existing file with the given content.
     /// Parent directories are created automatically if they do not exist.
-    /// 只能在工作空间内创建或覆盖文件，不允许在工作空间外写入。
+    /// 只能在工作空间或临时目录内创建或覆盖文件，不允许在其他位置写入。
     /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
     /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
@@ -132,8 +159,8 @@ public partial class FileTools(IUserWorkspace workspace)
     public string WriteFile(string filePath, string content)
     {
         filePath = ResolvePath(filePath);
-        if (!IsInsideWorkspace(filePath))
-            return $"{OutOfWorkspaceError} Path: {filePath}";
+        if (!IsInsideAllowedDirectory(filePath))
+            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -141,12 +168,13 @@ public partial class FileTools(IUserWorkspace workspace)
         return $"File written: {filePath}";
 
     }
+    
     /// <summary>
     /// Performs an exact string replacement in an existing file.
     /// Finds the first occurrence of originalContent and replaces it with newContent.
     /// If originalContent is not found, the update is aborted to prevent data loss.
     /// You must read the file with ReadFile before calling this tool to ensure you have the current content.
-    /// 只能在工作空间内修改文件，不允许修改工作空间外的文件。
+    /// 只能在工作空间或临时目录内修改文件，不允许修改其他位置的文件。
     /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
     /// </summary>
     /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
@@ -158,8 +186,8 @@ public partial class FileTools(IUserWorkspace workspace)
     public string UpdateFile(string filePath, string originalContent, string newContent)
     {
         filePath = ResolvePath(filePath);
-        if (!IsInsideWorkspace(filePath))
-            return $"{OutOfWorkspaceError} Path: {filePath}";
+        if (!IsInsideAllowedDirectory(filePath))
+            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
         if (!File.Exists(filePath))
             return $"File not found: {filePath}";
 
@@ -235,5 +263,47 @@ public partial class FileTools(IUserWorkspace workspace)
         return results.Count == 0
             ? "No matches found."
             : string.Join(Environment.NewLine, results);
+    }
+
+    /// <summary>
+    /// Deletes a file at the specified path.
+    /// 只能在工作空间或临时目录内删除文件，不允许删除其他位置的文件。
+    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
+    /// </summary>
+    /// <param name="filePath">Path to the file to delete. Can be absolute or relative to the workspace root.</param>
+    /// <returns>A confirmation message on success, or an error message if the file was not found or access was denied.</returns>
+    [AiTool]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    public string DeleteFile(string filePath)
+    {
+        filePath = ResolvePath(filePath);
+        if (!IsInsideAllowedDirectory(filePath))
+            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
+        if (!File.Exists(filePath))
+            return $"Error: File not found: {filePath}";
+
+        File.Delete(filePath);
+        return $"File deleted: {filePath}";
+    }
+
+    /// <summary>
+    /// Deletes a directory at the specified path, including all files and subdirectories.
+    /// 只能在工作空间或临时目录内删除目录，不允许删除其他位置的目录。
+    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
+    /// </summary>
+    /// <param name="directoryPath">Path to the directory to delete. Can be absolute or relative to the workspace root.</param>
+    /// <returns>A confirmation message on success, or an error message if the directory was not found or access was denied.</returns>
+    [AiTool]
+    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    public string DeleteDirectory(string directoryPath)
+    {
+        directoryPath = ResolvePath(directoryPath);
+        if (!IsInsideAllowedDirectory(directoryPath))
+            return $"{OutOfAllowedDirectoryError} Path: {directoryPath}";
+        if (!Directory.Exists(directoryPath))
+            return $"Error: Directory not found: {directoryPath}";
+
+        Directory.Delete(directoryPath, recursive: true);
+        return $"Directory deleted: {directoryPath}";
     }
 }

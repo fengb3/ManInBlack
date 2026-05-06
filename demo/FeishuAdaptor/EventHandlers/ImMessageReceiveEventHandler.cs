@@ -216,7 +216,7 @@ public class AgentLauncher(
                 result = text;
                 break;
             }
-            case default:
+            default:
             {
                 logger.LogWarning(
                     "Received unsupported message type {messageType} from user {userId}",
