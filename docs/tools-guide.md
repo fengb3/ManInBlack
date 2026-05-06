@@ -21,13 +21,17 @@
 
 所有路径支持绝对路径和相对路径（相对于 workspace 根目录）。
 
-| 方法         | 说明                                     |
-| ------------ | ---------------------------------------- |
-| `ReadFile`   | 读取文件，支持 offset/length 行范围      |
-| `WriteFile`  | 创建/覆盖文件，自动创建父目录            |
-| `UpdateFile` | 精确字符串替换，替换前必须先 ReadFile    |
-| `Glob`       | 按 glob 模式搜索文件，按修改时间排序     |
-| `Grep`       | 按正则搜索文件内容，返回匹配行和行号     |
+**写入权限**：`WriteFile`、`UpdateFile`、`DeleteFile`、`DeleteDirectory` 允许在工作空间和系统临时目录内操作（Linux/macOS 为 `/tmp`，Windows 为 `%TEMP%`），不允许在其他位置修改、创建或删除文件。
+
+| 方法              | 说明                                              |
+| ----------------- | ------------------------------------------------- |
+| `ReadFile`        | 读取文件，支持 offset/length 行范围               |
+| `WriteFile`       | 创建/覆盖文件，自动创建父目录                     |
+| `UpdateFile`      | 精确字符串替换，替换前必须先 ReadFile             |
+| `Glob`            | 按 glob 模式搜索文件，按修改时间排序              |
+| `Grep`            | 按正则搜索文件内容，返回匹配行和行号              |
+| `DeleteFile`      | 删除指定文件                                      |
+| `DeleteDirectory` | 递归删除指定目录及其所有内容                      |
 
 ### SkillTools
 

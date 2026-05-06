@@ -15,9 +15,21 @@ namespace ManInBlack.AI.Tools;
 [ServiceRegister.Scoped]
 public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor shellExecutor)
 {
+    /// <summary>
+    /// 存储后台任务的字典，键为任务 ID，值为包含 Process 和 TaskCompletionSource 的 BackgroundTask 记录。
+    /// </summary>
     private static readonly ConcurrentDictionary<int, BackgroundTask> BackgroundTasks = new();
+
+    /// <summary>
+    /// 用于生成后台任务 ID 的原子计数器，初始值为 0，每次创建新任务时递增。
+    /// </summary>
     private static int _nextTaskId;
 
+    /// <summary>
+    /// BackgroundTask 记录类型，包含一个可选的 Process 对象（如果需要终止进程）和一个 TaskCompletionSource<string> 用于存储命令输出结果。
+    /// </summary>
+    /// <param name="Process"></param>
+    /// <param name="Tcs"></param>
     private sealed record BackgroundTask(Process Process, TaskCompletionSource<string> Tcs);
 
     /// <summary>
