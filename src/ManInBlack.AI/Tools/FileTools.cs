@@ -114,7 +114,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <returns>The file content as a string, with lines joined by newline characters.</returns>
     [AiTool]
     [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
-    public async Task<string> ReadFile(string filePath, int offset = 0, int length = -1)
+    public async Task<string> Read(string filePath, int offset = 0, int length = -1)
     {
         filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
@@ -156,7 +156,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <returns>A confirmation message indicating the file was written.</returns>
     [AiTool]
     [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
-    public string WriteFile(string filePath, string content)
+    public string Write(string filePath, string content)
     {
         filePath = ResolvePath(filePath);
         if (!IsInsideAllowedDirectory(filePath))
@@ -166,7 +166,6 @@ public partial class FileTools(IUserWorkspace workspace)
             Directory.CreateDirectory(directory);
         File.WriteAllText(filePath, content);
         return $"File written: {filePath}";
-
     }
     
     /// <summary>
@@ -183,7 +182,7 @@ public partial class FileTools(IUserWorkspace workspace)
     /// <returns>A confirmation message on success, or an error message if the original content was not found.</returns>
     [AiTool]
     [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
-    public string UpdateFile(string filePath, string originalContent, string newContent)
+    public string Edit(string filePath, string originalContent, string newContent)
     {
         filePath = ResolvePath(filePath);
         if (!IsInsideAllowedDirectory(filePath))
@@ -264,46 +263,48 @@ public partial class FileTools(IUserWorkspace workspace)
             ? "No matches found."
             : string.Join(Environment.NewLine, results);
     }
+    
+    // delete operations are potentially destructive and may not be needed in many scenarios, so we can start without them and add later if necessary.
 
-    /// <summary>
-    /// Deletes a file at the specified path.
-    /// 只能在工作空间或临时目录内删除文件，不允许删除其他位置的文件。
-    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
-    /// </summary>
-    /// <param name="filePath">Path to the file to delete. Can be absolute or relative to the workspace root.</param>
-    /// <returns>A confirmation message on success, or an error message if the file was not found or access was denied.</returns>
-    [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
-    public string DeleteFile(string filePath)
-    {
-        filePath = ResolvePath(filePath);
-        if (!IsInsideAllowedDirectory(filePath))
-            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
-        if (!File.Exists(filePath))
-            return $"Error: File not found: {filePath}";
-
-        File.Delete(filePath);
-        return $"File deleted: {filePath}";
-    }
-
-    /// <summary>
-    /// Deletes a directory at the specified path, including all files and subdirectories.
-    /// 只能在工作空间或临时目录内删除目录，不允许删除其他位置的目录。
-    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
-    /// </summary>
-    /// <param name="directoryPath">Path to the directory to delete. Can be absolute or relative to the workspace root.</param>
-    /// <returns>A confirmation message on success, or an error message if the directory was not found or access was denied.</returns>
-    [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
-    public string DeleteDirectory(string directoryPath)
-    {
-        directoryPath = ResolvePath(directoryPath);
-        if (!IsInsideAllowedDirectory(directoryPath))
-            return $"{OutOfAllowedDirectoryError} Path: {directoryPath}";
-        if (!Directory.Exists(directoryPath))
-            return $"Error: Directory not found: {directoryPath}";
-
-        Directory.Delete(directoryPath, recursive: true);
-        return $"Directory deleted: {directoryPath}";
-    }
+    // /// <summary>
+    // /// Deletes a file at the specified path.
+    // /// 只能在工作空间或临时目录内删除文件，不允许删除其他位置的文件。
+    // /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
+    // /// </summary>
+    // /// <param name="filePath">Path to the file to delete. Can be absolute or relative to the workspace root.</param>
+    // /// <returns>A confirmation message on success, or an error message if the file was not found or access was denied.</returns>
+    // [AiTool]
+    // [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    // public string DeleteFile(string filePath)
+    // {
+    //     filePath = ResolvePath(filePath);
+    //     if (!IsInsideAllowedDirectory(filePath))
+    //         return $"{OutOfAllowedDirectoryError} Path: {filePath}";
+    //     if (!File.Exists(filePath))
+    //         return $"Error: File not found: {filePath}";
+    //
+    //     File.Delete(filePath);
+    //     return $"File deleted: {filePath}";
+    // }
+    //
+    // /// <summary>
+    // /// Deletes a directory at the specified path, including all files and subdirectories.
+    // /// 只能在工作空间或临时目录内删除目录，不允许删除其他位置的目录。
+    // /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
+    // /// </summary>
+    // /// <param name="directoryPath">Path to the directory to delete. Can be absolute or relative to the workspace root.</param>
+    // /// <returns>A confirmation message on success, or an error message if the directory was not found or access was denied.</returns>
+    // [AiTool]
+    // [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    // public string DeleteDirectory(string directoryPath)
+    // {
+    //     directoryPath = ResolvePath(directoryPath);
+    //     if (!IsInsideAllowedDirectory(directoryPath))
+    //         return $"{OutOfAllowedDirectoryError} Path: {directoryPath}";
+    //     if (!Directory.Exists(directoryPath))
+    //         return $"Error: Directory not found: {directoryPath}";
+    //
+    //     Directory.Delete(directoryPath, recursive: true);
+    //     return $"Directory deleted: {directoryPath}";
+    // }
 }
