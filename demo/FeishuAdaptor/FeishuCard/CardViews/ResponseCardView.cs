@@ -64,6 +64,11 @@ public partial class LlmToolExecutionViewModel : ViewModelBase
     /// </summary>
     public string Arguments { get; set; } = "";
 
+    /// <summary>
+    /// 用于存储工具执行时的附加描述（例如命令注释），并在卡片标题中显示
+    /// </summary>
+    public string Description { get; set; } = "";
+
     public string Result { get; set; } = "";
 }
 
@@ -130,12 +135,18 @@ public partial class ToolExecutionCardView(
     /// <summary>
     /// 更新卡片为"工具调用中"状态 — 更新标题为工具名，更新参数显示
     /// </summary>
-    public async Task UpdateForToolStartAsync(string toolName, string arguments, CancellationToken ct = default)
+    public async Task UpdateForToolStartAsync(string toolName, string arguments, string description = "", CancellationToken ct = default)
     {
         ViewModel.ToolName = toolName;
         ViewModel.Arguments = arguments;
+        ViewModel.Description = description;
 
         var displayName = GetToolDisplayName(toolName);
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            displayName = $"{displayName} - {description}";
+        }
+
         var argsMarkdown = Markdown(ArgsMarkdownElementId);
         argsMarkdown.Content = string.IsNullOrWhiteSpace(arguments) ? "无参数" : arguments;
 
@@ -164,6 +175,11 @@ public partial class ToolExecutionCardView(
     public async Task UpdateForToolResultAsync(string result, bool isError = false, CancellationToken ct = default)
     {
         var displayName = GetToolDisplayName(ViewModel.ToolName);
+        if (!string.IsNullOrWhiteSpace(ViewModel.Description))
+        {
+            displayName = $"{displayName} - {ViewModel.Description}";
+        }
+
         var argsMarkdown = Markdown(ArgsMarkdownElementId);
         argsMarkdown.Content = string.IsNullOrWhiteSpace(ViewModel.Arguments) ? "无参数" : ViewModel.Arguments;
 

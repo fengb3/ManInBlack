@@ -80,7 +80,17 @@ public class FeishuCardMiddleware(
                             ? string.Join(", ", fcc.Arguments.Select(pair => $"{pair.Key}: {pair.Value}"))
                             : "无参数";
 
-                        await toolCard.UpdateForToolStartAsync(toolName, arguments, ct);
+                        string description = "";
+                        if (toolName == "RunBash" && fcc.Arguments != null && fcc.Arguments.TryGetValue("command", out var cmdObj) && cmdObj?.ToString() is string cmdStr)
+                        {
+                            var firstLine = cmdStr.TrimStart().Split('\n')[0].Trim();
+                            if (firstLine.StartsWith("#"))
+                            {
+                                description = firstLine.TrimStart('#', ' ').Trim();
+                            }
+                        }
+
+                        await toolCard.UpdateForToolStartAsync(toolName, arguments, description, ct);
                         break;
                     }
                     case FunctionResultContent frc:
