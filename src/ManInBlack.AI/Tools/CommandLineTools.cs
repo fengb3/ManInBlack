@@ -32,61 +32,49 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     private sealed record BackgroundTask(Process? Process, TaskCompletionSource<string> Tcs);
 
     /// <summary>
-    /// Executes a given bash command and returns its output.
-    /// The working directory persists between commands, but shell state does not.
-    /// The shell environment is initialized from the user's profile (bash or zsh).
+    /// 执行给定的 Bash 命令并返回输出。工作目录在命令之间保持不变，但 Shell 状态不会。
+    /// Shell 环境从用户的配置文件（bash 或 zsh）初始化。
     ///
-    /// **IMPORTANT**: Avoid using this tool to run find, grep, cat, head, tail, sed, awk, or echo commands,
-    /// unless explicitly instructed or after you have verified that a dedicated tool cannot accomplish your task.
-    /// Instead, use the appropriate dedicated tool as this will provide a much better experience for the user:
+    /// **可操作目录**：工作空间目录和 /tmp 是可读写的。注意 /tmp 的内容在命令之间会被清空，
+    /// 如需跨命令保留临时文件，请使用工作空间目录。
     ///
-    /// - File search: Use Glob (NOT find or ls)
-    /// - Content search: Use Grep (NOT grep or rg)
-    /// - Read files: Use Read (NOT cat/head/tail)
-    /// - Edit files: Use Edit (NOT sed/awk)
-    /// - Write files: Use Write
-    /// - Communication: Output text directly (NOT echo/printf)
+    /// **重要提示**：除非明确指示，或在确认专用工具无法完成任务后，请勿使用此工具运行
+    /// find、grep、cat、head、tail、sed、awk 或 echo 命令。请使用相应的专用工具，
+    /// 这将为用户提供更好的体验：
     ///
-    /// While the Bash tool can do similar things, it's better to use the built-in
-    /// tools as they provide a better user experience and make it easier to
-    /// review tool calls and give permission.
+    /// - 文件搜索：使用 Glob（而非 find 或 ls）
+    /// - 内容搜索：使用 Grep（而非 grep 或 rg）
+    /// - 读取文件：使用 Read（而非 cat/head/tail）
+    /// - 编辑文件：使用 Edit（而非 sed/awk）
+    /// - 写入文件：使用 Write
+    /// - 通信输出：直接输出文本（而非 echo/printf）
     ///
-    /// Instructions:
+    /// 使用说明：
     ///
-    /// - The first line of your command must be a single comment starting with # that explains in one sentence what the command does.
-    /// - After that comment line, put the actual command on the following line.
-    /// - If your command will create new directories or files, first use this
-    /// tool to run ls to verify the parent directory exists and is the correct
-    /// location.
-    /// - Always quote file paths that contain spaces with double quotes in your command
-    /// (e.g., cd "path with spaces/file.txt")
-    /// - Try to maintain your current working directory throughout the session by using absolute paths
-    /// and avoiding usage of cd. You may use cd if the User explicitly requests it.
-    /// - You may specify an optional timeout in milliseconds (up to 600000ms / 10 minutes).
-    /// By default, your command will timeout after 120000ms (2 minutes).
-    /// - You can use the runInBackground parameter to run the command in the background.
-    /// Only use this if you don't need the result immediately and are OK being notified
-    /// when the command finishes later. You do not need to check the output right away -
-    /// you will be notified when it finishes.
+    /// - 命令的第一行必须是以 # 开头的单行注释，用一句话说明命令的作用。
+    /// - 注释行之后，在下一行放置实际命令。
+    /// - 如果命令会创建新目录或文件，请先使用此工具运行 ls 验证父目录存在且位置正确。
+    /// - 始终用双引号包裹包含空格的文件路径（如 cd "path with spaces/file.txt"）。
+    /// - 尽量在会话中使用绝对路径维持当前工作目录，避免使用 cd。用户明确要求时可使用 cd。
+    /// - 可以指定可选的超时时间（毫秒），最长 600000ms（10 分钟）。默认超时 120000ms（2 分钟）。
+    /// - 可以使用 runInBackground 参数在后台运行命令。仅在不需要立即获取结果时使用，
+    ///   命令完成后会收到通知，无需立即检查输出。
     ///
-    /// When issuing multiple commands:
-    /// - If the commands are independent and can run in parallel, make multiple Bash tool calls
-    /// in a single message. Example: if you need to run "git status" and "git diff",
-    /// send a single message with two Bash tool calls in parallel.
-    /// - If the commands depend on each other and must run sequentially, use a single Bash call
-    /// with &amp;&amp; to chain them together.
-    /// - Only use ; when you need to run commands sequentially but don't care if earlier commands fail.
-    /// - Do not use additional newlines to separate commands beyond the required first-line comment (newlines are ok in quoted strings).
-    /// - Avoid unnecessary sleep commands:
-    ///   - Do not sleep between commands that can run immediately - just run them.
-    ///   - If you must poll an external process, use GetBackgroundTaskResult to check status
-    /// rather than sleeping first.
-    ///   - If you must sleep, keep the duration short (1-5 seconds) to avoid blocking the user.
+    /// 多命令执行：
+    /// - 如果命令相互独立且可并行执行，在一条消息中发起多个 Bash 工具调用。
+    ///   例如：需要运行 "git status" 和 "git diff"，在一条消息中并行发送两个 Bash 调用。
+    /// - 如果命令相互依赖必须顺序执行，使用单个 Bash 调用并用 &amp;&amp; 链接。
+    /// - 仅在不关心前一个命令是否失败时使用 ; 分隔命令。
+    /// - 除必须的首行注释外，不要使用额外的换行分隔命令（引号字符串中的换行除外）。
+    /// - 避免不必要的 sleep 命令：
+    ///   - 可立即执行的命令之间不要 sleep。
+    ///   - 如需轮询外部进程，使用 GetBackgroundTaskResult 检查状态，而非先 sleep。
+    ///   - 如必须 sleep，保持短时间（1-5 秒），避免阻塞用户。
     /// </summary>
-    /// <param name="command">The Bash command to execute</param>
-    /// <param name="timeoutMs">command execution timeout in milliseconds (default to 120000)</param>
-    /// <param name="runInBackground">Run the command in the background and return immediately</param>
-    /// <returns>The output of the executed command, or a background task ID</returns>
+    /// <param name="command">要执行的 Bash 命令</param>
+    /// <param name="timeoutMs">命令执行超时时间（毫秒），默认 120000</param>
+    /// <param name="runInBackground">是否在后台运行命令并立即返回</param>
+    /// <returns>执行命令的输出，或后台任务 ID</returns>
     [AiTool]
     [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string RunBash(string command, int timeoutMs = 120000, bool runInBackground = false)
@@ -97,12 +85,18 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
 
         if (runInBackground)
         {
-            var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
             Task.Run(() =>
             {
                 try
                 {
-                    var result = shellExecutor.Execute(command, workspace.WorkingDirectory, timeoutMs);
+                    var result = shellExecutor.Execute(
+                        command,
+                        workspace.WorkingDirectory,
+                        timeoutMs
+                    );
                     var output = !string.IsNullOrEmpty(result.StandardError)
                         ? $"Bash error: {result.StandardError.Trim()}"
                         : result.StandardOutput.Trim();
@@ -130,10 +124,10 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     }
 
     /// <summary>
-    /// Check the result of a background task started by RunBash with runInBackground=true.
+    /// 检查后台任务的执行结果。仅适用于使用 runInBackground=true 启动的 RunBash 命令。返回任务输出或运行状态。完成后会从后台任务列表中移除该任务。
     /// </summary>
-    /// <param name="taskId">The background task ID returned by RunBash</param>
-    /// <returns>The task output if completed, or running status</returns>
+    /// <param name="taskId">后台任务 ID</param>
+    /// <returns>任务输出（如果已完成）或运行状态</returns>
     [AiTool]
     [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
     public string GetBackgroundTaskResult(int taskId)
@@ -147,7 +141,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
         BackgroundTasks.TryRemove(taskId, out _);
         return task.Tcs.Task.Result;
     }
-    
+
     /// <summary>
     /// 终止后台任务。停止关联进程并将结果设为已取消。
     /// </summary>
@@ -186,58 +180,47 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     {
         // Recursive delete root or home directory
         if (RecursiveDeleteRootOrHomeDirRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「recursive delete root or home directory」.";
+            return "Command blocked by security policy: detected dangerous operation「recursive delete root or home directory」.";
 
         // Format filesystem
         if (FormatFileSystemRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「format filesystem」.";
+            return "Command blocked by security policy: detected dangerous operation「format filesystem」.";
 
         // dd overwrite block device
         if (DdOverwriteBlockDeviceRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「dd overwrite block device」.";
+            return "Command blocked by security policy: detected dangerous operation「dd overwrite block device」.";
 
         // Fork bomb
         if (ForkBombRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「fork bomb」.";
+            return "Command blocked by security policy: detected dangerous operation「fork bomb」.";
 
         // Shutdown / reboot
         if (ShutdownRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「shutdown/reboot」.";
+            return "Command blocked by security policy: detected dangerous operation「shutdown/reboot」.";
 
         // Pipe remote script to shell
         if (PipeRemoteScriptRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「pipe remote script to shell」.";
+            return "Command blocked by security policy: detected dangerous operation「pipe remote script to shell」.";
 
         // Redirect overwrite block device
         if (RedirectOverwriteBlockDeviceRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「redirect overwrite block device」.";
+            return "Command blocked by security policy: detected dangerous operation「redirect overwrite block device」.";
 
         // Flush firewall rules
         if (FlushFirewallRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「flush firewall rules」.";
+            return "Command blocked by security policy: detected dangerous operation「flush firewall rules」.";
 
         // Reverse shell / network listener
         if (ReverseShellNetworkListener().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「reverse shell / network listener」.";
+            return "Command blocked by security policy: detected dangerous operation「reverse shell / network listener」.";
 
         // Overwrite critical system files
         if (OverwriteCriticalSystemFilesRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「overwrite critical system files」.";
+            return "Command blocked by security policy: detected dangerous operation「overwrite critical system files」.";
 
         // Create or modify Linux user
         if (CreateLinuxUserRegex().IsMatch(command))
-            return
-                "Command blocked by security policy: detected dangerous operation「create or modify Linux user」.";
+            return "Command blocked by security policy: detected dangerous operation「create or modify Linux user」.";
 
         return null;
     }
@@ -245,8 +228,11 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <summary>
     /// 匹配递归强制删除根目录或家目录的命令，如 <c>rm -rf /</c>、<c>rm -rf /*</c>、<c>rm --force ~</c>、<c>rm -rf $HOME</c>。
     /// </summary>
-    [GeneratedRegex(@"rm\s+(?:-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)(?:/\s*$|/\*|~|\$HOME)", RegexOptions.IgnoreCase,
-        "zh-CN")]
+    [GeneratedRegex(
+        @"rm\s+(?:-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)(?:/\s*$|/\*|~|\$HOME)",
+        RegexOptions.IgnoreCase,
+        "zh-CN"
+    )]
     private static partial Regex RecursiveDeleteRootOrHomeDirRegex();
 
     /// <summary>
@@ -270,7 +256,11 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <summary>
     /// 匹配关机、重启相关命令，如 <c>shutdown</c>、<c>reboot</c>、<c>poweroff</c>、<c>halt</c>、<c>init 0</c>、<c>init 6</c>。
     /// </summary>
-    [GeneratedRegex(@"\b(shutdown|reboot|poweroff|halt|init\s+[06])\b", RegexOptions.IgnoreCase, "zh-CN")]
+    [GeneratedRegex(
+        @"\b(shutdown|reboot|poweroff|halt|init\s+[06])\b",
+        RegexOptions.IgnoreCase,
+        "zh-CN"
+    )]
     private static partial Regex ShutdownRegex();
 
     /// <summary>
