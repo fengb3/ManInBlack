@@ -14,12 +14,14 @@ public static class Sandbox
     /// </summary>
     public static SandboxBuilder Confine(string workingDirectory, string command)
     {
+        var home = Environment.GetEnvironmentVariable("HOME") ?? "/root";
         return new SandboxBuilder()
             .WithCommand("/bin/bash", "-c", command)
             .Unshare(Namespaces.User | Namespaces.Pid | Namespaces.Ipc | Namespaces.Uts)
             .UnshareCgroupTry()
             .BindReadOnly("/", "/")
             .Bind(workingDirectory, workingDirectory)
+            .TryBind($"{home}/.cache", $"{home}/.cache")
             .MountProc()
             .MountDev()
             .MountTmpfs("/tmp")

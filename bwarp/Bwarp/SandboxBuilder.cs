@@ -31,9 +31,7 @@ public sealed class SandboxBuilder
     private bool _newSession;
     private bool _asPid1;
     private string? _workingDirectory;
-#pragma warning disable CS0414
     private string? _argv0;
-#pragma warning restore CS0414
 
     private string _command = "";
     private readonly List<string> _arguments = [];
@@ -233,6 +231,12 @@ public sealed class SandboxBuilder
     public SandboxBuilder AsPid1()
     {
         _asPid1 = true;
+        return this;
+    }
+
+    public SandboxBuilder WithArgv0(string argv0)
+    {
+        _argv0 = argv0;
         return this;
     }
 
