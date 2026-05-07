@@ -41,12 +41,14 @@ public class AgentPipelineBuilder
     /// </summary>
     public Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> Build(IServiceProvider serviceProvider)
     {
-        // // 终点：调用底层 IChatClient
-        // Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> pipeline = context =>
-        //     _chatClient.GetStreamingResponseAsync(context.Messages, context.Options);
+        return Build(serviceProvider, serviceProvider.GetRequiredService<IChatClient>());
+    }
 
-        var chatClient = serviceProvider.GetRequiredService<IChatClient>();
-
+    /// <summary>
+    /// 构建管道，使用指定的 <see cref="IChatClient"/> 实例
+    /// </summary>
+    public Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> Build(IServiceProvider serviceProvider, IChatClient chatClient)
+    {
         // message 第0条为 system prompt，最后1条为 user input，中间为 assistant 和 tool 消息
         Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> pipeline =
             context => { return chatClient.GetStreamingResponseAsync(context.Messages, context.Options); };

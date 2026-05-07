@@ -58,7 +58,8 @@ builder.Services.AddSerilog(loggerConfig =>
         );
 });
 
-builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
+builder.Services.AddManInBlackFromConfiguration(builder.Configuration)
+    .AddBuiltInAgents();
 
 builder.Services.AddAutoRegisteredServices();
 

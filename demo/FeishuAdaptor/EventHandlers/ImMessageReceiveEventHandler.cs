@@ -6,6 +6,7 @@ using FeishuNetSdk.Im.Events;
 using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Agent;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
@@ -53,6 +54,7 @@ public partial class ImMessageReceiveEventHandler(
 [ServiceRegister.Singleton]
 public class AgentLauncher(
     IServiceProvider rootServiceProvider,
+    IAgentRegistry agentRegistry,
     AgentExecutionTracker executionTracker,
     ILogger<AgentLauncher> logger
 )
@@ -93,6 +95,11 @@ public class AgentLauncher(
         agentContext.SessionId =
             user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
 
+        // 从注册表查找 "general" Agent 定义作为 SystemPrompt 基础
+        var generalAgent = agentRegistry.Get("general")
+            ?? throw new InvalidOperationException("未找到 'general' Agent");
+
+        agentContext.SystemPrompt = generalAgent.Instructions;
         agentContext.SystemPrompt += $"""
             <system>
             你是运行在飞书中的智能 agent

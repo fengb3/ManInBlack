@@ -1,7 +1,8 @@
-using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Agent;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Abstraction.Tools;
+using ManInBlack.AI.Agent;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Services;
@@ -54,6 +55,10 @@ public static class DependencyInjection
 
             services.AddAutoRegisteredServices();
 
+            // 注册 Agent 工厂相关服务
+            services.AddSingleton<IAgentRegistry, AgentRegistry>();
+            services.AddScoped<IAgentFactory, AgentFactory>();
+
             // Linux 使用 Bwarp 沙盒执行，Windows/macOS 直接 Process.Start
             if (OperatingSystem.IsLinux())
                 services.AddScoped<IShellExecutor, BwarpShellExecutor>();
@@ -61,6 +66,31 @@ public static class DependencyInjection
                 services.AddScoped<IShellExecutor, ProcessShellExecutor>();
             services.AddToolExecutor();
             services.AddToolMiddlewares();
+            return services;
+        }
+
+        /// <summary>
+        /// 使用 Fluent API 注册一个 Agent 定义。
+        /// AgentDefinition 会以 Singleton 注册到 DI，并由 AgentRegistry 自动收集。
+        /// </summary>
+        public IServiceCollection AddAgent(string name, Action<AgentBuilder> configure)
+        {
+            var builder = new AgentBuilder(name);
+            configure(builder);
+            var definition = builder.Build();
+            services.AddSingleton(definition);
+            return services;
+        }
+
+        /// <summary>
+        /// 注册所有内置 Agent 定义（General、Coder、Shell、Analyst）
+        /// </summary>
+        public IServiceCollection AddBuiltInAgents(AgentModelOptions? model = null)
+        {
+            services.AddSingleton(BuiltInAgents.General(model));
+            services.AddSingleton(BuiltInAgents.Coder(model));
+            services.AddSingleton(BuiltInAgents.Shell(model));
+            services.AddSingleton(BuiltInAgents.Analyst(model));
             return services;
         }
 
@@ -89,6 +119,9 @@ public static class DependencyInjection
             var settings = new ManInBlackSettings();
             configuration.Bind(settings);
             var modelChoice = settings.ToModelChoice();
+
+            // 从配置加载 Agent 定义并注册到 DI，AgentRegistry 会自动收集
+            AgentConfigurationLoader.LoadFromConfiguration(services, settings);
 
             return services.AddManInBlack(opt =>
             {
