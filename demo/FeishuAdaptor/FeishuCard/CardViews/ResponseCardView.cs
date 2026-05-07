@@ -1,25 +1,33 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using FeishuAdaptor.FeishuCard.Cards;
 using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Tools;
 
 namespace FeishuAdaptor.FeishuCard.CardViews;
 
 [ServiceRegister.Transient]
 public partial class LlmReasoningViewModel : ViewModelBase
 {
-    [ObservableProperty] public partial string Reasoning { get; set; } = "\n";
+    [ObservableProperty]
+    public partial string Reasoning { get; set; } = "\n";
 }
 
 [ServiceRegister.Transient.As<CardView<LlmReasoningViewModel>>]
-public class ReasoningCardView(LlmReasoningViewModel viewModel, CardService cardService, CardUpdateScheduler scheduler)
-    : CardView<LlmReasoningViewModel>(viewModel, cardService, scheduler)
+public class ReasoningCardView(
+    LlmReasoningViewModel viewModel,
+    CardService cardService,
+    CardUpdateScheduler scheduler
+) : CardView<LlmReasoningViewModel>(viewModel, cardService, scheduler)
 {
     protected override void Define()
     {
         // Card.Config!.WidthMode = "300px";
 
         var reasoningMarkdown = BindMarkdown(vm => vm.Reasoning);
-        var panel = CollapsiblePanel(builder => { builder.Element(reasoningMarkdown); });
+        var panel = CollapsiblePanel(builder =>
+        {
+            builder.Element(reasoningMarkdown);
+        });
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {
@@ -36,12 +44,16 @@ public class ReasoningCardView(LlmReasoningViewModel viewModel, CardService card
 [ServiceRegister.Transient]
 public partial class LlmOutputViewModel : ViewModelBase
 {
-    [ObservableProperty] public partial string Output { get; set; } = "\n";
+    [ObservableProperty]
+    public partial string Output { get; set; } = "\n";
 }
 
 [ServiceRegister.Transient.As<CardView<LlmOutputViewModel>>]
-public class LlmOutputCardView(LlmOutputViewModel viewModel, CardService cardService, CardUpdateScheduler scheduler)
-    : CardView<LlmOutputViewModel>(viewModel, cardService, scheduler)
+public class LlmOutputCardView(
+    LlmOutputViewModel viewModel,
+    CardService cardService,
+    CardUpdateScheduler scheduler
+) : CardView<LlmOutputViewModel>(viewModel, cardService, scheduler)
 {
     protected override void Define()
     {
@@ -76,8 +88,8 @@ public partial class LlmToolExecutionViewModel : ViewModelBase
 public partial class ToolExecutionCardView(
     LlmToolExecutionViewModel viewModel,
     CardService cardService,
-    CardUpdateScheduler scheduler)
-    : CardView<LlmToolExecutionViewModel>(viewModel, cardService, scheduler)
+    CardUpdateScheduler scheduler
+) : CardView<LlmToolExecutionViewModel>(viewModel, cardService, scheduler)
 {
     private int _updateSequence;
     private const string PanelElementId = "toolPanel";
@@ -90,24 +102,24 @@ public partial class ToolExecutionCardView(
     private static readonly Dictionary<string, string> ToolDisplayNameMap = new()
     {
         // CommandLineTools
-        { "RunBash", "💻 执行命令" },
-        { "GetBackgroundTaskResult", "📥 获取后台任务结果" },
-        { "KillBackgroundTask", "🛑 终止后台任务" },
+        { nameof(CommandLineTools.RunBash), "💻 执行命令" },
+        { nameof(CommandLineTools.GetBackgroundTaskResult), "📥 获取后台任务结果" },
+        { nameof(CommandLineTools.KillBackgroundTask), "🛑 终止后台任务" },
         // FileTools
-        { "ReadFile", "📖 读取文件" },
-        { "WriteFile", "✍️ 写入文件" },
-        { "UpdateFile", "📝 更新文件" },
-        { "Glob", "🔎 搜索文件" },
-        { "Grep", "🔍 搜索内容" },
+        { nameof(FileTools.Read), "📖 读取文件" },
+        { nameof(FileTools.Write), "✍️ 写入文件" },
+        { nameof(FileTools.Edit), "📝 更新文件" },
+        { nameof(FileTools.Glob), "🔎 搜索文件" },
+        { nameof(FileTools.Grep), "🔍 搜索内容" },
         // SkillTools
-        { "LoadSkill", "🧠 加载技能" },
+        { nameof(SkillTools.LoadSkill), "🧠 加载技能" },
     };
 
     /// <summary>
     /// 根据工具方法名获取中文显示名，未映射时返回原始名称
     /// </summary>
-    private static string GetToolDisplayName(string? toolName)
-        => toolName is not null && ToolDisplayNameMap.TryGetValue(toolName, out var displayName)
+    private static string GetToolDisplayName(string? toolName) =>
+        toolName is not null && ToolDisplayNameMap.TryGetValue(toolName, out var displayName)
             ? displayName
             : toolName ?? "未知工具";
 
@@ -119,7 +131,13 @@ public partial class ToolExecutionCardView(
         var argsMarkdown = Markdown(ArgsMarkdownElementId);
         argsMarkdown.Content = "";
 
-        var panel = CollapsiblePanel(builder => { builder.Element(argsMarkdown); }, PanelElementId);
+        var panel = CollapsiblePanel(
+            builder =>
+            {
+                builder.Element(argsMarkdown);
+            },
+            PanelElementId
+        );
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {
@@ -135,7 +153,12 @@ public partial class ToolExecutionCardView(
     /// <summary>
     /// 更新卡片为"工具调用中"状态 — 更新标题为工具名，更新参数显示
     /// </summary>
-    public async Task UpdateForToolStartAsync(string toolName, string arguments, string description = "", CancellationToken ct = default)
+    public async Task UpdateForToolStartAsync(
+        string toolName,
+        string arguments,
+        string description = "",
+        CancellationToken ct = default
+    )
     {
         ViewModel.ToolName = toolName;
         ViewModel.Arguments = arguments;
@@ -150,7 +173,13 @@ public partial class ToolExecutionCardView(
         var argsMarkdown = Markdown(ArgsMarkdownElementId);
         argsMarkdown.Content = string.IsNullOrWhiteSpace(arguments) ? "无参数" : arguments;
 
-        var panel = CollapsiblePanel(builder => { builder.Element(argsMarkdown); }, PanelElementId);
+        var panel = CollapsiblePanel(
+            builder =>
+            {
+                builder.Element(argsMarkdown);
+            },
+            PanelElementId
+        );
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {
@@ -172,7 +201,11 @@ public partial class ToolExecutionCardView(
     /// <param name="result">工具返回结果</param>
     /// <param name="isError">工具执行是否失败</param>
     /// <param name="ct">取消令牌</param>
-    public async Task UpdateForToolResultAsync(string result, bool isError = false, CancellationToken ct = default)
+    public async Task UpdateForToolResultAsync(
+        string result,
+        bool isError = false,
+        CancellationToken ct = default
+    )
     {
         var displayName = GetToolDisplayName(ViewModel.ToolName);
         if (!string.IsNullOrWhiteSpace(ViewModel.Description))
@@ -181,17 +214,22 @@ public partial class ToolExecutionCardView(
         }
 
         var argsMarkdown = Markdown(ArgsMarkdownElementId);
-        argsMarkdown.Content = string.IsNullOrWhiteSpace(ViewModel.Arguments) ? "无参数" : ViewModel.Arguments;
+        argsMarkdown.Content = string.IsNullOrWhiteSpace(ViewModel.Arguments)
+            ? "无参数"
+            : ViewModel.Arguments;
 
         var resultMarkdown = Markdown(ResultMarkdownElementId);
         resultMarkdown.Content = string.IsNullOrWhiteSpace(result) ? "无返回结果" : result;
 
-        var panel = CollapsiblePanel(builder =>
-        {
-            builder.Element(argsMarkdown);
-            builder.Hr();
-            builder.Element(resultMarkdown);
-        }, PanelElementId);
+        var panel = CollapsiblePanel(
+            builder =>
+            {
+                builder.Element(argsMarkdown);
+                builder.Hr();
+                builder.Element(resultMarkdown);
+            },
+            PanelElementId
+        );
         panel.Expanded = false;
         panel.Header = new CollapsiblePanelHeader
         {

@@ -36,7 +36,7 @@ public static class DependencyInjection
             });
 
             services.AddScoped<AgentPipelineBuilder>();
-            services.AddTransient<AgentContext>();
+            services.AddScoped<AgentContext>();
             services.AddSingleton<AgentExecutionTracker>();
 
             services.AddHttpClient(string.Empty)
