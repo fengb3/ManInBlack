@@ -39,6 +39,7 @@ Read the corresponding doc before modifying a module:
 | Topic | Doc |
 |---|---|
 | Architecture, project layers, pipeline | [docs/architecture.md](docs/architecture.md) |
+| Agent factory, definition, lifecycle | [docs/agent-factory-guide.md](docs/agent-factory-guide.md) |
 | Middleware development & pipeline order | [docs/middleware-guide.md](docs/middleware-guide.md) |
 | Source generators & diagnostic rules | [docs/sourcegenerator-guide.md](docs/sourcegenerator-guide.md) |
 | Tool development & `[AiTool]` pattern | [docs/tools-guide.md](docs/tools-guide.md) |
