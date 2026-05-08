@@ -1,8 +1,9 @@
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Factory;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
-using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Factory;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
@@ -11,40 +12,33 @@ using Microsoft.Extensions.DependencyInjection;
 
 // 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
 var services = new ServiceCollection();
-services.AddManInBlackFromSettings();
-
+services.AddManInBlackFromSettings()
+    .AddAgent("assistant", preset => preset
+        .WithName("通用助手")
+        .WithDescription("一个可以执行系统命令的 AI 助手")
+        .WithInstruction("你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ")
+        .UsePipeline(AgentPipelineNames.Default));
 
 var rootSp = services.BuildServiceProvider();
 
 using var scope = rootSp.CreateScope();
-var       sp    = scope.ServiceProvider;
+var sp = scope.ServiceProvider;
 
 var userId = "console";
 
 var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
 var user = await userStorage.GetOrCreateUser(userId);
 
+var factory = sp.GetRequiredService<AgentFactory>();
+var agent = factory.Create("assistant", new AgentCreateOptions
+{
+    UserInput = args[0],
+    ParentId = userId,
+    ParentType = "Default",
+    SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId)
+});
 
-var agentContext = sp.GetRequiredService<AgentContext>();
-agentContext.AgentId    = Guid.NewGuid().ToString();
-agentContext.ParentId   = userId;
-agentContext.ParentType = "Default";
-agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
-
-
-// middle ware 顺序, 系统提示, 持久会话
-
-var pipeline = new AgentPipelineBuilder()
-    .UseDefault()
-    .Build(sp);
-
-
-agentContext.SystemPrompt = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
-agentContext.UserInput = args[0];
-
-
-
-var updates = pipeline(agentContext);
+var updates = agent.Pipeline(agent.Context);
 
 Console.WriteLine("=== ManInBlack Agent Console ===");
 Console.WriteLine();
@@ -108,7 +102,7 @@ await foreach (ChatResponseUpdate update in updates)
 
 Console.WriteLine();
 Console.WriteLine();
-var usage = agentContext.AccumulatedUsage;
+var usage = agent.Context.AccumulatedUsage;
 if (usage.InputTokenCount is not null || usage.OutputTokenCount is not null)
 {
     Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}, 缓存: {usage.CachedInputTokenCount}");
