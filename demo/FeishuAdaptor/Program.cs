@@ -2,7 +2,9 @@
 
 using System.Text.Json.Serialization;
 using FeishuAdaptor;
+using FeishuAdaptor.Middlewares;
 using ManInBlack.AI;
+using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Configuration;
 using Microsoft.Extensions.Http;
 using Serilog;
@@ -60,9 +62,21 @@ builder.Services.AddSerilog(loggerConfig =>
 
 builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
 
+// 注册飞书 Agent 定义
+builder.Services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "feishu-agent",
+    Instruction = "你是运行在飞书中的智能 agent",
+    PipelineName = "feishu"
+});
+
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
+
+// 注册飞书自定义管道（需在 Build 后获取 Factory 实例）
+var factory = app.Services.GetRequiredService<AgentFactory>();
+factory.RegisterPipeline("feishu", pipeline => pipeline.Use<FeishuCardMiddleware>().UseDefault());
 
 // 愿你健康, 开心, 美满, 幸福
 app.MapGet(

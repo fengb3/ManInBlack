@@ -1,15 +1,10 @@
 ﻿using System.Text.Json;
-using FeishuAdaptor.Helper;
-using FeishuAdaptor.Middlewares;
 using FeishuNetSdk;
 using FeishuNetSdk.Im.Events;
 using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
-using ManInBlack.AI.Abstraction.Middleware;
-using ManInBlack.AI.Abstraction.Storage;
-using ManInBlack.AI.Middlewares;
 
 namespace FeishuAdaptor.EventHandlers;
 
@@ -53,7 +48,7 @@ public partial class ImMessageReceiveEventHandler(
 [ServiceRegister.Singleton]
 public class AgentLauncher(
     IServiceProvider rootServiceProvider,
-    AgentExecutionTracker executionTracker,
+    AgentFactory factory,
     ILogger<AgentLauncher> logger
 )
 {
@@ -61,13 +56,8 @@ public class AgentLauncher(
     {
         var userId = input.Event!.Sender!.SenderId!.UserId!; // user id is unique over all application, can be used as parent id for agent context
 
-        // logger.LogInformation("{input}", JsonSerializer.Serialize(input));
-
         // 取消该用户正在运行的旧 Agent，注册新的 CancellationTokenSource
-        var cts = executionTracker.RegisterAndCancelExisting(userId);
-
-        using var scope = rootServiceProvider.CreateScope();
-        var sp = scope.ServiceProvider;
+        var cts = factory.RegisterAndCancelExisting(userId);
 
         logger.LogInformation(
             "Received message from user {userId}: {content}",
@@ -75,39 +65,29 @@ public class AgentLauncher(
             input.Event.Message?.Content
         );
 
-        var pipeline = new AgentPipelineBuilder()
-            .Use<FeishuCardMiddleware>()
-            .UseDefault()
-            .Build(sp);
-
-        // var sessionStorage = scope.ServiceProvider.GetRequiredService<ISessionStorage>();
-        var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
-        var user = await userStorage.GetOrCreateUser(userId);
-
-        var agentContext = sp.GetRequiredService<AgentContext>();
-        agentContext.CancellationToken = cts.Token;
-
-        agentContext.AgentId = Guid.NewGuid().ToString();
-        agentContext.ParentId = userId;
-        agentContext.ParentType = "feishu_user";
-        agentContext.SessionId =
-            user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
-
-        agentContext.SystemPrompt += $"""
-            <system>
-            你是运行在飞书中的智能 agent
-            你的面对的用户的 飞书 open id 是: {input.Event!.Sender!.SenderId!.OpenId!}
-            </system>
-            """;
-
-        var userLlmInput = await HandleMessage(sp, input, agentContext, cts.Token);
-
-        agentContext.UserInput = userLlmInput;
-
-        var updates = pipeline(agentContext);
+        // 处理消息内容（仍需 scope 解析飞书 API）
+        string userLlmInput;
+        using (var messageScope = rootServiceProvider.CreateScope())
+        {
+            userLlmInput = await HandleMessage(messageScope.ServiceProvider, input, cts.Token);
+        }
 
         try
         {
+            // 使用 Factory 运行 agent，通过 configure 回调注入动态 SystemPrompt
+            var openId = input.Event!.Sender!.SenderId!.OpenId!;
+            var updates = factory.RunAsync(
+                "feishu-agent",
+                userLlmInput,
+                userId,
+                "feishu_user",
+                ctx => ctx.SystemPrompt += $"""
+                    <system>
+                    你的面对的用户的 飞书 open id 是: {openId}
+                    </system>
+                    """,
+                cts.Token);
+
             await foreach (var _ in updates) { }
         }
         catch (OperationCanceledException)
@@ -125,21 +105,10 @@ public class AgentLauncher(
         }
         finally
         {
-            executionTracker.Release(userId, cts);
-            // 打印日志
+            factory.Release(userId, cts);
             logger.LogInformation(
-                "Finished processing message from user {userId} "
-                    + "Token usage for agent {AgentContextAgentId} with "
-                    + "InputTokenCount={inputTokenCount}, "
-                    + "TotalTokenCount={totalTokenCount}, "
-                    + "ReasoningTokenCount={reasoningTokenCount}, "
-                    + "CachedInputTokenCount={cachedInputTokenCount}",
-                userId,
-                agentContext.AgentId,
-                agentContext.AccumulatedUsage.InputTokenCount,
-                agentContext.AccumulatedUsage.TotalTokenCount,
-                agentContext.AccumulatedUsage.ReasoningTokenCount,
-                agentContext.AccumulatedUsage.CachedInputTokenCount
+                "Finished processing message from user {userId}",
+                userId
             );
         }
     }
@@ -147,7 +116,6 @@ public class AgentLauncher(
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
-        AgentContext context,
         CancellationToken ct = default
     )
     {

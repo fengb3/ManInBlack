@@ -1,8 +1,6 @@
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
-using ManInBlack.AI.Abstraction.Storage;
-using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.AI;
@@ -12,46 +10,21 @@ using Microsoft.Extensions.DependencyInjection;
 // 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
 var services = new ServiceCollection();
 services.AddManInBlackFromSettings();
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "console-agent",
+    Instruction = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。",
+    PipelineName = "default"
+});
 
 
 var rootSp = services.BuildServiceProvider();
 
-using var scope = rootSp.CreateScope();
-var       sp    = scope.ServiceProvider;
-
-var userId = "console";
-
-var userStorage = scope.ServiceProvider.GetRequiredService<IUserStorage>();
-var user = await userStorage.GetOrCreateUser(userId);
-
-
-var agentContext = sp.GetRequiredService<AgentContext>();
-agentContext.AgentId    = Guid.NewGuid().ToString();
-agentContext.ParentId   = userId;
-agentContext.ParentType = "Default";
-agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(userId);
-
-
-// middle ware 顺序, 系统提示, 持久会话
-
-var pipeline = new AgentPipelineBuilder()
-    .UseDefault()
-    .Build(sp);
-
-
-agentContext.SystemPrompt = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复. ";
-agentContext.UserInput = args[0];
-
-
-
-var updates = pipeline(agentContext);
-
 Console.WriteLine("=== ManInBlack Agent Console ===");
 Console.WriteLine();
 
-// register tool call
-
-var eventBus = sp.GetRequiredService<EventBus>();
+// 注册 EventBus 订阅
+var eventBus = rootSp.GetRequiredService<EventBus>();
 
 eventBus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
 {
@@ -67,8 +40,12 @@ eventBus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
     Console.ResetColor();
 });
 
-var last = "";
+// 通过 AgentFactory 运行 agent
+var factory = rootSp.GetRequiredService<AgentFactory>();
+AgentContext? capturedContext = null;
+var updates = factory.RunAsync("console-agent", args[0], "console", "Default", ctx => capturedContext = ctx);
 
+var last = "";
 
 await foreach (ChatResponseUpdate update in updates)
 {
@@ -108,8 +85,8 @@ await foreach (ChatResponseUpdate update in updates)
 
 Console.WriteLine();
 Console.WriteLine();
-var usage = agentContext.AccumulatedUsage;
-if (usage.InputTokenCount is not null || usage.OutputTokenCount is not null)
+var usage = capturedContext?.AccumulatedUsage;
+if (usage is not null && (usage.InputTokenCount is not null || usage.OutputTokenCount is not null))
 {
     Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}, 缓存: {usage.CachedInputTokenCount}");
 }
