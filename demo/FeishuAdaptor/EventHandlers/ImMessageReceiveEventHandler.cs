@@ -65,15 +65,15 @@ public class AgentLauncher(
             input.Event.Message?.Content
         );
 
-        // 处理消息内容（仍需 scope 解析飞书 API）
-        string userLlmInput;
-        using (var messageScope = rootServiceProvider.CreateScope())
-        {
-            userLlmInput = await HandleMessage(messageScope.ServiceProvider, input, cts.Token);
-        }
-
         try
         {
+            // 处理消息内容（仍需 scope 解析飞书 API）
+            string userLlmInput;
+            using (var messageScope = rootServiceProvider.CreateScope())
+            {
+                userLlmInput = await HandleMessage(messageScope.ServiceProvider, input, cts.Token);
+            }
+
             // 使用 Factory 运行 agent，通过 configure 回调注入动态 SystemPrompt
             var openId = input.Event!.Sender!.SenderId!.OpenId!;
             var updates = factory.RunAsync(

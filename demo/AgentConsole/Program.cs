@@ -23,27 +23,31 @@ var rootSp = services.BuildServiceProvider();
 Console.WriteLine("=== ManInBlack Agent Console ===");
 Console.WriteLine();
 
-// 注册 EventBus 订阅
-var eventBus = rootSp.GetRequiredService<EventBus>();
-
-eventBus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
-{
-    Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"\n[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
-    Console.ResetColor();
-});
-
-eventBus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
-{
-    Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
-    Console.ResetColor();
-});
-
 // 通过 AgentFactory 运行 agent
 var factory = rootSp.GetRequiredService<AgentFactory>();
 AgentContext? capturedContext = null;
-var updates = factory.RunAsync("console-agent", args[0], "console", "Default", ctx => capturedContext = ctx);
+IDisposable? toolExecutingSub = null;
+IDisposable? toolExecutedSub = null;
+
+var updates = factory.RunAsync("console-agent", args[0], "console", "Default", ctx =>
+{
+    capturedContext = ctx;
+
+    // 在 Factory 的 scope 内订阅 EventBus，确保能收到事件
+    var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
+    toolExecutingSub = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"\n[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
+        Console.ResetColor();
+    });
+    toolExecutedSub = bus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
+        Console.ResetColor();
+    });
+});
 
 var last = "";
 
@@ -82,6 +86,10 @@ await foreach (ChatResponseUpdate update in updates)
         }
     }
 }
+
+// 清理 EventBus 订阅
+toolExecutingSub?.Dispose();
+toolExecutedSub?.Dispose();
 
 Console.WriteLine();
 Console.WriteLine();
