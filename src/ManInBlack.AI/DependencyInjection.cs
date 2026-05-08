@@ -1,8 +1,10 @@
 using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Factory;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Configuration;
+using ManInBlack.AI.Factory;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
@@ -95,6 +97,32 @@ public static class DependencyInjection
                 opt.ModelChoice = modelChoice;
                 configure?.Invoke(opt);
             });
+        }
+
+        /// <summary>
+        /// 注册一个 Agent 预设，可通过 AgentFactory 按名称创建对应的 Agent 实例
+        /// </summary>
+        /// <param name="presetName">预设名称，用于后续通过 AgentFactory.Create() 引用</param>
+        /// <param name="configure">预设配置委托</param>
+        public IServiceCollection AddAgent(string presetName, Action<AgentPresetBuilder> configure)
+        {
+            var builder = new AgentPresetBuilder();
+            configure(builder);
+            var preset = builder.Build();
+
+            // 确保预设字典和工厂已注册
+            if (!services.Any(s => s.ServiceType == typeof(IDictionary<string, AgentPreset>)))
+            {
+                services.AddSingleton<IDictionary<string, AgentPreset>>(new Dictionary<string, AgentPreset>());
+                services.AddScoped<AgentFactory>();
+            }
+
+            // 通过替换 Singleton 实例来添加预设
+            var existingDescriptor = services.First(s => s.ServiceType == typeof(IDictionary<string, AgentPreset>));
+            var existingDict = (Dictionary<string, AgentPreset>)existingDescriptor.ImplementationInstance!;
+            existingDict[presetName] = preset;
+
+            return services;
         }
     }
 }
