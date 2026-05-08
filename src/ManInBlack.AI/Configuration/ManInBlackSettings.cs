@@ -12,6 +12,11 @@ public class ManInBlackSettings
     /// 全局钩子配置列表，对所有用户生效。脚本路径相对于 {RootPath}/hooks/ 目录。
     /// </summary>
     public List<HookSettings> Hooks { get; set; } = [];
+
+    /// <summary>
+    /// 工具描述配置列表，用于覆盖工具的默认描述和参数描述
+    /// </summary>
+    public List<ToolDescriptionSetting>? ToolDescriptions { get; set; }
 }
 
 public class FeishuSettings

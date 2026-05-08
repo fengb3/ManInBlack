@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using ManInBlack.AI.Abstraction.Tools;
 
 namespace ManInBlack.AI.Abstraction.Middleware;
 
@@ -36,6 +37,12 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// 系统提示词
     /// </summary>
     public string SystemPrompt { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// 每次请求的工具描述覆盖列表，用于在运行时动态修改工具的描述、参数描述等。
+    /// 在管道执行前由前置中间件或调用方设置，ToolPromptMiddleware 会读取并应用。
+    /// </summary>
+    public List<ToolDescriptionOverride>? ToolDescriptionOverrides { get; set; }
     
     /// <summary>
     /// 本轮用户输入的原始文本，供中间件参考，但不一定会直接发送给模型
