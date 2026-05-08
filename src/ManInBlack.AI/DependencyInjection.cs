@@ -37,7 +37,7 @@ public static class DependencyInjection
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
-            services.AddSingleton<AgentExecutionTracker>();
+            services.AddSingleton<AgentFactory>();
 
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() =>
@@ -72,6 +72,15 @@ public static class DependencyInjection
         {
             var configuration = ManInBlackConfigurationBuilder.BuildConfiguration();
             return services.AddManInBlackFromConfiguration(configuration, configure);
+        }
+
+        /// <summary>
+        /// 注册 Agent 定义到 DI 容器。AgentFactory 构造时会自动收集并注册所有定义。
+        /// </summary>
+        public IServiceCollection AddAgentDefinition(AgentDefinition definition)
+        {
+            services.AddSingleton(definition);
+            return services;
         }
 
         /// <summary>
