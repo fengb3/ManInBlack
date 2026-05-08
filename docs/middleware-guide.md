@@ -37,10 +37,11 @@ SavePersistence ← UserInput ← ContextCompress ← Tools ← AgentLoop ← IC
 | `SystemPrompt`            | `string`                      | 系统提示词，在 `SystemPromptInjectionMiddleware` 中拼入 Messages |
 | `UserInput`               | `string`                      | 本轮用户输入原文                                                 |
 | `Items`                   | `IDictionary<string, object>` | 中间件间共享状态字典                                             |
-| `ServiceProvider`         | `IServiceProvider`            | DI 容器，用于解析服务                                            |
+| `ServiceProvider`        | `IServiceProvider`            | DI 容器，用于解析服务                                            |
 | `AgentId`                 | `string`                      | Agent 实例标识                                                   |
 | `ParentId` / `ParentType` | `string`                      | 父级标识和类型（用户或另一个 Agent）                             |
 | `AccumulatedUsage`        | `UsageDetails`                | 累积的 Token 用量                                                |
+| `ToolDescriptionOverrides` | `List<ToolDescriptionOverride>?` | 每次请求的工具描述覆盖列表，ToolPromptMiddleware 读取并应用 |
 | `CancellationToken`       | `CancellationToken`           | 取消令牌                                                         |
 
 ---
@@ -332,7 +333,8 @@ builder.Use(new MyStatelessMiddleware());
 | 9   | `ContextCompressMiddleware`       | 压缩旧的工具结果                   |
 | 10  | `CommandToolMiddleware`           | 注入命令行工具声明                 |
 | 11  | `FileToolMiddleware`              | 注入文件操作工具声明               |
-| 12  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后）         |
+| 12  | `ToolPromptMiddleware`            | 在所有工具声明注入之后，动态覆盖工具描述、参数描述和返回值描述 |
+| 13  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后）         |
 
 ### 顺序规则
 
@@ -370,3 +372,4 @@ if (context.Items.TryGetValue("my_key", out var value))
 4. **DI 生命周期**：所有中间件注册为 `Scoped`，每次请求创建新实例。
 5. **线程安全**：`AgentContext` 不是线程安全的，不要在中间件内启动并发操作访问它。
 6. **`yield break` 终止管道**：不调用 `next()` 直接 `yield break` 可以短路管道，但要确保消费者能正确处理提前结束的情况。
+7. **幂等性**：`AgentLoopMiddleware` 会在循环中多次触发管道，你的中间件如果修改 `context.Options.Tools`，必须确保幂等（例如用 `context.Items` 做 sentinel）。

@@ -19,17 +19,36 @@
     "AppSecret": "",
     "VerificationToken": "",
     "ApiBaseUrl": "https://open.feishu.cn/"
-  }
+  },
+  "ToolDescriptions": [
+    {
+      "ToolName": "GetWeather",
+      "Description": "获取指定城市的天气信息",
+      "ParameterOverrides": {
+        "city": "城市名称（如：北京、上海）"
+      },
+      "ReturnsDescription": "返回天气信息的 JSON",
+      "AdditionalParameters": [
+        {
+          "Name": "unit",
+          "Type": "string",
+          "Description": "温度单位（celsius/fahrenheit）",
+          "Required": false
+        }
+      ]
+    }
+  ]
 }
 ```
 
-| 字段        | 必填 | 说明                                                 |
-| ----------- | ---- | ---------------------------------------------------- |
-| `Provider`  | 是   | 提供商名称，见 [Provider 配置指南](./provider-guide.md) |
-| `ApiKey`    | 是   | API 密钥，启动时校验非空                              |
-| `BaseUrl`   | 否   | 自定义地址，省略则使用 Provider 默认值                |
-| `ModelId`   | 是   | 模型标识符，如 `gpt-4o`、`deepseek-chat`              |
-| `Feishu`    | 否   | 飞书集成配置，仅 FeishuAdaptor 需要                   |
+| 字段              | 必填 | 说明                                                 |
+| ----------------- | ---- | ---------------------------------------------------- |
+| `Provider`        | 是   | 提供商名称，见 [Provider 配置指南](./provider-guide.md) |
+| `ApiKey`          | 是   | API 密钥，启动时校验非空                              |
+| `BaseUrl`         | 否   | 自定义地址，省略则使用 Provider 默认值                |
+| `ModelId`         | 是   | 模型标识符，如 `gpt-4o`、`deepseek-chat`              |
+| `Feishu`          | 否   | 飞书集成配置，仅 FeishuAdaptor 需要                   |
+| `ToolDescriptions` | 否   | 工具描述覆盖列表，支持运行时动态修改工具的描述、参数描述和返回值描述。详见 [工具开发指北](./tools-guide.md) |
 
 ---
 
@@ -151,6 +170,12 @@ public double Temperature { get; set; } = 1.0;
 ```
 
 2. 如需校验，在 `ValidateManInBlackSettings` 中添加规则。
+
+3. 复杂配置：列表嵌套对象
+```csharp
+// 复杂配置：列表嵌套对象
+public List<ToolDescriptionSetting>? ToolDescriptions { get; set; }
+```
 
 完成。老 settings.json 无需迁移——缺少的字段走 C# 默认值，多余的字段自动忽略。
 
