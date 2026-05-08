@@ -103,11 +103,13 @@ public class AgentFactory
     }
 
     /// <summary>
-    /// 释放该用户的跟踪记录。仅当字典中存储的 CTS 与传入的是同一实例时才移除，防止误删新 Agent 的 CTS
+    /// 释放该用户的跟踪记录并 Dispose CTS。仅当字典中存储的 CTS 与传入的是同一实例时才移除，防止误删新 Agent 的 CTS。
+    /// 无论 TryRemove 是否成功都会 Dispose CTS，避免资源泄漏。
     /// </summary>
     public void Release(string userId, CancellationTokenSource cts)
     {
         _tracking.TryRemove(new KeyValuePair<string, CancellationTokenSource>(userId, cts));
+        cts.Dispose();
     }
 
     /// <summary>
@@ -133,14 +135,14 @@ public class AgentFactory
 
         // 2. 创建 DI scope（在 finally 中释放）
         var scope = _scopeFactory.CreateScope();
-        var sp = scope.ServiceProvider;
-
-        // 3. 解析依赖服务
-        var userStorage = sp.GetRequiredService<IUserStorage>();
-        var agentContext = sp.GetRequiredService<AgentContext>();
 
         try
         {
+            var sp = scope.ServiceProvider;
+
+            // 3. 解析依赖服务
+            var userStorage = sp.GetRequiredService<IUserStorage>();
+            var agentContext = sp.GetRequiredService<AgentContext>();
             // 4. 获取或创建用户
             var user = await userStorage.GetOrCreateUser(parentId);
 
