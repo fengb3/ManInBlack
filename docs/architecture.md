@@ -43,10 +43,11 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | ------------------ | -------------------------------------------------------- |
 | `ChatClient/`      | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini）       |
 | `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
-| `Middlewares/`     | 12 个中间件 + AgentPipelineBuilder + AgentExecutionTracker |
+| `Middlewares/`     | 12 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools                  |
 | `ToolCallFilters/` | LoggingFilter、BroadCastingFilter、LargeResultFilter    |
 | `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
+| *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 
 此外还包含所有 Provider 子类（OpenAIProvider、AnthropicProvider 等）、`ModelChoice`、`ChatClientProviderExtensions`，以及 DI 注册入口。
 
@@ -186,7 +187,7 @@ CompatibleWith: "Gemini"    → GeminiCompatibleChatClient     (SSE + API Key in
 AddManInBlack(configure)
     ├── AgentPipelineBuilder        (Scoped)
     ├── AgentContext                (Scoped)
-    ├── AgentExecutionTracker       (Singleton)
+    ├── AgentFactory                (Singleton)
     ├── IChatClient                 (Singleton, via CreateChatClient)
     ├── HttpClient                  (PooledConnectionLifetime: 2min)
     ├── AddAutoRegisteredServices() [源生成]
@@ -203,6 +204,34 @@ AddManInBlackFromConfiguration(IConfiguration, configure?)
     ├── IValidateOptions<ManInBlackSettings> 校验 ApiKey
     └── 调用 AddManInBlack
 ```
+
+---
+
+## Agent 工厂
+
+`AgentFactory` 是框架的核心入口，负责管理 Agent 的完整生命周期：
+
+- **定义注册** — `AgentDefinition` POCO 封装 Agent 名称、描述、指令和关联管道
+- **管道配置** — 通过委托 `Func<AgentPipelineBuilder, AgentPipelineBuilder>` 注册命名管道
+- **执行追踪** — 同用户并发请求自动取消旧 Agent
+- **流式运行** — `RunAsync()` 自动创建 DI scope、解析依赖、构建管道、执行并 yield 结果
+
+```csharp
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "my-agent",
+    Instruction = "你是一个AI助手",
+    PipelineName = "default"
+});
+
+var factory = sp.GetRequiredService<AgentFactory>();
+await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "User"))
+{
+    // 处理流式响应
+}
+```
+
+详见 [Agent 工厂指南](./agent-factory-guide.md)。
 
 ---
 
