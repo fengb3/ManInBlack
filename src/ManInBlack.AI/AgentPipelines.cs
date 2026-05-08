@@ -19,6 +19,7 @@ public static class AgentPipelineBuilderExtensions
             .Use<ContextCompressMiddleware>()
             .Use<CommandLineToolsMiddleware>()
             .Use<FileToolsMiddleware>()
+            .Use<ToolPromptMiddleware>()
             .UseSimple(); 
     
     
