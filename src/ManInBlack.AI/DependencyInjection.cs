@@ -111,16 +111,24 @@ public static class DependencyInjection
             var preset = builder.Build();
 
             // 确保预设字典和工厂已注册
-            if (!services.Any(s => s.ServiceType == typeof(IDictionary<string, AgentPreset>)))
+            var dictDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(IDictionary<string, AgentPreset>));
+            if (dictDescriptor is null)
             {
-                services.AddSingleton<IDictionary<string, AgentPreset>>(new Dictionary<string, AgentPreset>());
+                var dict = new Dictionary<string, AgentPreset>();
+                services.AddSingleton<IDictionary<string, AgentPreset>>(dict);
                 services.AddScoped<AgentFactory>();
+                dict[presetName] = preset;
             }
+            else
+            {
+                // 安全获取已有的 Singleton 实例
+                if (dictDescriptor.ImplementationInstance is not IDictionary<string, AgentPreset> existingDict)
+                    throw new InvalidOperationException(
+                        "IDictionary<string, AgentPreset> 已被注册，但实现方式不受 AddAgent 支持。" +
+                        "请确保使用 ImplementationInstance 方式注册，或移除已有的注册。");
 
-            // 通过替换 Singleton 实例来添加预设
-            var existingDescriptor = services.First(s => s.ServiceType == typeof(IDictionary<string, AgentPreset>));
-            var existingDict = (Dictionary<string, AgentPreset>)existingDescriptor.ImplementationInstance!;
-            existingDict[presetName] = preset;
+                existingDict[presetName] = preset;
+            }
 
             return services;
         }

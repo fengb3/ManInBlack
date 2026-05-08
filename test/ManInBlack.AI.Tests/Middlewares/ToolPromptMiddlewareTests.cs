@@ -19,7 +19,13 @@ public class FakeOptionsMonitor<T> : IOptionsMonitor<T>
     public T CurrentValue { get; private set; }
     public FakeOptionsMonitor(T value) => CurrentValue = value;
     public T Get(string? name) => CurrentValue;
-    public IDisposable OnChange(Action<T, string?> listener) => null!;
+    public IDisposable OnChange(Action<T, string?> listener) => EmptyDisposable.Instance;
+}
+
+file class EmptyDisposable : IDisposable
+{
+    public static readonly EmptyDisposable Instance = new();
+    public void Dispose() { }
 }
 
 public class ToolPromptMiddlewareTests

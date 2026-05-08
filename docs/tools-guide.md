@@ -156,7 +156,7 @@ agentContext.ToolDescriptionOverrides = new List<ToolDescriptionOverride>
 
 | 属性 | 类型 | 说明 | 必需 |
 |------|------|------|------|
-| `ToolName` | string | 工具全名（格式：类名.方法名） | 是 |
+| `ToolName` | string | 工具名称（默认为方法名；跨类同名方法冲突时格式为 `类名.方法名`） | 是 |
 | `Description` | string? | 新的工具描述 | 否 |
 | `ParameterOverrides` | Dictionary<string, string>? | 参数描述覆盖 | 否 |
 | `ReturnsDescription` | string? | 新的返回值描述 | 否 |

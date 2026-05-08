@@ -33,7 +33,6 @@ public class ToolPromptMiddleware(IOptionsMonitor<ManInBlackSettings>? optionsMo
                 yield return update;
             yield break;
         }
-        context.Items[AppliedKey] = true;
 
         // 收集所有 override（config 层 + per-request 层）
         var overrides = BuildOverrides(context);
@@ -48,6 +47,9 @@ public class ToolPromptMiddleware(IOptionsMonitor<ManInBlackSettings>? optionsMo
 
         // 应用覆盖到工具列表
         ApplyOverrides(context.Options?.Tools, overrides);
+
+        // 应用成功后标记幂等，确保只执行一次
+        context.Items[AppliedKey] = true;
 
         await foreach (var update in next().WithCancellation(ct))
             yield return update;
@@ -69,12 +71,27 @@ public class ToolPromptMiddleware(IOptionsMonitor<ManInBlackSettings>? optionsMo
             }
         }
 
-        // 请求层覆盖（覆盖配置层）
+        // 请求层覆盖（按字段覆盖配置层，未设置的字段保留配置层的值）
         if (context.ToolDescriptionOverrides is not null)
         {
             foreach (var ov in context.ToolDescriptionOverrides)
             {
-                overrides[ov.ToolName] = ov;
+                if (overrides.TryGetValue(ov.ToolName, out var existing))
+                {
+                    // 按字段合并：请求层仅覆盖它设置的字段
+                    overrides[ov.ToolName] = new ToolDescriptionOverride
+                    {
+                        ToolName = ov.ToolName,
+                        Description = ov.Description ?? existing.Description,
+                        ParameterOverrides = ov.ParameterOverrides ?? existing.ParameterOverrides,
+                        ReturnsDescription = ov.ReturnsDescription ?? existing.ReturnsDescription,
+                        AdditionalParameters = ov.AdditionalParameters ?? existing.AdditionalParameters,
+                    };
+                }
+                else
+                {
+                    overrides[ov.ToolName] = ov;
+                }
             }
         }
 
@@ -171,7 +188,7 @@ public class ToolPromptMiddleware(IOptionsMonitor<ManInBlackSettings>? optionsMo
 
                 properties[param.Name] = paramObj;
 
-                if (param.Required)
+                if (param.Required && !required.Any(r => r?.GetValue<string>() == param.Name))
                     required.Add(param.Name);
             }
         }
