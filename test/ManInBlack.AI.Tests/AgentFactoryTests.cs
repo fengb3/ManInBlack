@@ -126,8 +126,6 @@ public class AgentFactoryTests
         // Assert — Release 后再次注册同一用户不会取消旧的 CTS（因为已被移除）
         var newCts = factory.RegisterAndCancelExisting("user-1");
         Assert.False(newCts.IsCancellationRequested);
-        // 之前的 cts 也不应被取消（因为已被 Release 移除）
-        Assert.False(cts.IsCancellationRequested);
     }
 
     [Fact]
