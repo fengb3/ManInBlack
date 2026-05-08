@@ -63,8 +63,8 @@ dotnet add reference <path>/src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.Sour
 
 ```csharp
 using ManInBlack.AI;
-using ManInBlack.AI.Abstraction.Middleware;
-using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -72,27 +72,43 @@ using Microsoft.Extensions.DependencyInjection;
 var services = new ServiceCollection();
 services.AddManInBlackFromSettings();
 
-// 配置 Agent
+// 注册 Agent 定义
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "my-agent",
+    Instruction = "你是一个有帮助的AI助手。请用中文回复。",
+    PipelineName = "default"
+});
+
 var rootSp = services.BuildServiceProvider();
-using var scope = rootSp.CreateScope();
-var sp = scope.ServiceProvider;
 
-var ctx = sp.GetRequiredService<AgentContext>();
-ctx.AgentId    = Guid.NewGuid().ToString();
-ctx.ParentId   = "my-user";
-ctx.ParentType = "User";
+// 通过 AgentFactory 运行 agent
+var factory = rootSp.GetRequiredService<AgentFactory>();
+AgentContext? capturedContext = null;
+IDisposable? toolExecutingSub = null;
+IDisposable? toolExecutedSub = null;
 
-// 构建管道
-var pipeline = new AgentPipelineBuilder()
-    .UseDefault()
-    .Build(sp);
-
-// 发起对话
-ctx.SystemPrompt = "你是一个有帮助的AI助手。请用中文回复。";
-ctx.UserInput    = "帮我解释一下什么是依赖注入";
+var updates = factory.RunAsync("my-agent", "帮我解释一下什么是依赖注入", "my-user", "User", ctx =>
+{
+    capturedContext = ctx;
+    // 在 Factory 的 scope 内订阅 EventBus，查看工具调用过程
+    var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
+    toolExecutingSub = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[Tool Call] {@event.ToolName}");
+        Console.ResetColor();
+    });
+    toolExecutedSub = bus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[Tool Result] {@event.Result}");
+        Console.ResetColor();
+    });
+});
 
 // 流式输出
-await foreach (var update in pipeline(ctx))
+await foreach (var update in updates)
 {
     foreach (var content in update.Contents)
     {
@@ -111,9 +127,14 @@ await foreach (var update in pipeline(ctx))
     }
 }
 
+// 清理订阅
+toolExecutingSub?.Dispose();
+toolExecutedSub?.Dispose();
+
 // 查看用量
-var usage = ctx.AccumulatedUsage;
-Console.WriteLine($"\nToken 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}");
+var usage = capturedContext?.AccumulatedUsage;
+if (usage is not null)
+    Console.WriteLine($"\nToken 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}");
 ```
 
 ---
@@ -161,26 +182,33 @@ services.AddManInBlack(opt =>
 
 ## 使用最小管道
 
-`UseDefault()` 包含完整管道（持久化、Skill、压缩等）。如果只需要最小管道：
+`UseDefault()` 包含完整管道（持久化、Skill、压缩等）。如果只需要最小管道，可以在 `AgentDefinition` 中指定 `PipelineName = "simple"`：
 
 ```csharp
-var pipeline = new AgentPipelineBuilder()
-    .UseSimple()  // Logging → Enrich → SystemPrompt → UserInput → Retry → AgentLoop
-    .Build(sp);
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "simple-agent",
+    Instruction = "你是一个AI助手",
+    PipelineName = "simple"  // Logging → Enrich → SystemPrompt → UserInput → Retry → AgentLoop
+});
 ```
 
-`UseSimple()` 不包含持久化和压缩，更适合一次性对话。
+`simple` 管道不包含持久化和压缩，更适合一次性对话。
+
+也可以注册自定义管道：
+
+```csharp
+var factory = sp.GetRequiredService<AgentFactory>();
+factory.RegisterPipeline("my-pipeline", builder => builder
+    .Use<MyCustomMiddleware>()
+    .UseSimple());
+```
 
 ---
 
 ## 进阶：加载历史会话
 
-管道中 `ReadPersistenceMiddleware` 自动从 `ISessionStorage` 恢复历史消息。你只需要设置正确的 `SessionId` 和 `ParentId`：
-
-```csharp
-ctx.SessionId = "my-user_1713456789";  // 指定会话 ID，从该会话恢复
-ctx.ParentId  = "my-user";
-```
+`AgentFactory` 内部自动管理会话生命周期。`SessionId` 由 `IUserStorage` 自动解析，无需手动设置。`default` 管道中的 `ReadPersistenceMiddleware` 会自动从 `ISessionStorage` 恢复历史消息。
 
 持久化基于实现了 `IUserStorage` 的服务。默认实现 `FileUserStorage` 将数据保存在 `~/.man-in-black/`。
 
@@ -188,6 +216,7 @@ ctx.ParentId  = "my-user";
 
 ## 下一步
 
+- 查看 [Agent 工厂指南](./agent-factory-guide.md) 了解 Agent 定义、管道注册和完整生命周期管理
 - 查看 [配置指南](./configuration-guide.md) 了解配置系统、IOptions 和文件变更跟踪
 - 了解 [架构概览](./architecture.md) 理解洋葱模型
 - 查看 [Middleware 开发指北](./middleware-guide.md) 学习编写自定义中间件
