@@ -16,20 +16,10 @@ namespace ManInBlack.AI.Middlewares;
 /// 支持两层覆盖：配置层（IOptionsMonitor）和请求层（AgentContext.ToolDescriptionOverrides），请求层优先。
 /// </summary>
 [ServiceRegister.Scoped]
-public class ToolPromptMiddleware : AgentMiddleware
+public class ToolPromptMiddleware(IOptionsMonitor<ManInBlackSettings>? optionsMonitor,
+    ILogger<ToolPromptMiddleware> logger) : AgentMiddleware
 {
     private const string AppliedKey = "ToolPromptMiddleware.Applied";
-
-    private readonly IOptionsMonitor<ManInBlackSettings>? _optionsMonitor;
-    private readonly ILogger<ToolPromptMiddleware> _logger;
-
-    public ToolPromptMiddleware(
-        IOptionsMonitor<ManInBlackSettings>? optionsMonitor,
-        ILogger<ToolPromptMiddleware> logger)
-    {
-        _optionsMonitor = optionsMonitor;
-        _logger = logger;
-    }
 
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
         AgentContext context,
@@ -71,9 +61,9 @@ public class ToolPromptMiddleware : AgentMiddleware
         var overrides = new Dictionary<string, ToolDescriptionOverride>();
 
         // 配置层覆盖（基础层）
-        if (_optionsMonitor is not null)
+        if (optionsMonitor is not null)
         {
-            foreach (var setting in _optionsMonitor.CurrentValue.ToolDescriptions ?? [])
+            foreach (var setting in optionsMonitor.CurrentValue.ToolDescriptions ?? [])
             {
                 overrides[setting.ToolName] = MapSettingToOverride(setting);
             }
@@ -105,7 +95,7 @@ public class ToolPromptMiddleware : AgentMiddleware
             if (tools[i] is not AIFunctionDeclaration decl) continue;
             if (!overrides.TryGetValue(decl.Name, out var ov)) continue;
 
-            _logger.LogDebug("正在覆盖工具 {ToolName} 的描述", decl.Name);
+            logger.LogDebug("正在覆盖工具 {ToolName} 的描述", decl.Name);
             tools[i] = CreateOverriddenDeclaration(decl, ov);
         }
     }
