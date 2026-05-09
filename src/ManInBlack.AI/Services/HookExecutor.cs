@@ -48,7 +48,7 @@ public class HookExecutor(
     {
         var allHooks = _cachedHooks ??= LoadAllHooks();
 
-        logger.LogInformation("[Hook] 执行挂载点 {HookPoint}，已加载 {Total} 个钩子（全局 {Global}，用户 {User}），工作空间：{Workspace}",
+        logger.LogDebug("[Hook] 执行挂载点 {HookPoint}，已加载 {Total} 个钩子（全局 {Global}，用户 {User}），工作空间：{Workspace}",
             point, allHooks.Count,
             allHooks.Count(h => h.IsGlobal), allHooks.Count(h => !h.IsGlobal),
             userWorkspace.WorkingDirectory);
@@ -62,11 +62,11 @@ public class HookExecutor(
 
         if (matched.Count == 0)
         {
-            logger.LogInformation("[Hook] 挂载点 {HookPoint} 无匹配钩子，跳过", point);
+            logger.LogDebug("[Hook] 挂载点 {HookPoint} 无匹配钩子，跳过", point);
             return Task.FromResult(new HookResult { Succeeded = true });
         }
 
-        logger.LogInformation("[Hook] 挂载点 {HookPoint} 匹配 {Count} 个钩子：{Names}",
+        logger.LogDebug("[Hook] 挂载点 {HookPoint} 匹配 {Count} 个钩子：{Names}",
             point, matched.Count, string.Join(", ", matched.Select(h => h.Hook.Name)));
 
         var injectedTexts = new List<string>();
@@ -77,17 +77,20 @@ public class HookExecutor(
             ct.ThrowIfCancellationRequested();
 
             var scriptCommand = ResolveScriptCommand(hook, isGlobal, out var workingDir);
-            logger.LogInformation("[Hook] 执行钩子 {Name}，命令：{Command}，工作目录：{WorkingDir}",
+            logger.LogDebug("[Hook] 执行钩子 {Name}，命令：{Command}，工作目录：{WorkingDir}",
                 hook.Name, scriptCommand, workingDir);
 
             var result = ExecuteSingleScript(scriptCommand, workingDir, hook, context);
 
-            logger.LogInformation("[Hook] 钩子 {Name} 返回：IsBlocked={IsBlocked}, InjectedText={HasText}, Succeeded={Succeeded}",
+            logger.LogDebug("[Hook] 钩子 {Name} 返回：IsBlocked={IsBlocked}, InjectedText={HasText}, Succeeded={Succeeded}",
                 hook.Name, result.IsBlocked, !string.IsNullOrEmpty(result.InjectedText), result.Succeeded);
 
             // 第一个 IsBlocked 短路
             if (result.IsBlocked)
             {
+                logger.LogInformation("[Hook] 挂载点 {HookPoint} 被钩子 {Name} 阻断：{Reason}",
+                    point, hook.Name, result.BlockReason);
+
                 return Task.FromResult(new HookResult
                 {
                     IsBlocked = true,

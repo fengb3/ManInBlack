@@ -27,6 +27,8 @@ Hook 通过两个集成层接入框架：
 
 ## 挂载点一览
 
+> **注意：** Hook 通过 EventBus 间接触发。`AgentLoopMiddleware` 发布 `AfterLlmCallEvent` 和 `AllToolsCompletedEvent`，`HookMiddleware` 订阅这些事件并执行对应的 Hook 脚本。`BeforeLlmCall` 和 `AgentCompleted` 由 `HookMiddleware` 直接发布；`BeforeToolExecute` 和 `AfterToolExecute` 由 `AgentLifecycleFilter` 发布和订阅。
+
 | 挂载点                 | 触发时机                           | 实现者                   | 可执行的操作                |
 |---------------------|--------------------------------|-----------------------|-----------------------|
 | `BeforeLlmCall`     | 首次 LLM 调用前                     | `HookMiddleware`      | 注入 SystemPrompt、修改上下文 |
@@ -375,3 +377,4 @@ AgentLifecycleFilter           ← BeforeToolExecute → AfterToolExecute
 - **全局钩子工作目录**：全局钩子的工作目录为 `{RootPath}/hooks/`，用户钩子的工作目录为 `{workspace}/`
 - **AfterToolExecute 不阻断流程**：`AgentLifecycleFilter` 中 `AfterToolExecute` 的返回结果被忽略，不会影响后续流程
 - **ToolNames 过滤仅对工具级挂载点生效**：`BeforeToolExecute` 和 `AfterToolExecute` 会按 `ToolNames` 过滤，其他挂载点忽略此字段
+- **日志默认精简**：Hook 执行明细（匹配、命令、返回）默认记录为 `Debug`；`Warning` 保留脚本异常，`Information` 仅保留关键事件（如阻断）

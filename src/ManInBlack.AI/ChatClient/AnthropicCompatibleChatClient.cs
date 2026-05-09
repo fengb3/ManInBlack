@@ -296,8 +296,8 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
                 ["description"] = tool.Description ?? ""
             };
 
-            if (tool is AIFunction aiFunc)
-                obj["input_schema"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            if (tool is AIFunctionDeclaration aiFuncDecl)
+                obj["input_schema"] = JsonNode.Parse(aiFuncDecl.JsonSchema.GetRawText());
             else
                 obj["input_schema"] = new JsonObject { ["type"] = "object" };
 

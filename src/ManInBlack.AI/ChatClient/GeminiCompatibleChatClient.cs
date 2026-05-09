@@ -251,8 +251,8 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                 ["description"] = tool.Description ?? ""
             };
 
-            if (tool is AIFunction aiFunc)
-                obj["parameters"] = JsonNode.Parse(aiFunc.JsonSchema.GetRawText());
+            if (tool is AIFunctionDeclaration aiFuncDecl)
+                obj["parameters"] = JsonNode.Parse(aiFuncDecl.JsonSchema.GetRawText());
             else
                 obj["parameters"] = new JsonObject { ["type"] = "object" };
 

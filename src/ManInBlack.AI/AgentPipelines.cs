@@ -12,6 +12,7 @@ public static class AgentPipelineBuilderExtensions
     /// <returns></returns>
     public static AgentPipelineBuilder UseDefault(this AgentPipelineBuilder builder) =>
         builder
+            .Use<EventPublishingMiddleware>() // 在最外层, 用于ui监听agent事件
             .Use<ReadPersistenceMiddleware>()
             .Use<SavePersistenceMiddleware>()
             .Use<SkillMiddleware>()
@@ -35,6 +36,5 @@ public static class AgentPipelineBuilderExtensions
             .Use<SystemPromptInjectionMiddleware>()
             .Use<UserInputMiddleware>()
             .Use<RetryMiddleware>()
-            .Use<EventPublishingMiddleware>()
             .Use<AgentLoopMiddleware>(); // Agent Loop 应该在最后一个
 }

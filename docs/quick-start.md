@@ -81,8 +81,9 @@ dotnet add reference <path>/src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.Sour
 ```csharp
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Events;
 using ManInBlack.AI.Services;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 // 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
@@ -102,56 +103,65 @@ var rootSp = services.BuildServiceProvider();
 // 通过 AgentFactory 运行 agent
 var factory = rootSp.GetRequiredService<AgentFactory>();
 AgentContext? capturedContext = null;
-IDisposable? toolExecutingSub = null;
-IDisposable? toolExecutedSub = null;
+var subs = new List<IDisposable>();
 
 var updates = factory.RunAsync("my-agent", "帮我解释一下什么是依赖注入", "my-user", "User", ctx =>
 {
     capturedContext = ctx;
-    // 在 Factory 的 scope 内订阅 EventBus，查看工具调用过程
-    var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    toolExecutingSub = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
-    {
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[Tool Call] {@event.ToolName}");
-        Console.ResetColor();
-    });
-    toolExecutedSub = bus.Subscribe<AfterToolExecuteEvent>(async (@event, ct) =>
-    {
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[Tool Result] {@event.ResultJson}");
-        Console.ResetColor();
-    });
-});
 
-// 流式输出
-await foreach (var update in updates)
-{
-    foreach (var content in update.Contents)
+    // 在 Factory 的 scope 内订阅 EventBus，用 AgentId 作为 key 隔离事件
+    var key = ctx.AgentId;
+    var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
+
+    // 订阅模型流式输出（推荐方式）
+    var last = "";
+    subs.Add(bus.Subscribe<ModelContentEvent>(key, async (evt, ct) =>
     {
-        switch (content)
+        switch (evt.Kind)
         {
-            case TextContent text:
-                Console.Write(text.Text);
-                break;
-            case TextReasoningContent reasoning:
+            case ModelContentKind.Reasoning:
+                if (last != "reasoning")
+                    Console.WriteLine("[Reasoning]");
+                last = "reasoning";
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write(reasoning.Text);
+                Console.Write(evt.Text);
                 Console.ResetColor();
                 break;
-            // UsageContent 由 AgentLoopMiddleware 自动累积
+            case ModelContentKind.Text:
+                if (last != "text")
+                    Console.WriteLine();
+                last = "text";
+                Console.Write(evt.Text);
+                break;
         }
-    }
-}
+    }));
 
-// 清理订阅
-toolExecutingSub?.Dispose();
-toolExecutedSub?.Dispose();
+    // 订阅工具调用过程
+    subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(key, async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"\n[Tool Call] {@event.ToolName}({@event.ArgumentsJson})");
+        Console.ResetColor();
+    }));
+    subs.Add(bus.Subscribe<AfterToolExecuteEvent>(key, async (@event, ct) =>
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[Tool Result] {@event.ResultJson} {@event.Error}");
+        Console.ResetColor();
+    }));
+});
+
+// 仅驱动枚举，输出由上面的 EventBus handler 处理
+await foreach (var _ in updates) { }
+
+// 清理 EventBus 订阅
+foreach (var sub in subs) sub.Dispose();
 
 // 查看用量
+Console.WriteLine();
 var usage = capturedContext?.AccumulatedUsage;
-if (usage is not null)
-    Console.WriteLine($"\nToken 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}");
+if (usage is not null && (usage.InputTokenCount is not null || usage.OutputTokenCount is not null))
+    Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}");
 ```
 
 ---
@@ -176,11 +186,12 @@ Token 用量 — 输入: 42, 输出: 128
 
 ## 手动配置（不使用 settings.json）
 
-如果需要在代码中直接配置，使用 `AddManInBlack`：
+如果需要在代码中直接配置（不依赖 `settings.json`），使用 `AddManInBlack`：
 
 ```csharp
 services.AddManInBlack(opt =>
 {
+    // ModelChoice 是运行时使用的模型选择对象，包含协议、密钥、地址和模型 ID
     opt.ModelChoice = new ModelChoice
     {
         Schema = "OpenAI",
@@ -190,6 +201,8 @@ services.AddManInBlack(opt =>
     };
 });
 ```
+
+> **注意**：`ModelChoice` 是代码中使用的运行时类型，而 `settings.json` 中使用的是 `ModelChoiceSettings`（仅包含 `ProviderName` + `ModelId`，通过引用 `Providers` 字典中的条目间接获取密钥和地址）。两者不可混用——`AddManInBlack` 接受 `ModelChoice`，`AddManInBlackFromSettings` 内部会将 `ModelChoiceSettings` + `ProviderSettings` 解析为 `ModelChoice`。
 
 详见 [Provider 配置指南](./provider-guide.md)。
 
@@ -213,7 +226,11 @@ services.AddAgentDefinition(new AgentDefinition
 也可以注册自定义管道：
 
 ```csharp
+// 在 DI 容器构建完成后，从 ServiceProvider 获取 AgentFactory
+var sp = services.BuildServiceProvider();
 var factory = sp.GetRequiredService<AgentFactory>();
+
+// RegisterPipeline 需要在 RunAsync 之前调用
 factory.RegisterPipeline("my-pipeline", builder => builder
     .Use<MyCustomMiddleware>()
     .UseSimple());

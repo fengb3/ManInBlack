@@ -39,7 +39,7 @@
 
 ### 作用域管理 — DI Scope 自动创建和释放
 
-`RunAsync` 每次调用时自动创建 `IServiceScope`，在 `finally` 中释放。这意味着每次 Agent 运行都有独立的 Scoped 服务实例（`AgentContext`、`IChatClient`、`EventBus` 等），不会互相干扰。
+`RunAsync` 每次调用时自动创建 `IServiceScope`，在 `finally` 中释放。这意味着每次 Agent 运行都有独立的 Scoped 服务实例（`AgentContext`、`IChatClient` 等），不会互相干扰。`EventBus` 是 Singleton 服务，全局共享，通过 key（`AgentId`）隔离不同 Agent 的事件。
 
 ---
 
@@ -86,7 +86,7 @@ void RegisterPipeline(string name, Func<AgentPipelineBuilder, AgentPipelineBuild
 
 ### 使用场景
 
-当内置的 `"default"` 和 `"simple"` 不满足需求时，可以注册自定义管道。例如在飞书场景中注入一个卡片格式化中间件：
+当内置的 `"default"` 和 `"simple"` 不满足需求时，可以注册自定义管道。例如在飞书场景中注入一个自定义中间件：
 
 ```csharp
 // 在 WebApplication.Build() 之后获取 Factory
@@ -94,7 +94,7 @@ var factory = app.Services.GetRequiredService<AgentFactory>();
 
 // 注册飞书自定义管道
 factory.RegisterPipeline("feishu", pipeline => pipeline
-    .Use<FeishuCardMiddleware>()  // 自定义中间件：将响应格式化为飞书卡片
+    .Use<MyCustomMiddleware>()    // 自定义中间件
     .UseDefault());               // 接上默认管道
 
 // 对应的 Agent 定义需要指定 PipelineName = "feishu"
@@ -189,9 +189,10 @@ var updates = factory.RunAsync(
     "console-agent", args[0], "console", "Default",
     ctx =>
     {
-        // 在 Factory 的 scope 内订阅，确保事件隔离
+        // 在 Factory 的 scope 内订阅，使用 ctx.AgentId 作为 key
         bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-        subscription = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
+        var key = ctx.AgentId;
+        subscription = bus.Subscribe<BeforeToolExecuteEvent>(key, async (@event, ct) =>
         {
             Console.WriteLine($"[Tool Call] {@event.ToolName}");
         });
@@ -202,7 +203,7 @@ await foreach (var _ in updates) { }
 subscription?.Dispose();
 ```
 
-> **重要：** EventBus 的 `Subscribe` 必须在 `configure` 回调中执行（即 Factory 创建的 Scope 内），才能收到当前 Scope 的事件。在 Scope 外订阅会收不到任何事件。详见[作用域生命周期](#作用域生命周期)。
+> **重要：** EventBus 的 `Subscribe` 必须在 `configure` 回调中执行（即 Factory 创建的 Scope 内），使用 `ctx.AgentId` 作为 key，才能收到当前 Agent 的事件。在 Scope 外订阅或使用错误的 key 会收不到任何事件。详见[作用域生命周期](#作用域生命周期)。
 
 ---
 
@@ -293,27 +294,28 @@ public async Task HandleMessageAsync(string userId, string userInput)
 每次 `RunAsync` 调用都创建独立的 Scope。这意味着：
 
 - `AgentContext` 是 Scope 内唯一的，不会被其他 Agent 共享
-- `IChatClient`、`EventBus` 等 Scoped 服务各自独立
+- `IChatClient` 等 Scoped 服务各自独立
+- `EventBus` 是 Singleton 服务，全局共享，但通过 key（`AgentId`）隔离不同 Agent 的事件
 - 多个 Agent 可以安全地并发运行
 
-### EventBus 的 ScopeId 隔离
+### EventBus 的 key 隔离
 
-`EventBus` 基于 Scope 隔离事件。只有在**同一个 Scope 内**订阅的处理器才能收到该 Scope 发布的事件。
+`EventBus` 是全局单例（Singleton），通过 key（通常是 `AgentId`）隔离不同 Agent 的事件。订阅时必须使用正确的 key 才能收到对应 Agent 的事件。
 
 ```csharp
-// ✅ 正确：在 configure 回调中订阅（Factory Scope 内）
+// ✅ 正确：在 configure 回调中订阅，使用 ctx.AgentId 作为 key
 var updates = factory.RunAsync("agent", input, userId, "console", ctx =>
 {
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    bus.Subscribe<AfterToolExecuteEvent>(async (e, ct) =>
+    bus.Subscribe<AfterToolExecuteEvent>(ctx.AgentId, async (e, ct) =>
     {
         Console.WriteLine($"工具执行完成: {e.ToolName}");
     });
 });
 
-// ❌ 错误：在 Factory Scope 外订阅
-var bus = rootSp.GetRequiredService<EventBus>(); // 这不是 Factory Scope 的 EventBus
-bus.Subscribe<AfterToolExecuteEvent>(...);           // 收不到事件
+// ❌ 错误：使用错误的 key 订阅，收不到事件
+var bus = rootSp.GetRequiredService<EventBus>();
+bus.Subscribe<AfterToolExecuteEvent>("wrong-key", ...);  // key 不匹配，收不到事件
 ```
 
 ---
@@ -354,11 +356,12 @@ var updates = factory.RunAsync("console-agent", args[0], "console", "Default", c
 
     // 在 Factory 的 scope 内订阅 EventBus
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    toolExecutingSub = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
+    var key = ctx.AgentId;
+    toolExecutingSub = bus.Subscribe<BeforeToolExecuteEvent>(key, async (@event, ct) =>
     {
         Console.WriteLine($"[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
     });
-    toolExecutedSub = bus.Subscribe<AfterToolExecuteEvent>(async (@event, ct) =>
+    toolExecutedSub = bus.Subscribe<AfterToolExecuteEvent>(key, async (@event, ct) =>
     {
         Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
     });
@@ -417,7 +420,7 @@ var app = builder.Build();
 // 注册自定义管道（Build 之后才能获取 Factory）
 var factory = app.Services.GetRequiredService<AgentFactory>();
 factory.RegisterPipeline("feishu", pipeline => pipeline
-    .Use<FeishuCardMiddleware>()  // 飞书卡片中间件
+    .Use<MyCustomMiddleware>()  // 自定义中间件
     .UseDefault());
 
 app.Run();
@@ -477,11 +480,11 @@ public class AgentLauncher(
 
 1. **AgentFactory 是 Singleton** — 注册为 `AddSingleton<AgentFactory>()`，整个应用生命周期内只有一个实例。`RunAsync` 每次调用创建独立的 Scope，不会互相干扰。
 
-2. **同名定义会报错** — `RegisterDefinition` 使用 `TryAdd`，同名 Agent 定义会抛出 `ArgumentException`。
+2. **同名定义会报错** — `RegisterDefinition` 内部使用 `ConcurrentDictionary.TryAdd`，如果同名 Agent 已存在（`TryAdd` 返回 `false`），会抛出 `ArgumentException`。
 
 3. **configure 回调在 Scope 内执行** — 回调中获取的 `ctx.ServiceProvider` 是 Scope 级别的，不是 Root ServiceProvider。用它解析 Scoped 服务是安全的。
 
-4. **EventBus 必须在 Scope 内订阅** — 在 `configure` 回调中通过 `ctx.ServiceProvider` 获取 EventBus 并订阅。Scope 外订阅收不到事件。
+4. **EventBus 订阅必须使用正确的 key** — `EventBus` 是 Singleton，通过 key（`AgentId`）隔离事件。在 `configure` 回调中通过 `ctx.ServiceProvider` 获取 EventBus，使用 `ctx.AgentId` 作为 key 订阅。使用错误的 key 会收不到事件。
 
 5. **Release 必须 finally** — 无论 Agent 正常结束还是异常退出，都要调用 `factory.Release(userId, cts)` 来清理追踪记录和释放 CTS。
 

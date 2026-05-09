@@ -169,17 +169,16 @@ public partial class FileTools(IUserWorkspace workspace)
     }
     
     /// <summary>
-    /// Performs an exact string replacement in an existing file.
-    /// Finds the first occurrence of originalContent and replaces it with newContent.
-    /// If originalContent is not found, the update is aborted to prevent data loss.
-    /// You must read the file with ReadFile before calling this tool to ensure you have the current content.
+    /// 在已有文件中执行精确字符串替换。查找 originalContent 的首次出现并替换为 newContent。
+    /// 如果未找到 originalContent，则中止操作以防止数据丢失。
+    /// 调用此工具前必须先通过 Read 读取文件，确保拥有最新内容。
     /// 只能在工作空间或临时目录内修改文件，不允许修改其他位置的文件。
-    /// All file paths are relative to the workspace root directory. Relative paths are resolved automatically.
+    /// 所有文件路径相对于工作空间根目录，相对路径会自动解析。
     /// </summary>
-    /// <param name="filePath">Path to the file. Can be absolute or relative to the workspace root.</param>
-    /// <param name="originalContent">The exact text to find and replace. Must match the current file content exactly.</param>
-    /// <param name="newContent">The text to replace originalContent with.</param>
-    /// <returns>A confirmation message on success, or an error message if the original content was not found.</returns>
+    /// <param name="filePath">文件路径。可以是绝对路径或相对于工作空间根目录的相对路径。</param>
+    /// <param name="originalContent">要查找并替换的精确文本。必须与文件当前内容完全匹配。</param>
+    /// <param name="newContent">用于替换 originalContent 的文本。</param>
+    /// <returns>成功时返回确认消息；如果未找到原始内容则返回错误消息。</returns>
     [AiTool]
     [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string Edit(string filePath, string originalContent, string newContent)
@@ -192,10 +191,15 @@ public partial class FileTools(IUserWorkspace workspace)
 
         var currentContent = File.ReadAllText(filePath);
 
-        if (!currentContent.Contains(originalContent))
+        var index = currentContent.IndexOf(originalContent, StringComparison.Ordinal);
+        if (index < 0)
             return "Update aborted: the file has been modified since it was last read. Please re-read the file and try again.\n" + $"File: {filePath}";
 
-        File.WriteAllText(filePath, currentContent.Replace(originalContent, newContent));
+        var updatedContent = string.Concat(
+            currentContent.AsSpan(0, index),
+            newContent,
+            currentContent.AsSpan(index + originalContent.Length));
+        File.WriteAllText(filePath, updatedContent);
         return $"File updated: {filePath}";
     }
 

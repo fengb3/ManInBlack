@@ -2,13 +2,16 @@ using System.Runtime.CompilerServices;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Events;
+using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
-/// 钩子中间件，在 LLM 调用前和 Agent 循环结束时执行用户自定义钩子脚本。
+/// 钩子中间件，通过 EventBus 订阅 Agent 生命周期事件并执行用户自定义钩子脚本。
 /// <para>
 /// 洋葱模型管道中位于 AgentLoopMiddleware 外层，因此 <c>next()</c> 会触发整个内部循环，
 /// 仅当 AgentLoopMiddleware 的 while 循环退出（无更多 function call）时才返回。
@@ -23,31 +26,115 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // ── BeforeLlmCall：在首次 LLM 调用前执行钩子 ──
-        logger.LogInformation("[HookMiddleware] BeforeLlmCall 触发，AgentId={AgentId}, UserInput={UserInput}",
-            context.AgentId, context.UserInput);
+        var key = context.AgentId;
+        var bus = context.ServiceProvider.GetRequiredService<EventBus>();
+        var subs = new List<IDisposable>();
 
-        var beforeContext = new HookContext
+        // ── 订阅全部生命周期事件 ──
+        subs.Add(bus.Subscribe<BeforeLlmCallEvent>(key, async (evt, ct) =>
         {
-            HookPoint    = HookPoint.BeforeLlmCall.ToString(),
-            AgentId      = context.AgentId,
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.BeforeLlmCall.ToString(),
+                AgentId = evt.AgentId,
+                SystemPrompt = evt.SystemPrompt,
+                UserInput = evt.UserInput,
+            };
+            var result = await hookExecutor.ExecuteAsync(HookPoint.BeforeLlmCall, hookCtx, ct);
+            if (result.Succeeded && !string.IsNullOrEmpty(result.InjectedText))
+            {
+                evt.InjectedTexts.Add(result.InjectedText);
+                if (result.InjectTarget is not null)
+                    evt.InjectTarget = result.InjectTarget;
+            }
+        }));
+
+        subs.Add(bus.Subscribe<AfterLlmCallEvent>(key, async (evt, ct) =>
+        {
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.AfterLlmCall.ToString(),
+                AgentId = evt.AgentId,
+                SystemPrompt = evt.SystemPrompt,
+                UserInput = evt.UserInput,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AfterLlmCall, hookCtx, ct);
+        }));
+
+        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(key, async (evt, ct) =>
+        {
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.BeforeToolExecute.ToString(),
+                AgentId = evt.AgentId,
+                ToolName = evt.ToolName,
+                CallId = evt.CallId,
+                ArgumentsJson = evt.ArgumentsJson,
+            };
+            var result = await hookExecutor.ExecuteAsync(HookPoint.BeforeToolExecute, hookCtx, ct);
+            if (result.IsBlocked)
+            {
+                evt.IsBlocked = true;
+                evt.BlockReason = result.BlockReason;
+            }
+        }));
+
+        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(key, async (evt, ct) =>
+        {
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.AfterToolExecute.ToString(),
+                AgentId = evt.AgentId,
+                ToolName = evt.ToolName,
+                CallId = evt.CallId,
+                ArgumentsJson = evt.ArgumentsJson,
+                ResultJson = evt.ResultJson,
+                Error = evt.Error,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AfterToolExecute, hookCtx, ct);
+        }));
+
+        subs.Add(bus.Subscribe<AllToolsCompletedEvent>(key, async (evt, ct) =>
+        {
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.AllToolsCompleted.ToString(),
+                AgentId = evt.AgentId,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AllToolsCompleted, hookCtx, ct);
+        }));
+
+        subs.Add(bus.Subscribe<AgentCompletedEvent>(key, async (evt, ct) =>
+        {
+            var hookCtx = new HookContext
+            {
+                HookPoint = HookPoint.AgentCompleted.ToString(),
+                AgentId = evt.AgentId,
+                SystemPrompt = evt.SystemPrompt,
+                UserInput = evt.UserInput,
+            };
+            await hookExecutor.ExecuteAsync(HookPoint.AgentCompleted, hookCtx, ct);
+        }));
+
+        // ── BeforeLlmCall：发布事件，handler 执行钩子，读取注入文本 ──
+        var beforeEvt = new BeforeLlmCallEvent
+        {
+            AgentId = key,
             SystemPrompt = context.SystemPrompt,
-            UserInput    = context.UserInput,
+            UserInput = context.UserInput,
         };
+        await bus.PublishAsync(key, beforeEvt, ct);
 
-        var beforeResult = await hookExecutor.ExecuteAsync(HookPoint.BeforeLlmCall, beforeContext, ct);
-
-        // 如果钩子注入了文本，追加到 SystemPrompt（InjectTarget 为空时默认追加到 SystemPrompt）
-        if (beforeResult.Succeeded
-            && !string.IsNullOrEmpty(beforeResult.InjectedText)
-            && (string.IsNullOrEmpty(beforeResult.InjectTarget)
-                || string.Equals(beforeResult.InjectTarget, "SystemPrompt", StringComparison.OrdinalIgnoreCase)))
+        if (beforeEvt.InjectedTexts.Count > 0
+            && (string.IsNullOrEmpty(beforeEvt.InjectTarget)
+                || string.Equals(beforeEvt.InjectTarget, "SystemPrompt", StringComparison.OrdinalIgnoreCase)))
         {
+            var injected = string.Join(Environment.NewLine, beforeEvt.InjectedTexts);
             context.SystemPrompt = string.IsNullOrEmpty(context.SystemPrompt)
-                ? beforeResult.InjectedText
-                : $"{context.SystemPrompt}\n\n{beforeResult.InjectedText}";
+                ? injected
+                : $"{context.SystemPrompt}\n\n{injected}";
 
-            logger.LogInformation("[HookMiddleware] SystemPrompt 已注入文本，长度={Length}", beforeResult.InjectedText.Length);
+            logger.LogDebug("[HookMiddleware] SystemPrompt 已注入文本，长度={Length}", injected.Length);
         }
 
         // ── 流式转发内部管道输出，同时检测 FunctionCallContent ──
@@ -70,19 +157,19 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             yield return update;
         }
 
-        // ── AgentCompleted：当 AgentLoopMiddleware 退出 while 循环（无 function call）时触发 ──
+        // ── AgentCompleted：当无 function call 时发布事件 ──
         if (!hasFunctionCalls)
         {
-            logger.LogInformation("[HookMiddleware] AgentCompleted 触发，AgentId={AgentId}", context.AgentId);
-            var completedContext = new HookContext
+            logger.LogDebug("[HookMiddleware] AgentCompleted 触发，AgentId={AgentId}", context.AgentId);
+            await bus.PublishAsync(key, new AgentCompletedEvent
             {
-                HookPoint    = HookPoint.AgentCompleted.ToString(),
-                AgentId      = context.AgentId,
+                AgentId = key,
                 SystemPrompt = context.SystemPrompt,
-                UserInput    = context.UserInput,
-            };
-
-            await hookExecutor.ExecuteAsync(HookPoint.AgentCompleted, completedContext, ct);
+                UserInput = context.UserInput,
+            }, ct);
         }
+
+        // ── 清理订阅 ──
+        foreach (var sub in subs) sub.Dispose();
     }
 }

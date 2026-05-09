@@ -2,7 +2,6 @@
 
 using System.Text.Json.Serialization;
 using FeishuAdaptor;
-using FeishuAdaptor.Middlewares;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Configuration;
@@ -76,7 +75,7 @@ var app = builder.Build();
 
 // 注册飞书自定义管道（需在 Build 后获取 Factory 实例）
 var factory = app.Services.GetRequiredService<AgentFactory>();
-factory.RegisterPipeline("feishu", pipeline => pipeline.Use<FeishuCardMiddleware>().UseDefault());
+factory.RegisterPipeline("feishu", pipeline => pipeline.UseDefault());
 
 // 愿你健康, 开心, 美满, 幸福
 app.MapGet(

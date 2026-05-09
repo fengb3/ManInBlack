@@ -38,10 +38,10 @@ ManInBlack 通过 `EventBus` 实现组件间的事件通信。EventBus 是一个
 | 事件 | 时机 | 发布者 |
 |---|---|---|
 | `BeforeLlmCallEvent` | LLM 调用前，支持注入文本 | `HookMiddleware` |
-| `AfterLlmCallEvent` | LLM 响应后 | `HookMiddleware` |
+| `AfterLlmCallEvent` | LLM 响应后 | `AgentLoopMiddleware` |
 | `BeforeToolExecuteEvent` | 工具执行前，支持阻断 | `AgentLifecycleFilter` |
 | `AfterToolExecuteEvent` | 工具执行后 | `AgentLifecycleFilter` |
-| `AllToolsCompletedEvent` | 本批次所有工具执行完毕 | `HookMiddleware` |
+| `AllToolsCompletedEvent` | 本批次所有工具执行完毕 | `AgentLoopMiddleware` |
 | `AgentCompletedEvent` | Agent 循环结束 | `HookMiddleware` |
 
 ---
@@ -191,7 +191,8 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 |---|---|---|---|
 | `EventPublishingMiddleware` | Scoped | `ModelContentEvent` | 中间件管道内，包裹 LLM 调用 |
 | `AgentLifecycleFilter` | Scoped | `BeforeToolExecuteEvent`、`AfterToolExecuteEvent` | 工具过滤器管道内 |
-| `HookMiddleware` | Scoped | `BeforeLlmCallEvent`、`AfterLlmCallEvent`、`AllToolsCompletedEvent`、`AgentCompletedEvent` | 中间件管道内 |
+| `AgentLoopMiddleware` | Scoped | `AfterLlmCallEvent`、`AllToolsCompletedEvent` | 中间件管道内 |
+| `HookMiddleware` | Scoped | `BeforeLlmCallEvent`、`AgentCompletedEvent` | 中间件管道内 |
 
 ---
 
@@ -204,6 +205,8 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 | `src/ManInBlack.AI/Events/AgentLifecycleEvent.cs` | Agent 生命周期事件（6 种） |
 | `src/ManInBlack.AI/ToolCallFilters/AgentLifecycleFilter.cs` | 工具执行生命周期过滤器，发布 BeforeToolExecute / AfterToolExecute 事件 |
 | `src/ManInBlack.AI/Middlewares/EventPublishingMiddleware.cs` | 模型流式输出事件发布者 |
+| `src/ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs` | Agent 循环中间件，发布 AfterLlmCall / AllToolsCompleted 事件 |
+| `src/ManInBlack.AI/Middlewares/HookMiddleware.cs` | 钩子中间件，发布 BeforeLlmCall / AgentCompleted 事件 |
 | `test/ManInBlack.AI.Tests/EventBusTests.cs` | EventBus 单元测试 |
 
 ---

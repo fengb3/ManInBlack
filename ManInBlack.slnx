@@ -1,8 +1,12 @@
 <Solution>
   <Folder Name="/Docs/">
+    <File Path="AGENTS.md" />
     <File Path="CLAUDE.md" />
+    <File Path="docs/agent-factory-guide.md" />
     <File Path="docs/architecture.md" />
+    <File Path="docs/code-review-checklist.md" />
     <File Path="docs/configuration-guide.md" />
+    <File Path="docs/eventbus-guide.md" />
     <File Path="docs/feishu-guide.md" />
     <File Path="docs/hooks-guide.md" />
     <File Path="docs/middleware-guide.md" />

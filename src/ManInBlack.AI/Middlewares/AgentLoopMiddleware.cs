@@ -4,22 +4,28 @@ using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Tools;
+using ManInBlack.AI.Events;
+using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
 
 /// <summary>
 /// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史。
-/// 支持在 LLM 调用后（AfterLlmCall）和所有工具执行完毕后（AllToolsCompleted）触发钩子。
+/// 通过 EventBus 发布 AfterLlmCallEvent 和 AllToolsCompletedEvent。
 /// </summary>
 [ServiceRegister.Scoped]
-public class AgentLoopMiddleware(IToolExecutor toolExecutor, IHookExecutor hookExecutor, ILogger<AgentContext> logger) : AgentMiddleware
+public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContext> logger) : AgentMiddleware
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        var bus = context.ServiceProvider.GetRequiredService<EventBus>();
+        var key = context.AgentId;
+
         while (true)
         {
             var functionCalls    = new List<FunctionCallContent>();
@@ -62,14 +68,12 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, IHookExecutor hookE
                 context.Messages.Add(new ChatMessage(ChatRole.Assistant, assistantContents));
 
             // ── AfterLlmCall：LLM 响应流结束后触发 ──
-            var afterLlmCtx = new HookContext
+            await bus.PublishAsync(key, new AfterLlmCallEvent
             {
-                HookPoint    = HookPoint.AfterLlmCall.ToString(),
-                AgentId      = context.AgentId,
+                AgentId = key,
                 SystemPrompt = context.SystemPrompt,
-                UserInput    = context.UserInput,
-            };
-            await hookExecutor.ExecuteAsync(HookPoint.AfterLlmCall, afterLlmCtx, ct);
+                UserInput = context.UserInput,
+            }, ct);
 
             if (functionCalls.Count == 0)
                 yield break;
@@ -91,7 +95,6 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, IHookExecutor hookE
                 {
                     Console.BackgroundColor = ConsoleColor.Red;
                     Console.ForegroundColor = ConsoleColor.White;
-                    // Console.WriteLine($"Error: {toolCtx.Error}");
                     logger.LogError(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
                     Console.ResetColor();
                 }
@@ -104,12 +107,10 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, IHookExecutor hookE
             context.Messages.Add(new ChatMessage(ChatRole.Tool, toolResults));
 
             // ── AllToolsCompleted：本批次所有工具执行完毕后触发 ──
-            var allToolsCtx = new HookContext
+            await bus.PublishAsync(key, new AllToolsCompletedEvent
             {
-                HookPoint = HookPoint.AllToolsCompleted.ToString(),
-                AgentId   = context.AgentId,
-            };
-            await hookExecutor.ExecuteAsync(HookPoint.AllToolsCompleted, allToolsCtx, ct);
+                AgentId = key,
+            }, ct);
         }
     }
 }

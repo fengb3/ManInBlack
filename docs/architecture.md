@@ -30,10 +30,11 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | ------------- | --------------------------------------------- |
 | `Middleware/` | AgentMiddleware（抽象基类）、AgentContext（POCO）|
 | `Storage/`    | ISessionStorage、IUserStorage、AgentStorageOptions |
-| `Tools/`      | IToolExecutor、ToolCallFilter（抽象）、ToolExecuteContext、ToolFunctionDeclaration |
+| `Tools/`      | IToolExecutor、ToolCallFilter（抽象）、ToolExecuteContext、ToolFunctionDeclaration、IShellExecutor |
 | `Attributes/` | [AiTool]、[ServiceRegister]（驱动源生成器）     |
+| `Hooks/`      | IHookExecutor、HookPoint、HookContext、HookResult  |
 
-此外还包含 `IUserWorkspace` 接口。
+此外还包含 `IUserWorkspace` 接口和 `IModelProvider` 接口。
 
 ### ManInBlack.AI — 实现层
 
@@ -43,9 +44,9 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | ------------------ | -------------------------------------------------------- |
 | `ChatClient/`      | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini）       |
 | `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
-| `Middlewares/`     | 12 个中间件 + AgentPipelineBuilder                        |
+| `Middlewares/`     | 14 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools                  |
-| `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter、LargeResultFilter    |
+| `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter（LargeResultFilter 已注释） |
 | `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 
@@ -109,11 +110,11 @@ builder.Use<A>().Use<B>().Use<C>().Build(sp);
 通过 `builder.UseDefault()` 配置的完整管道：
 
 ```
-ReadPersistence → SavePersistence → Skill → AgentProfile
+EventPublishing → ReadPersistence → SavePersistence → Skill → AgentProfile
     → ContextCompress → CommandLineTools → FileTools → [UseSimple]
 
 [UseSimple]
-Logging → MessageEnrich → SystemPromptInjection → UserInput → Retry → AgentLoop
+Logging → MessageEnrich → Hook → SystemPromptInjection → UserInput → Retry → AgentLoop
 ```
 
 注册顺序 = 从外到内的到达顺序。AgentLoop 必须在最内层（最后注册）。
@@ -182,9 +183,12 @@ AddManInBlack(configure)
     ├── AgentFactory                (Singleton)
     ├── IChatClient                 (Singleton, via CreateChatClient)
     ├── HttpClient                  (PooledConnectionLifetime: 2min)
+    ├── IShellExecutor              (Scoped, Linux: BwarpShellExecutor / 其他: ProcessShellExecutor)
     ├── AddAutoRegisteredServices() [源生成]
     ├── AddToolExecutor()           [源生成]
     └── AddToolMiddlewares()        [源生成]
+
+注：IHookExecutor、IUserWorkspace 等接口实现通过 AddAutoRegisteredServices() 由源生成器自动注册。
 
 AddManInBlackFromSettings(configure?)
     ├── ManInBlackConfigurationBuilder.BuildConfiguration() (reloadOnChange)
@@ -247,7 +251,7 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 │  AgentLoopMiddleware │  收集 functionCalls → 调用 IToolExecutor
 └─────────────────────┘
         │
-        ▼ ToolCallFilter 管道 (Logging → BroadCasting → LargeResult)
+        ▼ ToolCallFilter 管道 (Logging → AgentLifecycle)
 ┌─────────────────────┐
 │  ToolExecutor        │  switch(name) → 调用对应的 [AiTool] 方法
 └─────────────────────┘

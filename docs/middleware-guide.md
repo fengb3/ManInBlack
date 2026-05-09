@@ -11,9 +11,11 @@
 中间件管道采用 **洋葱模型**：请求从外层向内传递，响应从内层向外返回。每个中间件持有 `next` 委托，决定何时（以及是否）将控制权交给下一个中间件。
 
 ```
-Logging → Enrich → Skill → Profile → SystemPrompt → ReadPersistence
+EventPublishing → ReadPersistence → SavePersistence → Skill → Profile → ContextCompress
+    ↓                                                                              ↑
+CommandLineTools → FileTools → Logging → Enrich → Hook → SystemPrompt → UserInput
     ↓                                                              ↑
-SavePersistence ← UserInput ← ContextCompress ← Tools ← AgentLoop ← IChatClient
+Retry → AgentLoop ← IChatClient
 ```
 
 `AgentPipelineBuilder.Build()` 以**逆序**包裹中间件，最终抵达 `IChatClient.GetStreamingResponseAsync()` 终点。
@@ -112,7 +114,7 @@ public class MyMiddleware(ILogger<MyMiddleware> logger, IMyService myService) : 
 
 在调用 `next()` 之前修改 `Messages`、`Options`、`SystemPrompt` 等。
 
-**示例 — 注入工具声明**（参考 `CommandToolMiddleware`）：
+**示例 — 注入工具声明**（参考 `CommandLineToolsMiddleware`）：
 
 ```csharp
 public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
@@ -319,20 +321,32 @@ builder.Use(new MyStatelessMiddleware());
 
 ### 默认管道顺序
 
+`UseDefault()` 先注册外层中间件，内部调用 `UseSimple()` 注册内层：
+
+**UseDefault() 外层：**
+
 | #   | 中间件                            | 职责                               |
 | --- | --------------------------------- | ---------------------------------- |
-| 1   | `LoggingMiddleware`               | 记录输入/输出日志                  |
-| 2   | `MessageEnrichMiddleware`         | 为消息补全 `CreatedAt` 元数据      |
-| 3   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
-| 4   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
-| 5   | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
-| 6   | `ReadPersistenceMiddleware`       | 加载历史消息，处理 reset 命令      |
-| 7   | `SavePersistenceMiddleware`       | 自动持久化新增消息                 |
-| 8   | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
-| 9   | `ContextCompressMiddleware`       | 压缩旧的工具结果                   |
-| 10  | `CommandToolMiddleware`           | 注入命令行工具声明                 |
-| 11  | `FileToolMiddleware`              | 注入文件操作工具声明               |
-| 12  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后）         |
+| 1   | `EventPublishingMiddleware`       | 在最外层，用于 UI 监听 Agent 事件  |
+| 2   | `ReadPersistenceMiddleware`       | 加载历史消息，处理 reset 命令      |
+| 3   | `SavePersistenceMiddleware`       | 自动持久化新增消息                 |
+| 4   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
+| 5   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
+| 6   | `ContextCompressMiddleware`       | 压缩旧的工具结果                   |
+| 7   | `CommandLineToolsMiddleware`      | 注入命令行工具声明（源生成器生成） |
+| 8   | `FileToolsMiddleware`             | 注入文件操作工具声明（源生成器生成）|
+
+**UseSimple() 内层：**
+
+| #   | 中间件                            | 职责                               |
+| --- | --------------------------------- | ---------------------------------- |
+| 9   | `LoggingMiddleware`               | 记录输入/输出日志                  |
+| 10  | `MessageEnrichMiddleware`         | 为消息补全 `CreatedAt` 元数据      |
+| 11  | `HookMiddleware`                  | 执行用户自定义钩子脚本             |
+| 12  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
+| 13  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
+| 14  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
+| 15  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后）         |
 
 ### 顺序规则
 

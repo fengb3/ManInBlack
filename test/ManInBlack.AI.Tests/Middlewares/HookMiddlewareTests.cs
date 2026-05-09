@@ -4,8 +4,10 @@ using System.Threading.Tasks;
 using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Services;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -13,13 +15,21 @@ namespace ManInBlack.AI.Tests.Middlewares;
 
 public class HookMiddlewareTests
 {
+    private static IServiceProvider BuildSp(EventBus? bus = null)
+    {
+        bus ??= new EventBus();
+        return new ServiceCollection()
+            .AddSingleton(bus)
+            .BuildServiceProvider();
+    }
+
     [Fact]
     public async Task HandleAsync_BeforeLlmCall_ShouldFireHook()
     {
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-1",
             SystemPrompt = "你是助手",
@@ -47,7 +57,7 @@ public class HookMiddlewareTests
             Result = new HookResult { Succeeded = true, InjectedText = "附加规则：请用中文回答" }
         };
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-2",
             SystemPrompt = "你是助手",
@@ -76,7 +86,7 @@ public class HookMiddlewareTests
             }
         };
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-3",
             SystemPrompt = "基础提示词",
@@ -97,14 +107,13 @@ public class HookMiddlewareTests
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-4",
             SystemPrompt = "sys",
             UserInput = "hi",
         };
 
-        // next 返回的流中没有 FunctionCallContent
         var updates = new[]
         {
             new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("hello")])
@@ -126,14 +135,13 @@ public class HookMiddlewareTests
         // Arrange
         var fakeExecutor = new FakeHookExecutor();
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-5",
             SystemPrompt = "sys",
             UserInput = "call tool",
         };
 
-        // next 返回的流中包含 FunctionCallContent
         var updates = new[]
         {
             new ChatResponseUpdate(ChatRole.Assistant,
@@ -159,7 +167,7 @@ public class HookMiddlewareTests
             Result = new HookResult { Succeeded = true, InjectedText = "" }
         };
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
-        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        var ctx = new AgentContext(BuildSp())
         {
             AgentId = "agent-6",
             SystemPrompt = "原始提示词",
