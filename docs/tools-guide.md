@@ -48,7 +48,7 @@
 | 过滤器               | 作用                                     |
 | -------------------- | ---------------------------------------- |
 | `LoggingFilter`      | 记录工具名、参数、结果长度到日志         |
-| `BroadCastingFilter` | 通过 `EventBus` 发布 `ToolExecutingEvent` / `ToolExecutedEvent` |
+| `AgentLifecycleFilter` | 通过 `EventBus` 发布 `BeforeToolExecuteEvent` / `AfterToolExecuteEvent` |
 
 `LargeResultFilter`（已注释）：大结果截断并写入文件，返回截断提示。
 

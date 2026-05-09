@@ -12,7 +12,7 @@ public partial class SkillTools(Services.SkillService skillService)
     /// <param name="name">skill name to load</param>
     /// <returns>skill content if success</returns>
     [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string LoadSkill(string name) => skillService.GetContent(name);
 
     //
@@ -22,6 +22,6 @@ public partial class SkillTools(Services.SkillService skillService)
     // /// <param name="skillFilePath">.skill file path</param>
     // /// <returns>result of skill installation</returns>
     // [AiTool]
-    // [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    // [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     // public string InstallSkill(string skillFilePath) => skillService.InstallSkill(skillFilePath);
 }

@@ -76,7 +76,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="runInBackground">是否在后台运行命令并立即返回</param>
     /// <returns>执行命令的输出，或后台任务 ID</returns>
     [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string RunBash(string command, int timeoutMs = 120000, bool runInBackground = false)
     {
         var dangerCheck = CheckDangerousCommand(command);
@@ -129,7 +129,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="taskId">后台任务 ID</param>
     /// <returns>任务输出（如果已完成）或运行状态</returns>
     [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string GetBackgroundTaskResult(int taskId)
     {
         if (!BackgroundTasks.TryGetValue(taskId, out var task))
@@ -148,7 +148,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     /// <param name="taskId">后台任务 ID</param>
     /// <returns>终止结果</returns>
     [AiTool]
-    [AiTool.HasFilter<HookFilter, LoggingFilter, BroadCastingFilter>]
+    [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string KillBackgroundTask(int taskId)
     {
         if (!BackgroundTasks.TryGetValue(taskId, out var task))

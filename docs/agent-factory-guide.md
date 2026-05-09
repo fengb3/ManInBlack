@@ -191,7 +191,7 @@ var updates = factory.RunAsync(
     {
         // 在 Factory 的 scope 内订阅，确保事件隔离
         bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-        subscription = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+        subscription = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
         {
             Console.WriteLine($"[Tool Call] {@event.ToolName}");
         });
@@ -305,7 +305,7 @@ public async Task HandleMessageAsync(string userId, string userInput)
 var updates = factory.RunAsync("agent", input, userId, "console", ctx =>
 {
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    bus.Subscribe<ToolExecutedEvent>(async (e, ct) =>
+    bus.Subscribe<AfterToolExecuteEvent>(async (e, ct) =>
     {
         Console.WriteLine($"工具执行完成: {e.ToolName}");
     });
@@ -313,7 +313,7 @@ var updates = factory.RunAsync("agent", input, userId, "console", ctx =>
 
 // ❌ 错误：在 Factory Scope 外订阅
 var bus = rootSp.GetRequiredService<EventBus>(); // 这不是 Factory Scope 的 EventBus
-bus.Subscribe<ToolExecutedEvent>(...);           // 收不到事件
+bus.Subscribe<AfterToolExecuteEvent>(...);           // 收不到事件
 ```
 
 ---
@@ -354,11 +354,11 @@ var updates = factory.RunAsync("console-agent", args[0], "console", "Default", c
 
     // 在 Factory 的 scope 内订阅 EventBus
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    toolExecutingSub = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+    toolExecutingSub = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
     {
         Console.WriteLine($"[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
     });
-    toolExecutedSub = bus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+    toolExecutedSub = bus.Subscribe<AfterToolExecuteEvent>(async (@event, ct) =>
     {
         Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
     });

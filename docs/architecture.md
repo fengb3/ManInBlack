@@ -45,7 +45,7 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
 | `Middlewares/`     | 12 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools                  |
-| `ToolCallFilters/` | LoggingFilter、BroadCastingFilter、LargeResultFilter    |
+| `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter、LargeResultFilter    |
 | `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 

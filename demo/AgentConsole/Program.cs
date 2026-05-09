@@ -3,7 +3,6 @@ using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Events;
 using ManInBlack.AI.Services;
-using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.DependencyInjection;
 
 
@@ -58,16 +57,16 @@ var updates = factory.RunAsync("console-agent", args[0], "console", "Default", c
         }
     }));
 
-    subs.Add(bus.Subscribe<ToolExecutingEvent>(key, async (@event, ct) =>
+    subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(key, async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"\n[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
+        Console.WriteLine($"\n[Tool Call] {@event.ToolName}({@event.ArgumentsJson})");
         Console.ResetColor();
     }));
-    subs.Add(bus.Subscribe<ToolExecutedEvent>(key, async (@event, ct) =>
+    subs.Add(bus.Subscribe<AfterToolExecuteEvent>(key, async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
+        Console.WriteLine($"[Tool Result] {@event.ResultJson} {@event.Error}");
         Console.ResetColor();
     }));
 });

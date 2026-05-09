@@ -110,16 +110,16 @@ var updates = factory.RunAsync("my-agent", "帮我解释一下什么是依赖注
     capturedContext = ctx;
     // 在 Factory 的 scope 内订阅 EventBus，查看工具调用过程
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    toolExecutingSub = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+    toolExecutingSub = bus.Subscribe<BeforeToolExecuteEvent>(async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"[Tool Call] {@event.ToolName}");
         Console.ResetColor();
     });
-    toolExecutedSub = bus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+    toolExecutedSub = bus.Subscribe<AfterToolExecuteEvent>(async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[Tool Result] {@event.Result}");
+        Console.WriteLine($"[Tool Result] {@event.ResultJson}");
         Console.ResetColor();
     });
 });

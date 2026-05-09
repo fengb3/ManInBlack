@@ -44,6 +44,7 @@ dotnet run --project demo/FeishuAdaptor                         # 飞书 bot dem
 - [工具开发指北](docs/tools-guide.md)
 - [配置指南](docs/configuration-guide.md)
 - [Hook 开发指北](docs/hooks-guide.md)
+- [事件总线指南](docs/eventbus-guide.md)
 - [测试指北](docs/testing-guide.md)
 - [Provider 配置指南](docs/provider-guide.md)
 - [飞书适配器指南](docs/feishu-guide.md)

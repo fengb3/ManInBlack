@@ -20,7 +20,7 @@ Hook 通过两个集成层接入框架：
 | 集成层    | 类                     | 触发的挂载点                                 |
 |--------|-----------------------|----------------------------------------|
 | 中间件层   | `HookMiddleware`      | `BeforeLlmCall`、`AgentCompleted`       |
-| 工具过滤器层 | `HookFilter`          | `BeforeToolExecute`、`AfterToolExecute` |
+| 工具过滤器层 | `AgentLifecycleFilter` | `BeforeToolExecute`、`AfterToolExecute` |
 | 循环中间件层 | `AgentLoopMiddleware` | `AfterLlmCall`、`AllToolsCompleted`     |
 
 ---
@@ -31,8 +31,8 @@ Hook 通过两个集成层接入框架：
 |---------------------|--------------------------------|-----------------------|-----------------------|
 | `BeforeLlmCall`     | 首次 LLM 调用前                     | `HookMiddleware`      | 注入 SystemPrompt、修改上下文 |
 | `AfterLlmCall`      | LLM 响应流结束后                     | `AgentLoopMiddleware` | 检查响应内容、记录日志           |
-| `BeforeToolExecute` | 单个工具执行前                        | `HookFilter`          | 阻断执行、检查参数             |
-| `AfterToolExecute`  | 单个工具执行后                        | `HookFilter`          | 检查结果、审计日志             |
+| `BeforeToolExecute` | 单个工具执行前                        | `AgentLifecycleFilter` | 阻断执行、检查参数             |
+| `AfterToolExecute`  | 单个工具执行后                        | `AgentLifecycleFilter` | 检查结果、审计日志             |
 | `AllToolsCompleted` | 本批次所有工具执行完毕后                   | `AgentLoopMiddleware` | 批量后处理                 |
 | `AgentCompleted`    | Agent 循环结束（无更多 function call）时 | `HookMiddleware`      | 最终处理、清理资源             |
 
@@ -335,16 +335,15 @@ ReadPersistenceMiddleware
 
 ### ToolCallFilter 管道
 
-`HookFilter` 包裹在每个工具调用前后：
+`AgentLifecycleFilter` 包裹在每个工具调用前后：
 
 ```
-HookFilter                     ← BeforeToolExecute → AfterToolExecute
+AgentLifecycleFilter           ← BeforeToolExecute → AfterToolExecute
   └─ LoggingFilter
-      └─ BroadCastingFilter
-          └─ 实际工具调用
+      └─ 实际工具调用
 ```
 
-- `HookFilter` 在 `next()` 前触发 `BeforeToolExecute`，在 `next()` 返回后触发 `AfterToolExecute`
+- `AgentLifecycleFilter` 在 `next()` 前触发 `BeforeToolExecute`，在 `next()` 返回后触发 `AfterToolExecute`
 - 如果 `BeforeToolExecute` 返回 `IsBlocked=true`，跳过实际工具调用
 
 ---
@@ -360,7 +359,7 @@ HookFilter                     ← BeforeToolExecute → AfterToolExecute
 | `ManInBlack.AI/Configuration/HookSettings.cs`      | AI          | 单条钩子配置模型                                         |
 | `ManInBlack.AI/Services/HookExecutor.cs`           | AI          | 钩子执行引擎实现                                         |
 | `ManInBlack.AI/Middlewares/HookMiddleware.cs`      | AI          | 中间件层钩子，处理 BeforeLlmCall / AgentCompleted         |
-| `ManInBlack.AI/ToolCallFilters/HookFilter.cs`      | AI          | 工具过滤器层钩子，处理 BeforeToolExecute / AfterToolExecute |
+| `ManInBlack.AI/ToolCallFilters/AgentLifecycleFilter.cs` | AI | 工具过滤器层钩子，处理 BeforeToolExecute / AfterToolExecute |
 | `ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs` | AI          | 循环中间件，处理 AfterLlmCall / AllToolsCompleted        |
 
 ---
@@ -374,5 +373,5 @@ HookFilter                     ← BeforeToolExecute → AfterToolExecute
 - **Hooks 配置每个 Scope 缓存一次**：`HookExecutor` 使用懒加载缓存 `_cachedHooks`，在首次调用 `ExecuteAsync`
   时加载全局和用户钩子，后续调用直接使用缓存
 - **全局钩子工作目录**：全局钩子的工作目录为 `{RootPath}/hooks/`，用户钩子的工作目录为 `{workspace}/`
-- **AfterToolExecute 不阻断流程**：`HookFilter` 中 `AfterToolExecute` 的返回结果被忽略，不会影响后续流程
+- **AfterToolExecute 不阻断流程**：`AgentLifecycleFilter` 中 `AfterToolExecute` 的返回结果被忽略，不会影响后续流程
 - **ToolNames 过滤仅对工具级挂载点生效**：`BeforeToolExecute` 和 `AfterToolExecute` 会按 `ToolNames` 过滤，其他挂载点忽略此字段
