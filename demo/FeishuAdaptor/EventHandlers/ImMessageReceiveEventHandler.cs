@@ -1,12 +1,11 @@
 using System.Text.Json;
-using FeishuAdaptor.FeishuCard.CardViews;
+using FeishuAdaptor.FeishuCard;
 using FeishuNetSdk;
 using FeishuNetSdk.Im.Events;
 using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
-using ManInBlack.AI.Events;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -59,7 +58,6 @@ public class AgentLauncher(
     public async Task LaunchAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input)
     {
         var userId = input.Event!.Sender!.SenderId!.UserId!;
-        var openId = input.Event!.Sender!.SenderId!.OpenId!;
 
         var cts = factory.RegisterAndCancelExisting(userId);
 
@@ -77,7 +75,7 @@ public class AgentLauncher(
                 userLlmInput = await HandleMessage(messageScope.ServiceProvider, input, cts.Token);
             }
 
-            var subs = new List<IDisposable>();
+            FeishuCardSession? cardSession = null;
 
             var updates = factory.RunAsync(
                 "feishu-agent",
@@ -88,118 +86,18 @@ public class AgentLauncher(
                 {
                     ctx.SystemPrompt += $"""
                         <system>
-                        你的面对的用户的 飞书 open id 是: {openId}
+                        你的面对的用户的 飞书 user id 是: {userId}
                         </system>
                         """;
 
-                    var key = ctx.AgentId;
                     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-                    var sp = ctx.ServiceProvider;
-
-                    // 状态跟踪
-                    string lastLlmType = "";
-                    LlmOutputViewModel? lastOutput = null;
-                    LlmReasoningViewModel? lastReasoning = null;
-                    List<CardViewBase> streamingCardViews = [];
-                    var toolExecutions = new Dictionary<string, ToolExecutionCardView>();
-
-                    subs.Add(bus.Subscribe<ModelContentEvent>(key, async (evt, ct) =>
-                    {
-                        switch (evt.Kind)
-                        {
-                            case ModelContentKind.Reasoning:
-                            {
-                                if (string.IsNullOrEmpty(evt.Text)) break;
-                                if (lastLlmType != nameof(LlmReasoningViewModel))
-                                {
-                                    var (vm1, view1) = CreateCard<LlmReasoningViewModel>(sp, openId);
-                                    streamingCardViews.Add(view1);
-                                    lastReasoning = vm1;
-                                    lastLlmType = nameof(LlmReasoningViewModel);
-                                }
-                                lastReasoning!.Reasoning += evt.Text;
-                                break;
-                            }
-                            case ModelContentKind.Text:
-                            {
-                                if (string.IsNullOrEmpty(evt.Text)) break;
-                                if (lastLlmType != nameof(LlmOutputViewModel))
-                                {
-                                    var (vm2, view2) = CreateCard<LlmOutputViewModel>(sp, openId);
-                                    streamingCardViews.Add(view2);
-                                    lastOutput = vm2;
-                                    lastLlmType = nameof(LlmOutputViewModel);
-                                }
-                                lastOutput!.Output += evt.Text;
-                                break;
-                            }
-                            case ModelContentKind.Completed:
-                            {
-                                foreach (var view in streamingCardViews)
-                                {
-                                    try { await view.CloseStreamingAsync(ct); }
-                                    catch { }
-                                }
-                                break;
-                            }
-                        }
-                    }));
-
-                    subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(key, async (evt, ct) =>
-                    {
-                        lastLlmType = "";
-
-                        if (!toolExecutions.TryGetValue(evt.CallId, out var toolCard))
-                        {
-                            toolCard = (ToolExecutionCardView)sp
-                                .GetRequiredService<CardView<LlmToolExecutionViewModel>>();
-                            await toolCard.InitializeAsync(ct);
-                            await toolCard.SendToUserAsync("open_id", openId, ct);
-                            toolExecutions[evt.CallId] = toolCard;
-                        }
-
-                        var toolName = evt.ToolName ?? "未知工具";
-                        var description = "";
-
-                        // 从 ArgumentsJson 提取描述（如 RunBash 的注释行）
-                        if (toolName == "RunBash" && evt.ArgumentsJson is not null)
-                        {
-                            try
-                            {
-                                using var doc = JsonDocument.Parse(evt.ArgumentsJson);
-                                if (doc.RootElement.TryGetProperty("command", out var cmdProp))
-                                {
-                                    var cmdStr = cmdProp.GetString() ?? "";
-                                    var firstLine = cmdStr.TrimStart().Split('\n')[0].Trim();
-                                    if (firstLine.StartsWith("#"))
-                                        description = firstLine.TrimStart('#', ' ').Trim();
-                                }
-                            }
-                            catch { }
-                        }
-
-                        var arguments = evt.ArgumentsJson ?? "无参数";
-                        await toolCard.UpdateForToolStartAsync(toolName, arguments, description, ct);
-                    }));
-
-                    subs.Add(bus.Subscribe<AfterToolExecuteEvent>(key, async (evt, ct) =>
-                    {
-                        if (!toolExecutions.TryGetValue(evt.CallId, out var toolCard)) return;
-
-                        var resultText = evt.ResultJson ?? "";
-                        if (resultText.Length > 500)
-                            resultText = string.Concat(resultText.AsSpan(0, 500), "\n...");
-
-                        await toolCard.UpdateForToolResultAsync(
-                            string.IsNullOrWhiteSpace(resultText) ? "无返回结果" : resultText,
-                            isError: evt.Error is not null,
-                            ct);
-                    }));
+                    cardSession = new FeishuCardSession(ctx.ServiceProvider, userId, bus, ctx.AgentId);
+                    cardSession.Subscribe();
                 });
 
             await foreach (var _ in updates) { }
 
-            foreach (var sub in subs) sub.Dispose();
+            cardSession?.Dispose();
         }
         catch (OperationCanceledException)
         {
@@ -210,7 +108,7 @@ public class AgentLauncher(
             logger.LogError(
                 ex,
                 "Error processing message from user {userId}",
-                input.Event.Sender.SenderId.OpenId
+                input.Event.Sender.SenderId.UserId
             );
             throw;
         }
@@ -224,21 +122,13 @@ public class AgentLauncher(
         }
     }
 
-    private static (T ViewModel, CardView<T> View) CreateCard<T>(IServiceProvider sp, string openId) where T : ViewModelBase
-    {
-        var view = sp.GetRequiredService<CardView<T>>();
-        view.InitializeAsync().GetAwaiter().GetResult();
-        view.SendToUserAsync("open_id", openId).GetAwaiter().GetResult();
-        return (view.ViewModel, view);
-    }
-
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
         CancellationToken ct = default
     )
     {
-        var userId = input.Event!.Sender!.SenderId!.OpenId!;
+        var userId = input.Event!.Sender!.SenderId!.UserId!;
         var messageType = input.Event!.Message!.MessageType!;
         var messageContent = input.Event!.Message!.Content!;
 

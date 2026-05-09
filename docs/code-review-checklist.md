@@ -23,11 +23,10 @@
   - [x] `docs/architecture.md` — 管道顺序、Filter 名称、中间件数量、Abstraction 目录结构
   - [x] `docs/middleware-guide.md` — 管道顺序（UseDefault 外层 + UseSimple 内层）、中间件名称
 - [x] **H3-remaining: tools-guide.md 文档与代码不匹配** — 方法名已修正（ReadFile→Read, WriteFile→Write, UpdateFile→Edit），KillBackgroundTask 已补充，DeleteFile/DeleteDirectory 标注已注释。`docs/tools-guide.md`
-- [ ] **H5: 同步阻塞异步方法（死锁风险）** — 三处 `.Wait()` / `GetAwaiter().GetResult()`
+- [ ] **H5: 同步阻塞异步方法（死锁风险）** — 两处 `.Wait()` / `GetAwaiter().GetResult()`
   - [ ] `src/ManInBlack.AI/Middlewares/PersistenceMiddleware.cs:116` — `SaveMessage().Wait()`
   - [ ] `src/ManInBlack.AI/Services/FileUserWorkspace.cs:15` — `GetOrCreateUser().GetAwaiter().GetResult()`
-  - [ ] `demo/FeishuAdaptor/EventHandlers/ImMessageReceiveEventHandler.cs:225-231` — `InitializeAsync().GetAwaiter().GetResult()`
-- [ ] **H6: 飞书卡片逻辑从中间件迁移后未重构** — 100+ 行逻辑塞入匿名回调，应提取为独立类或恢复为中间件。`demo/FeishuAdaptor/EventHandlers/ImMessageReceiveEventHandler.cs:88-196`
+- [x] **H6: 飞书卡片逻辑提取为独立类** — 从匿名回调重构为 `FeishuCardSession`。`demo/FeishuAdaptor/FeishuCard/FeishuCardSession.cs`
 - [ ] **H7: InjectTarget 功能不完整** — 只实现了 SystemPrompt 注入，UserMessage 和 ToolResult 分支缺失。`src/ManInBlack.AI/Middlewares/HookMiddleware.cs:129-130`
 - [ ] **H8: SystemPromptInjectionMiddleware 未处理 null** — `context.SystemPrompt.Length` 在 SystemPrompt 为 null 时 NRE。`src/ManInBlack.AI/Middlewares/SystemPromptInjectionMiddleware.cs:25`
 - [ ] **H9: EventPublishingMiddleware 无测试** — 默认管道最外层中间件零覆盖。`test/ManInBlack.AI.Tests/`
