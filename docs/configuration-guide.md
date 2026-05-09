@@ -10,10 +10,28 @@
 
 ```json
 {
-  "Provider": "OpenAI",
-  "ApiKey": "sk-xxx",
-  "BaseUrl": "https://api.openai.com",
-  "ModelId": "gpt-4o",
+  "Providers": {
+    "default": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-xxx",
+      "BaseUrl": "https://api.openai.com"
+    },
+    "deepseek": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-yyy",
+      "BaseUrl": "https://api.deepseek.com"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "default",
+      "ModelId": "gpt-4o"
+    },
+    "deepseek-chat": {
+      "ProviderName": "deepseek",
+      "ModelId": "deepseek-chat"
+    }
+  },
   "Feishu": {
     "AppId": "",
     "AppSecret": "",
@@ -23,13 +41,22 @@
 }
 ```
 
-| 字段        | 必填 | 说明                                                 |
-| ----------- | ---- | ---------------------------------------------------- |
-| `Provider`  | 是   | 提供商名称，见 [Provider 配置指南](./provider-guide.md) |
-| `ApiKey`    | 是   | API 密钥，启动时校验非空                              |
-| `BaseUrl`   | 否   | 自定义地址，省略则使用 Provider 默认值                |
-| `ModelId`   | 是   | 模型标识符，如 `gpt-4o`、`deepseek-chat`              |
-| `Feishu`    | 否   | 飞书集成配置，仅 FeishuAdaptor 需要                   |
+### Providers 字段
+
+| 字段      | 必填 | 说明                                                        |
+| --------- | ---- | ----------------------------------------------------------- |
+| `Schema`  | 是   | 协议类型：`"OpenAI"` / `"Anthropic"` / `"Gemini"`          |
+| `ApiKey`  | 是   | API 密钥，启动时校验非空                                    |
+| `BaseUrl` | 否   | 自定义地址，省略则使用 Schema 对应的默认值                   |
+
+### ModelChoices 字段
+
+| 字段           | 必填 | 说明                                                |
+| -------------- | ---- | --------------------------------------------------- |
+| `ProviderName` | 是   | 引用 Providers 中的 key                             |
+| `ModelId`      | 是   | 模型标识符，如 `gpt-4o`、`deepseek-chat`            |
+
+`ModelChoices` 必须包含 `"default"` 条目，启动时校验。
 
 ---
 
@@ -65,15 +92,17 @@ builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
 
 ### 方式三：AddManInBlack（手动配置）
 
-不读取 settings.json，在代码中直接指定 Provider：
+不读取 settings.json，在代码中直接指定：
 
 ```csharp
 services.AddManInBlack(opt =>
 {
     opt.ModelChoice = new ModelChoice
     {
-        Provider = new DeepSeekProvider() { ApiKey = "sk-xxx" },
-        ModelId  = "deepseek-chat",
+        Schema  = "OpenAI",
+        ApiKey  = "sk-xxx",
+        BaseUrl = "https://api.deepseek.com",
+        ModelId = "deepseek-chat",
     };
 });
 ```
@@ -90,13 +119,14 @@ services.AddManInBlack(opt =>
 // 启动时快照（IOptions<T>）
 public class MyService(IOptions<ManInBlackSettings> options)
 {
-    var apiKey = options.Value.ApiKey;
+    var providers = options.Value.Providers;
+    var choices = options.Value.ModelChoices;
 }
 
 // 跟踪文件变更（IOptionsMonitor<T>）
 public class MyService(IOptionsMonitor<ManInBlackSettings> monitor)
 {
-    var currentApiKey = monitor.CurrentValue.ApiKey;
+    var currentChoices = monitor.CurrentValue.ModelChoices;
 
     monitor.OnChange(settings =>
     {
@@ -117,24 +147,28 @@ public class MyService(IOptionsMonitor<ManInBlackSettings> monitor)
 
 ## 配置校验
 
-`ApiKey` 已注册 `IValidateOptions<ManInBlackSettings>` 校验，取值时自动检查非空：
+已注册 `IValidateOptions<ManInBlackSettings>` 校验，取值时自动检查：
+
+- `Providers` 至少有一项
+- `ModelChoices` 包含 `"default"` 键
+- 每个 Provider 的 Schema 为合法值（`"OpenAI"` / `"Anthropic"` / `"Gemini"`）
+- 每个 Provider 的 ApiKey 非空
+- 每个 ModelChoice 的 ProviderName 在 Providers 中存在
 
 ```csharp
-// ApiKey 为空时抛 OptionsValidationException
+// 校验失败时抛 OptionsValidationException
 var settings = options.Value;
 ```
 
-新增必填字段的校验，编辑 `Configuration/ValidateManInBlackSettings.cs`：
+新增校验规则，编辑 `Configuration/ValidateManInBlackSettings.cs`：
 
 ```csharp
 public ValidateOptionsResult Validate(string? name, ManInBlackSettings options)
 {
-    if (string.IsNullOrWhiteSpace(options.ApiKey))
-        return ValidateOptionsResult.Fail("settings.json 缺少 ApiKey 配置");
+    if (options.Providers.Count == 0)
+        return ValidateOptionsResult.Fail("settings.json 缺少 Providers 配置");
 
-    // 新增校验
-    if (string.IsNullOrWhiteSpace(options.NewRequiredField))
-        return ValidateOptionsResult.Fail("settings.json 缺少 NewRequiredField 配置");
+    // ... 其他校验
 
     return ValidateOptionsResult.Success;
 }

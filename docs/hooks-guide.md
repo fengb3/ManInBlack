@@ -48,9 +48,18 @@ Hook 配置分为全局配置和用户级配置两个层级。
 
 ```json
 {
-  "Provider": "OpenAI",
-  "ApiKey": "sk-xxx",
-  "ModelId": "gpt-4o",
+  "Providers": {
+    "default": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-xxx"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "default",
+      "ModelId": "gpt-4o"
+    }
+  },
   "Hooks": [
     {
       "Name": "安全检查",

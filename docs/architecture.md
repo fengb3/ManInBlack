@@ -33,7 +33,7 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Tools/`      | IToolExecutor、ToolCallFilter（抽象）、ToolExecuteContext、ToolFunctionDeclaration |
 | `Attributes/` | [AiTool]、[ServiceRegister]（驱动源生成器）     |
 
-此外还包含 `IModelProvider` 接口、`ModelProvider` 抽象基类、`IUserWorkspace` 接口。
+此外还包含 `IUserWorkspace` 接口。
 
 ### ManInBlack.AI — 实现层
 
@@ -49,7 +49,7 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 
-此外还包含所有 Provider 子类（OpenAIProvider、AnthropicProvider 等）、`ModelChoice`、`ChatClientProviderExtensions`，以及 DI 注册入口。
+此外还包含 `ModelChoice`（纯数据结构：Schema/ApiKey/BaseUrl/ModelId）、`ChatClientProviderExtensions`，以及 DI 注册入口。
 
 ### ManInBlack.AI.SourceGenerator — 编译层
 
@@ -134,25 +134,17 @@ User ←──────────────── ChatResponseUpdate 流 
 
 ### 三态适配
 
-15 个提供商最终通过 `CompatibleWith` 字段映射到 3 种 API 协议：
+配置中通过 `Schema` 字段指定协议类型，映射到 3 种 API 适配器：
 
 ```
-CompatibleWith: "OpenAI"    → OpenAICompatibleChatClient   (SSE: data: ... [DONE])
-CompatibleWith: "Anthropic" → AnthropicCompatibleChatClient (SSE: content_block_start/delta/stop)
-CompatibleWith: "Gemini"    → GeminiCompatibleChatClient     (SSE + API Key in query param)
+Schema: "OpenAI"    → OpenAICompatibleChatClient   (SSE: data: ... [DONE])
+Schema: "Anthropic" → AnthropicCompatibleChatClient (SSE: content_block_start/delta/stop)
+Schema: "Gemini"    → GeminiCompatibleChatClient     (SSE + API Key in query param)
 ```
-
-### 提供商注册表
-
-| CompatibleWith | 提供商                                                                             |
-| -------------- | ---------------------------------------------------------------------------------- |
-| OpenAI         | OpenAI, Kimi, DeepSeek, Qwen, Zhipu, Yi, Baichuan, StepFun, Spark, Doubao, MiniMax |
-| Anthropic      | Anthropic                                                                          |
-| Gemini         | Gemini                                                                             |
 
 ### 工厂分发
 
-`ChatClientProviderExtensions.CreateChatClient()` 通过 `switch(CompatibleWith)` 创建对应的适配器实例，注入 `HttpClient`
+`ChatClientProviderExtensions.CreateChatClient()` 通过 `switch(Schema)` 创建对应的适配器实例，注入 `HttpClient`
 和认证头。
 
 ---
@@ -201,7 +193,7 @@ AddManInBlackFromSettings(configure?)
 AddManInBlackFromConfiguration(IConfiguration, configure?)
     ├── Configure<ManInBlackSettings>(configuration)
     ├── Configure<FeishuSettings>(configuration.GetSection("Feishu"))
-    ├── IValidateOptions<ManInBlackSettings> 校验 ApiKey
+    ├── IValidateOptions<ManInBlackSettings> 校验 Providers、ModelChoices
     └── 调用 AddManInBlack
 ```
 

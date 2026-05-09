@@ -37,25 +37,42 @@ dotnet add reference <path>/src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.Sour
 
 ```json
 {
-  "Provider": "OpenAI",
-  "ApiKey": "sk-xxxxxxxx",
-  "BaseUrl": "https://api.openai.com",
-  "ModelId": "gpt-4o"
+  "Providers": {
+    "default": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-xxxxxxxx"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "default",
+      "ModelId": "gpt-4o"
+    }
+  }
 }
 ```
 
-对中国厂商（如 DeepSeek）：
+使用 DeepSeek 等其他厂商时，只需改 `BaseUrl`：
 
 ```json
 {
-  "Provider": "DeepSeek",
-  "ApiKey": "sk-xxxxxxxx",
-  "BaseUrl": "https://api.deepseek.com",
-  "ModelId": "deepseek-chat"
+  "Providers": {
+    "default": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-xxxxxxxx",
+      "BaseUrl": "https://api.deepseek.com"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "default",
+      "ModelId": "deepseek-chat"
+    }
+  }
 }
 ```
 
-`BaseUrl` 可选，每个 Provider 有默认值。完整配置说明见 [配置指南](./configuration-guide.md)。
+`BaseUrl` 可选，不填则使用 Schema 对应的默认值。完整配置说明见 [配置指南](./configuration-guide.md)。
 
 ---
 
@@ -159,24 +176,22 @@ Token 用量 — 输入: 42, 输出: 128
 
 ## 手动配置（不使用 settings.json）
 
-如果需要在代码中直接配置 Provider，使用 `AddManInBlack`：
+如果需要在代码中直接配置，使用 `AddManInBlack`：
 
 ```csharp
 services.AddManInBlack(opt =>
 {
     opt.ModelChoice = new ModelChoice
     {
-        Provider = new DeepSeekProvider()
-        {
-            ApiKey = "sk-xxx",
-            BaseUrl = "https://api.deepseek.com",
-        },
+        Schema = "OpenAI",
+        ApiKey = "sk-xxx",
+        BaseUrl = "https://api.deepseek.com",
         ModelId = "deepseek-chat",
     };
 });
 ```
 
-所有 Provider 类在 `ManInBlack.AI` 命名空间下。详见 [Provider 配置指南](./provider-guide.md)。
+详见 [Provider 配置指南](./provider-guide.md)。
 
 ---
 

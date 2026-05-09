@@ -1,51 +1,50 @@
 # AGENTS.md — ManInBlack
 
-.NET 10 AI agent framework. Unified abstractions for 15 chat providers through `Microsoft.Extensions.AI` (`IChatClient`). Onion-model middleware pipeline, source-generated tool dispatch, sandbox execution on Linux via bubblewrap.
+.NET 10 AI agent 框架。通过 `Microsoft.Extensions.AI`（`IChatClient`）统一抽象 3 种聊天协议（OpenAI/Anthropic/Gemini）。洋葱模型中间件管道，源生成器工具派发，Linux 下通过 bubblewrap 沙盒执行。
 
-## Build & test
+## 构建与测试
 
 ```bash
-dotnet build ManInBlack.slnx                                    # Build everything
-dotnet build src/ManInBlack.AI                                  # Main library only
-dotnet build src/ManInBlack.AI.SourceGenerator                  # Source generator (netstandard2.0)
-dotnet test test/ManInBlack.AI.Tests                            # Unit tests (xunit)
-dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # Filtered
-dotnet test test/FeishuAdaptor.Tests                            # Feishu adaptor tests (NSubstitute)
-dotnet run --project demo/AgentConsole                          # Console demo
+dotnet build ManInBlack.slnx                                    # 构建全部
+dotnet build src/ManInBlack.AI                                  # 仅构建主库
+dotnet build src/ManInBlack.AI.SourceGenerator                  # 源生成器（netstandard2.0）
+dotnet test test/ManInBlack.AI.Tests                            # 单元测试（xunit）
+dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # 过滤测试
+dotnet test test/FeishuAdaptor.Tests                            # 飞书适配器测试（NSubstitute）
+dotnet run --project demo/AgentConsole                          # 控制台 demo
 dotnet run --project demo/FeishuAdaptor                         # 飞书 bot demo
 ```
 
-No linter, formatter, or CI pipeline configured. No `global.json`, `Directory.Build.props`, or `.editorconfig`.
+未配置 linter、formatter 或 CI 管道。无 `global.json`、`Directory.Build.props` 或 `.editorconfig`。
 
-## Critical traps
+## 关键陷阱
 
-These are non-obvious constraints that agents frequently get wrong:
+这些是 Agent 经常踩坑的非显而易见的约束：
 
-- **DI uses C# 13 `extension` syntax** — NOT static extension methods. See `src/ManInBlack.AI/DependencyInjection.cs`.
-- **Source generators use `Fengb3.EasyCodeBuilder` only** — never raw `StringBuilder`. → [sourcegenerator-guide.md](docs/sourcegenerator-guide.md)
-- **`[AiTool]` classes must be `partial`** — compiler error MIB010 if not. XML docs on `[AiTool]` methods/params become LLM-visible descriptions. → [sourcegenerator-guide.md](docs/sourcegenerator-guide.md)
-- **`AgentLoopMiddleware` must always be the innermost** (last registered) middleware. → [middleware-guide.md](docs/middleware-guide.md)
+- **DI 使用 C# 13 `extension` 语法** — 不是静态扩展方法。参见 `src/ManInBlack.AI/DependencyInjection.cs`。
+- **源生成器只能用 `Fengb3.EasyCodeBuilder`** — 禁止使用原始 `StringBuilder`。→ [源生成器指南](docs/sourcegenerator-guide.md)
+- **`[AiTool]` 类必须声明为 `partial`** — 否则编译器报错 MIB010。`[AiTool]` 方法和参数上的 XML 文档注释会成为 LLM 可见的描述。→ [源生成器指南](docs/sourcegenerator-guide.md)
+- **`AgentLoopMiddleware` 必须始终是最内层**（最后注册的）中间件。→ [中间件开发指北](docs/middleware-guide.md)
 
-## Conventions
+## 约定
 
-- All comments and docs in Chinese. Maintain this convention.
-- Commit messages use [gitmoji](https://gitmoji.dev/) prefix. **NEVER** add `Co-authored-by` trailers.
-- Tests use hand-written fakes, no mocking frameworks (except FeishuAdaptor.Tests uses NSubstitute).
+- 所有注释和文档使用中文。
+- 提交信息使用 [gitmoji](https://gitmoji.dev/) 前缀。**禁止**添加 `Co-authored-by` 尾部。
+- 测试使用手写 fake，不使用 mock 框架（FeishuAdaptor.Tests 除外，使用 NSubstitute）。
+- 修改模块后必须同步更新 `docs/` 下对应文档的内容（配置示例、代码片段、字段说明等）。
 
-## Docs index
+## 文档索引
 
-Read the corresponding doc before modifying a module:
+修改模块前先阅读对应文档：
 
-| Topic | Doc |
-|---|---|
-| Architecture, project layers, pipeline | [docs/architecture.md](docs/architecture.md) |
-| Agent factory, definition, lifecycle | [docs/agent-factory-guide.md](docs/agent-factory-guide.md) |
-| Middleware development & pipeline order | [docs/middleware-guide.md](docs/middleware-guide.md) |
-| Source generators & diagnostic rules | [docs/sourcegenerator-guide.md](docs/sourcegenerator-guide.md) |
-| Tool development & `[AiTool]` pattern | [docs/tools-guide.md](docs/tools-guide.md) |
-| Configuration system (`IOptions`, `settings.json`) | [docs/configuration-guide.md](docs/configuration-guide.md) |
-| Hooks (external shell scripts) | [docs/hooks-guide.md](docs/hooks-guide.md) |
-| Testing middleware | [docs/testing-guide.md](docs/testing-guide.md) |
-| Provider configuration & 3 adapter protocols | [docs/provider-guide.md](docs/provider-guide.md) |
-| Feishu adaptor | [docs/feishu-guide.md](docs/feishu-guide.md) |
-| Quick start guide | [docs/quick-start.md](docs/quick-start.md) |
+- [架构概览](docs/architecture.md)
+- [Agent 工厂指南](docs/agent-factory-guide.md)
+- [中间件开发指北](docs/middleware-guide.md)
+- [源生成器指南](docs/sourcegenerator-guide.md)
+- [工具开发指北](docs/tools-guide.md)
+- [配置指南](docs/configuration-guide.md)
+- [Hook 开发指北](docs/hooks-guide.md)
+- [测试指北](docs/testing-guide.md)
+- [Provider 配置指南](docs/provider-guide.md)
+- [飞书适配器指南](docs/feishu-guide.md)
+- [快速开始](docs/quick-start.md)

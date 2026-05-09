@@ -78,7 +78,7 @@ Assert.Equal("response", results[0].Text);
 测试文件需要引用以下命名空间：
 
 ```csharp
-using ManInBlack.AI.Abstraction;              // IModelProvider, IUserWorkspace
+using ManInBlack.AI.Abstraction;              // IUserWorkspace
 using ManInBlack.AI.Abstraction.Middleware;    // AgentMiddleware, AgentContext
 using ManInBlack.AI.Abstraction.Tools;         // IToolExecutor, ToolExecuteContext
 using ManInBlack.AI.Abstraction.Storage;       // ISessionStorage, IUserStorage
