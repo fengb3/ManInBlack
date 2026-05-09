@@ -35,5 +35,6 @@ public static class AgentPipelineBuilderExtensions
             .Use<SystemPromptInjectionMiddleware>()
             .Use<UserInputMiddleware>()
             .Use<RetryMiddleware>()
+            .Use<EventPublishingMiddleware>()
             .Use<AgentLoopMiddleware>(); // Agent Loop 应该在最后一个
 }

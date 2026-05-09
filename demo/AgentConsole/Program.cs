@@ -1,9 +1,9 @@
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Events;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.ToolCallFilters;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 
@@ -26,70 +26,57 @@ Console.WriteLine();
 // 通过 AgentFactory 运行 agent
 var factory = rootSp.GetRequiredService<AgentFactory>();
 AgentContext? capturedContext = null;
-IDisposable? toolExecutingSub = null;
-IDisposable? toolExecutedSub = null;
+var subs = new List<IDisposable>();
 
 var updates = factory.RunAsync("console-agent", args[0], "console", "Default", ctx =>
 {
     capturedContext = ctx;
 
-    // 在 Factory 的 scope 内订阅 EventBus，确保能收到事件
+    var key = ctx.AgentId;
     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-    toolExecutingSub = bus.Subscribe<ToolExecutingEvent>(async (@event, ct) =>
+
+    // 订阅模型输出内容事件
+    var last = "";
+    subs.Add(bus.Subscribe<ModelContentEvent>(key, async (evt, ct) =>
+    {
+        switch (evt.Kind)
+        {
+            case ModelContentKind.Reasoning:
+                if (last != "reasoning")
+                    Console.WriteLine("[Reasoning]");
+                last = "reasoning";
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write(evt.Text);
+                Console.ResetColor();
+                break;
+            case ModelContentKind.Text:
+                if (last != "text")
+                    Console.WriteLine();
+                last = "text";
+                Console.Write(evt.Text);
+                break;
+        }
+    }));
+
+    subs.Add(bus.Subscribe<ToolExecutingEvent>(key, async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"\n[Tool Call] {@event.ToolName}({string.Join(", ", @event.Arguments.Select(kv => $"{kv.Key}: {kv.Value}"))})");
         Console.ResetColor();
-    });
-    toolExecutedSub = bus.Subscribe<ToolExecutedEvent>(async (@event, ct) =>
+    }));
+    subs.Add(bus.Subscribe<ToolExecutedEvent>(key, async (@event, ct) =>
     {
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"[Tool Result] {@event.Result} {@event.Exception}");
         Console.ResetColor();
-    });
+    }));
 });
 
-var last = "";
-
-await foreach (ChatResponseUpdate update in updates)
-{
-    foreach (var content in update.Contents)
-    {
-        switch (content)
-        {
-            case TextReasoningContent reasoning:
-
-                if (last != "reasoning")
-                {
-                    Console.WriteLine("[Reasoning]");
-                }
-
-                last = "reasoning";
-                
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write(reasoning.Text);
-                Console.ResetColor();
-                break;
-            case TextContent text:
-
-                if (last != "text")
-                {
-                    Console.WriteLine();
-                }
-                
-                last = "text";
-                Console.Write(text.Text);
-                break;
-            case UsageContent:
-                // usage 由 AgentLoopMiddleware 累积，不显示
-                break;
-        }
-    }
-}
+// 仅驱动枚举，输出由 EventBus handler 处理
+await foreach (var _ in updates) { }
 
 // 清理 EventBus 订阅
-toolExecutingSub?.Dispose();
-toolExecutedSub?.Dispose();
+foreach (var sub in subs) sub.Dispose();
 
 Console.WriteLine();
 Console.WriteLine();
