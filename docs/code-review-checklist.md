@@ -1,7 +1,8 @@
 # 代码审查待办清单
 
-> 生成时间：2025-05-09
+> 生成时间：2025-05-09 | 最后更新：2025-05-09
 > 基于 9 个文档维度的全量代码审查结果，已完成的标记为 ✅，待修复的标记为 ⬜。
+> 提交：67d2a74 🐛 修复 FileTools.Edit、SerializeTools、更新文档
 
 ---
 
@@ -15,13 +16,13 @@
 
 ### 待修复
 
-- [ ] **H3: 文档与代码全面不一致** — 架构、中间件、工厂、事件总线、Hook 文档均过时
+- [x] **H3: 文档与代码全面不一致** — 架构、中间件、工厂、事件总线、Hook 文档均已更新
   - [x] `docs/agent-factory-guide.md` — EventBus 生命周期、已删除中间件引用
   - [x] `docs/eventbus-guide.md` — 事件发布者记录
   - [x] `docs/hooks-guide.md` — 添加 EventBus 间接机制说明
-  - [ ] `docs/architecture.md` — 管道顺序、Filter 名称、中间件数量、Abstraction 目录结构
-  - [ ] `docs/middleware-guide.md` — 管道顺序、中间件名称
-  - [ ] `docs/tools-guide.md` — 工具方法名与代码不匹配（ReadFile→Read, WriteFile→Write, UpdateFile→Edit），KillBackgroundTask 未记录
+  - [x] `docs/architecture.md` — 管道顺序、Filter 名称、中间件数量、Abstraction 目录结构
+  - [x] `docs/middleware-guide.md` — 管道顺序（UseDefault 外层 + UseSimple 内层）、中间件名称
+- [x] **H3-remaining: tools-guide.md 文档与代码不匹配** — 方法名已修正（ReadFile→Read, WriteFile→Write, UpdateFile→Edit），KillBackgroundTask 已补充，DeleteFile/DeleteDirectory 标注已注释。`docs/tools-guide.md`
 - [ ] **H5: 同步阻塞异步方法（死锁风险）** — 三处 `.Wait()` / `GetAwaiter().GetResult()`
   - [ ] `src/ManInBlack.AI/Middlewares/PersistenceMiddleware.cs:116` — `SaveMessage().Wait()`
   - [ ] `src/ManInBlack.AI/Services/FileUserWorkspace.cs:15` — `GetOrCreateUser().GetAwaiter().GetResult()`
