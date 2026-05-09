@@ -40,7 +40,25 @@ public static class ManInBlackConfigurationBuilder
         if (!File.Exists(SettingsPath))
         {
             Directory.CreateDirectory(SettingsRoot);
-            var defaults = new ManInBlackSettings();
+            var defaults = new ManInBlackSettings
+            {
+                Providers = new Dictionary<string, ProviderSettings>
+                {
+                    ["default"] = new ProviderSettings
+                    {
+                        Schema = "OpenAI",
+                        ApiKey = "",
+                    }
+                },
+                ModelChoices = new Dictionary<string, ModelChoiceSettings>
+                {
+                    ["default"] = new ModelChoiceSettings
+                    {
+                        ProviderName = "default",
+                        ModelId = "gpt-4o",
+                    }
+                },
+            };
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(defaults, JsonWriteOptions));
         }
     }

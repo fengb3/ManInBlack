@@ -1,40 +1,32 @@
-using ManInBlack.AI.Abstraction;
-
 namespace ManInBlack.AI.Configuration;
 
 public static class SettingsLoader
 {
-    public static ModelChoice ToModelChoice(this ManInBlackSettings settings)
+    /// <summary>
+    /// 获取默认的 ModelChoice（由 Providers["default"] + ModelChoices["default"] 组合）
+    /// </summary>
+    public static ModelChoice GetDefaultModelChoice(this ManInBlackSettings settings)
     {
-        var provider = CreateProvider(settings.Provider);
-        provider.ApiKey = settings.ApiKey;
-        if (settings.BaseUrl is not null)
-            provider.BaseUrl = settings.BaseUrl;
+        return settings.GetModelChoice("default");
+    }
+
+    /// <summary>
+    /// 按 name 获取 ModelChoice
+    /// </summary>
+    public static ModelChoice GetModelChoice(this ManInBlackSettings settings, string name)
+    {
+        if (!settings.ModelChoices.TryGetValue(name, out var choice))
+            throw new KeyNotFoundException($"未找到 ModelChoice 配置：{name}");
+
+        if (!settings.Providers.TryGetValue(choice.ProviderName, out var provider))
+            throw new KeyNotFoundException($"ModelChoice \"{name}\" 引用的 Provider \"{choice.ProviderName}\" 不存在");
 
         return new ModelChoice
         {
-            Provider = provider,
-            ModelId = settings.ModelId,
+            Schema = provider.Schema,
+            ApiKey = provider.ApiKey,
+            BaseUrl = provider.BaseUrl ?? "",
+            ModelId = choice.ModelId,
         };
     }
-
-    static ModelProvider CreateProvider(string name) => name switch
-    {
-        "OpenAI" => new OpenAIProvider(),
-        "Anthropic" => new AnthropicProvider(),
-        "Gemini" => new GeminiProvider(),
-        "KimiCN" or "Kimi-cn" => new KimiCNProvider(),
-        "KimiAI" or "Kimi-ai" => new KimiAIProvider(),
-        "DeepSeek" => new DeepSeekProvider(),
-        "Qwen" => new QwenProvider(),
-        "Zhipu" => new ZhipuProvider(),
-        "ZhipuCodingPlan" => new ZhipuCodingPlanProvider(),
-        "Yi" => new YiProvider(),
-        "Baichuan" => new BaichuanProvider(),
-        "StepFun" => new StepFunProvider(),
-        "Spark" => new SparkProvider(),
-        "Doubao" => new DoubaoProvider(),
-        "MiniMax" => new MiniMaxProvider(),
-        _ => throw new NotSupportedException($"不支持的 Provider: {name}"),
-    };
 }

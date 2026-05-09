@@ -514,16 +514,14 @@ public class AnthropicCompatibleChatClientTests
     [Fact]
     public async Task CreateChatClient_AnthropicProviderBaseUrl_无重复V1路径()
     {
-        // 模拟 CreateChatClient 中对 AnthropicProvider.BaseUrl 的处理逻辑
         var handler = new MockHttpMessageHandler("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":0,"output_tokens":0}}""");
-        var provider = new AnthropicProvider { ApiKey = "test-key" };
+        const string baseUrl = "https://api.anthropic.com";
 
-        // 复现 CreateChatClient 中的 BaseAddress 设置逻辑
         var http = new HttpClient(handler);
-        http.BaseAddress = provider.BaseUrl.EndsWith('/')
-            ? new Uri(provider.BaseUrl)
-            : new Uri(provider.BaseUrl + "/");
-        http.DefaultRequestHeaders.Add("x-api-key", provider.ApiKey);
+        http.BaseAddress = baseUrl.EndsWith('/')
+            ? new Uri(baseUrl)
+            : new Uri(baseUrl + "/");
+        http.DefaultRequestHeaders.Add("x-api-key", "test-key");
         http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
         var client = new AnthropicCompatibleChatClient(http, "test-model");

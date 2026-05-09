@@ -42,9 +42,9 @@ public static class DependencyInjection
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() =>
                     new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
-            
+
             services.AddSingleton(options.ModelChoice);
-            
+
             services.AddScoped<IChatClient>(sp =>
             {
                 var choice = sp.GetRequiredService<ModelChoice>();
@@ -97,7 +97,10 @@ public static class DependencyInjection
 
             var settings = new ManInBlackSettings();
             configuration.Bind(settings);
-            var modelChoice = settings.ToModelChoice();
+            var modelChoice = settings.GetDefaultModelChoice();
+
+            // 注册完整配置，后续可通过 IOptions<ManInBlackSettings> 按名获取其他 ModelChoice
+            services.AddSingleton(settings);
 
             return services.AddManInBlack(opt =>
             {

@@ -1,56 +1,20 @@
 # Provider 配置指南
 
-本文档列出 ManInBlack 支持的所有 AI 提供商及其配置方式。
+本文档说明 ManInBlack 的 AI 提供商配置方式。
 
 ---
 
 ## 概览
 
-15 个提供商通过 `CompatibleWith` 字段映射到 3 种 API 协议：
+ManInBlack 支持三种 API 协议（Schema），通过 `Schema` 字段指定：
 
-| 协议      | 适配器                          | 认证方式                                 |
-| --------- | ------------------------------- | ---------------------------------------- |
-| OpenAI    | `OpenAICompatibleChatClient`    | `Authorization: Bearer {key}`            |
-| Anthropic | `AnthropicCompatibleChatClient` | `x-api-key: {key}` + `anthropic-version` |
-| Gemini    | `GeminiCompatibleChatClient`    | URL Query `?key={key}`                   |
+| Schema      | 适配器                          | 认证方式                                 | 默认 BaseUrl                                    |
+| ----------- | ------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `OpenAI`    | `OpenAICompatibleChatClient`    | `Authorization: Bearer {key}`            | `https://api.openai.com`                        |
+| `Anthropic` | `AnthropicCompatibleChatClient` | `x-api-key: {key}` + `anthropic-version` | `https://api.anthropic.com`                     |
+| `Gemini`    | `GeminiCompatibleChatClient`    | URL Query `?key={key}`                   | `https://generativelanguage.googleapis.com`     |
 
-绝大多数中国厂商兼容 OpenAI 协议，无需额外适配。
-
----
-
-## 完整提供商列表
-
-### OpenAI 协议兼容
-
-这些提供商使用标准的 OpenAI Chat Completions API。
-
-| 类名                      | 提供商       | 默认 BaseUrl                                     | settings.json 中的 Provider 值 |
-| ------------------------- | ------------ | ------------------------------------------------ | ------------------------------ |
-| `OpenAIProvider`          | OpenAI       | `https://api.openai.com`                         | `"OpenAI"`                     |
-| `DeepSeekProvider`        | DeepSeek     | `https://api.deepseek.com`                       | `"DeepSeek"`                   |
-| `KimiCNProvider`          | Kimi (国内)  | `https://api.moonshot.cn`                        | `"KimiCN"` 或 `"Kimi-cn"`      |
-| `KimiAIProvider`          | Kimi (国际)  | `https://api.moonshot.ai`                        | `"KimiAI"` 或 `"Kimi-ai"`      |
-| `QwenProvider`            | 通义千问     | `https://dashscope.aliyuncs.com/compatible-mode` | `"Qwen"`                       |
-| `ZhipuProvider`           | 智谱 AI      | `https://open.bigmodel.cn/api/paas/v4`           | `"Zhipu"`                      |
-| `ZhipuCodingPlanProvider` | 智谱编程计划 | `https://open.bigmodel.cn/api/coding/paas/v4`    | `"ZhipuCodingPlan"`            |
-| `YiProvider`              | 零一万物     | `https://api.lingyiwanwu.com`                    | `"Yi"`                         |
-| `BaichuanProvider`        | 百川智能     | `https://api.baichuan-ai.com`                    | `"Baichuan"`                   |
-| `StepFunProvider`         | 阶跃星辰     | `https://api.stepfun.com`                        | `"StepFun"`                    |
-| `SparkProvider`           | 讯飞星火     | `https://spark-api-open.xf-yun.com`              | `"Spark"`                      |
-| `DoubaoProvider`          | 豆包 (字节)  | `https://ark.cn-beijing.volces.com/api`          | `"Doubao"`                     |
-| `MiniMaxProvider`         | MiniMax      | `https://api.minimax.chat`                       | `"MiniMax"`                    |
-
-### Anthropic 协议兼容
-
-| 类名                | 提供商    | 默认 BaseUrl                | Provider 值   |
-| ------------------- | --------- | --------------------------- | ------------- |
-| `AnthropicProvider` | Anthropic | `https://api.anthropic.com` | `"Anthropic"` |
-
-### Gemini 协议兼容
-
-| 类名             | 提供商 | 默认 BaseUrl                                | Provider 值 |
-| ---------------- | ------ | ------------------------------------------- | ----------- |
-| `GeminiProvider` | Google | `https://generativelanguage.googleapis.com` | `"Gemini"`  |
+绝大多数厂商（DeepSeek、通义千问、智谱、Kimi、豆包等）兼容 OpenAI 协议，只需更改 `BaseUrl` 即可接入。
 
 ---
 
@@ -62,14 +26,50 @@
 
 ```json
 {
-  "Provider": "DeepSeek",
-  "ApiKey": "sk-xxxxxxxx",
-  "BaseUrl": "https://api.deepseek.com",
-  "ModelId": "deepseek-chat"
+  "Providers": {
+    "openai": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-xxx",
+      "BaseUrl": "https://api.openai.com"
+    },
+    "deepseek": {
+      "Schema": "OpenAI",
+      "ApiKey": "sk-yyy",
+      "BaseUrl": "https://api.deepseek.com"
+    },
+    "claude": {
+      "Schema": "Anthropic",
+      "ApiKey": "sk-zzz"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "openai",
+      "ModelId": "gpt-4o"
+    },
+    "deepseek-chat": {
+      "ProviderName": "deepseek",
+      "ModelId": "deepseek-chat"
+    },
+    "claude-sonnet": {
+      "ProviderName": "claude",
+      "ModelId": "claude-sonnet-4-20250514"
+    }
+  }
 }
 ```
 
-`BaseUrl` 可选，每个 Provider 有默认值。使用 `AddManInBlackFromSettings()` 加载：
+**结构说明：**
+
+- **Providers**：字典，key 为自定义名称。每个 provider 包含：
+  - `Schema`（必填）：协议类型，只允许 `"OpenAI"` / `"Anthropic"` / `"Gemini"`
+  - `ApiKey`（必填）：API 密钥
+  - `BaseUrl`（可选）：API 基础地址，不填则使用 Schema 对应的默认值
+- **ModelChoices**：字典，key 为自定义名称，**必须包含 `"default"`**。每个 choice 包含：
+  - `ProviderName`（必填）：引用 Providers 中的 key
+  - `ModelId`（必填）：模型标识符
+
+使用 `AddManInBlackFromSettings()` 加载，默认使用 `ModelChoices["default"]`：
 
 ```csharp
 services.AddManInBlackFromSettings();
@@ -79,24 +79,20 @@ services.AddManInBlackFromSettings();
 
 ### 方式二：代码配置
 
-直接在代码中创建 Provider 实例：
+直接在代码中创建 `ModelChoice`：
 
 ```csharp
 services.AddManInBlack(opt =>
 {
     opt.ModelChoice = new ModelChoice
     {
-        Provider = new DeepSeekProvider()
-        {
-            ApiKey = "sk-xxx",
-            BaseUrl = "https://api.deepseek.com",
-        },
+        Schema = "OpenAI",
+        ApiKey = "sk-xxx",
+        BaseUrl = "https://api.deepseek.com",
         ModelId = "deepseek-chat",
     };
 });
 ```
-
-所有 Provider 类在 `ManInBlack.AI` 命名空间下。
 
 ### 方式三：使用代理 / 中转 API
 
@@ -104,59 +100,74 @@ services.AddManInBlack(opt =>
 
 ```json
 {
-  "Provider": "OpenAI",
-  "ApiKey": "your-key",
-  "BaseUrl": "https://proxy.example.com/v1",
-  "ModelId": "gpt-4o"
+  "Providers": {
+    "proxy": {
+      "Schema": "OpenAI",
+      "ApiKey": "your-key",
+      "BaseUrl": "https://proxy.example.com/v1"
+    }
+  },
+  "ModelChoices": {
+    "default": {
+      "ProviderName": "proxy",
+      "ModelId": "gpt-4o"
+    }
+  }
 }
 ```
 
 ---
 
-## 注册新提供商
+## 按名称获取 ModelChoice
 
-只需创建类继承 `ModelProvider`（定义在 `ManInBlack.AI.Abstraction`）：
-
-```csharp
-using ManInBlack.AI.Abstraction;
-
-namespace ManInBlack.AI;
-
-public sealed class MyProvider : ModelProvider
-{
-    public override string ProviderName  => "MyProvider";
-    public override string BaseUrl       { get; set; } = "https://api.example.com";
-    public override string CompatibleWith => "OpenAI";  // 或 "Anthropic" / "Gemini"
-}
-```
-
-无需编写适配器代码 —— 只要 `CompatibleWith` 指向现有协议，工厂方法会自动创建对应的 `IChatClient` 实例。
-
-如果希望通过 `settings.json` 配置，还需在 `SettingsLoader.CreateProvider()` 中添加映射：
+通过 `ManInBlackSettings` 获取非默认的 ModelChoice：
 
 ```csharp
-"MyProvider" => new MyProvider(),
+var settings = sp.GetRequiredService<ManInBlackSettings>();
+var choice = settings.GetModelChoice("deepseek-chat");
+var chatClient = ChatClientProviderExtensions.CreateChatClient(
+    sp.GetRequiredService<IHttpClientFactory>(), choice);
 ```
 
 ---
 
-## 运行时提供商切换
+## 常见厂商配置示例
 
-通过 `ModelChoice` 在运行时动态选择：
+### DeepSeek
 
-```csharp
-// 不同任务用不同模型
-var chatChoice = new ModelChoice
+```json
 {
-    Provider = new DeepSeekProvider() { ApiKey = deepseekKey },
-    ModelId  = "deepseek-chat",
-};
-
-var codeChoice = new ModelChoice
-{
-    Provider = new OpenAIProvider() { ApiKey = openaiKey },
-    ModelId  = "gpt-4o",
-};
+  "Schema": "OpenAI",
+  "ApiKey": "sk-xxx",
+  "BaseUrl": "https://api.deepseek.com"
+}
 ```
 
-每次构建管道时可以传入不同的 `ModelChoice`，由 DI 容器中的 `IChatClient` 单例策略决定实际模型工厂逻辑。
+### 通义千问（Qwen）
+
+```json
+{
+  "Schema": "OpenAI",
+  "ApiKey": "sk-xxx",
+  "BaseUrl": "https://dashscope.aliyuncs.com/compatible-mode"
+}
+```
+
+### 智谱 AI
+
+```json
+{
+  "Schema": "OpenAI",
+  "ApiKey": "xxx.xxx",
+  "BaseUrl": "https://open.bigmodel.cn/api/paas/v4"
+}
+```
+
+### Google Gemini
+
+```json
+{
+  "Schema": "Gemini",
+  "ApiKey": "xxx"
+}
+```
