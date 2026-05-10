@@ -40,6 +40,21 @@
 | ------------ | -------------------------- |
 | `LoadSkill`  | 按名称加载 skill 内容      |
 
+### DelegationTools
+
+| 方法               | 说明                                                         |
+| ------------------ | ------------------------------------------------------------ |
+| `DelegateToAgent`  | 将任务委托给指定子 Agent 执行，返回子 Agent 的文本输出       |
+
+**参数：**
+
+| 参数        | 类型     | 说明                                         |
+| ----------- | -------- | -------------------------------------------- |
+| `agentName` | `string` | 要委托的子 Agent 名称（必须在父 Agent 的 SubAgents 列表中） |
+| `task`      | `string` | 要委托给子 Agent 的任务描述                   |
+
+**使用方式：** 通过 `DelegationMiddleware` 自动注入，不需要手动注册。只有 `AgentDefinition.SubAgents` 非空的 Agent 才会获得此工具。
+
 ---
 
 ## ToolCallFilter 管道

@@ -23,6 +23,7 @@
 | `Instruction`      | `string`   | `""`       | 系统提示词，赋值给 `AgentContext.SystemPrompt` |
 | `PipelineName`     | `string`   | `"default"` | 管道名称，决定使用哪套中间件组合         |
 | `ParentAgentName`  | `string?`  | `null`     | 父 Agent 名称（可选，用于多 Agent 编排） |
+| `SubAgents`        | `List<string>` | `[]`   | 可委托的子 Agent 名称列表 |
 
 ### 管道注册 — 命名管道配置委托
 
@@ -473,6 +474,56 @@ public class AgentLauncher(
     }
 }
 ```
+
+---
+
+## 子 Agent 委托
+
+AgentDefinition 的 `SubAgents` 属性声明了该 Agent 可以委托的子 Agent 列表。当 `SubAgents` 非空时，`DelegationMiddleware` 会自动注入委托工具和提示词。
+
+### 配置示例
+
+```csharp
+// 子 Agent 使用不包含 DelegationMiddleware 的 pipeline（如 "simple"），防止递归委托
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "researcher",
+    Description = "擅长搜索和分析信息",
+    Instruction = "你是一个研究助手...",
+    PipelineName = "simple"
+});
+
+// 父 Agent 使用 "default" pipeline（包含 DelegationMiddleware）
+services.AddAgentDefinition(new AgentDefinition
+{
+    Name = "orchestrator",
+    Instruction = "你是一个协调者...",
+    PipelineName = "default",
+    SubAgents = ["researcher"]
+});
+```
+
+### 委托流程
+
+1. 父 Agent 的 `DelegationMiddleware` 检查 `SubAgents` 是否非空
+2. 如果非空，注入 `DelegateToAgent` 工具声明和子 Agent 描述到系统提示词
+3. LLM 决定调用 `DelegateToAgent(agentName, task)` 工具
+4. `DelegationTools` 通过 `AgentFactory.RunAsync` 启动子 Agent
+5. 子 Agent 在独立的 DI 作用域和会话中运行
+6. 子 Agent 的文本输出作为工具结果返回给父 Agent
+
+### 事件
+
+委托过程会发布以下事件（以父 Agent 的 `AgentId` 为 key）：
+
+- `SubAgentStartedEvent` — 子 Agent 开始执行
+- `SubAgentCompletedEvent` — 子 Agent 执行完成（包含结果或错误）
+
+### 注意事项
+
+- **防止递归**：子 Agent 应使用不包含 `DelegationMiddleware` 的 pipeline（如 `simple`），从根本上防止循环委托
+- **独立会话**：子 Agent 以 `parentId = 父 AgentId` 创建独立会话，不继承父 Agent 的对话历史
+- **CancellationToken 传播**：父 Agent 的取消信号会自动传播到子 Agent
 
 ---
 

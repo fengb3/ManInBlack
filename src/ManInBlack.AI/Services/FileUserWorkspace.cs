@@ -12,7 +12,9 @@ namespace ManInBlack.AI.Services;
 [ServiceRegister.Scoped.As<IUserWorkspace>]
 public class FileUserWorkspace(IOptions<AgentStorageOptions> options, AgentContext agentContext, IUserStorage userStorage) : IUserWorkspace
 {
-    private readonly UserEntry _user = userStorage.GetOrCreateUser(agentContext.ParentId).GetAwaiter().GetResult();
+    private readonly UserEntry _user = userStorage.GetOrCreateUser(
+        !string.IsNullOrEmpty(agentContext.RootUserId) ? agentContext.RootUserId : agentContext.ParentId
+    ).GetAwaiter().GetResult();
 
     /// <inheritdoc />
     public string WorkingDirectory

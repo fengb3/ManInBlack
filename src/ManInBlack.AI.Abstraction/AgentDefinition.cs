@@ -29,4 +29,9 @@ public class AgentDefinition
     /// 父 Agent 名称（可选）
     /// </summary>
     public string? ParentAgentName { get; set; }
+
+    /// <summary>
+    /// 可委托的子 Agent 名称列表。如果非空，DelegationMiddleware 会注入委托工具和提示词。
+    /// </summary>
+    public List<string> SubAgents { get; set; } = [];
 }

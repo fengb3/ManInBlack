@@ -16,11 +16,12 @@ public static class AgentPipelineBuilderExtensions
             .Use<ReadPersistenceMiddleware>()
             .Use<SavePersistenceMiddleware>()
             .Use<SkillMiddleware>()
+            .Use<DelegationMiddleware>()
             .Use<AgentProfileMiddleware>()
             .Use<ContextCompressMiddleware>()
             .Use<CommandLineToolsMiddleware>()
             .Use<FileToolsMiddleware>()
-            .UseSimple(); 
+            .UseSimple();
     
     
     /// <summary>

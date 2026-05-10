@@ -44,6 +44,13 @@ ManInBlack 通过 `EventBus` 实现组件间的事件通信。EventBus 是一个
 | `AllToolsCompletedEvent` | 本批次所有工具执行完毕 | `AgentLoopMiddleware` |
 | `AgentCompletedEvent` | Agent 循环结束 | `HookMiddleware` |
 
+### 子 Agent 委托事件
+
+| 事件 | 时机 | 发布者 |
+|---|---|---|
+| `SubAgentStartedEvent` | 子 Agent 开始执行 | `DelegationTools` |
+| `SubAgentCompletedEvent` | 子 Agent 执行完成（含结果或错误） | `DelegationTools` |
+
 ---
 
 ## 事件详情
@@ -193,6 +200,7 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 | `AgentLifecycleFilter` | Scoped | `BeforeToolExecuteEvent`、`AfterToolExecuteEvent` | 工具过滤器管道内 |
 | `AgentLoopMiddleware` | Scoped | `AfterLlmCallEvent`、`AllToolsCompletedEvent` | 中间件管道内 |
 | `HookMiddleware` | Scoped | `BeforeLlmCallEvent`、`AgentCompletedEvent` | 中间件管道内 |
+| `DelegationTools` | Scoped | `SubAgentStartedEvent`、`SubAgentCompletedEvent` | 委托工具内 |
 
 ---
 
@@ -202,7 +210,7 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 |---|---|
 | `src/ManInBlack.AI/Services/EventBus.cs` | EventBus 核心：Subscribe/Publish，按 key + 类型双重隔离 |
 | `src/ManInBlack.AI/Events/ModelContentEvent.cs` | 模型输出事件和 `ModelContentKind` 枚举 |
-| `src/ManInBlack.AI/Events/AgentLifecycleEvent.cs` | Agent 生命周期事件（6 种） |
+| `src/ManInBlack.AI/Events/AgentLifecycleEvent.cs` | Agent 生命周期事件（8 种，含子 Agent 委托事件） |
 | `src/ManInBlack.AI/ToolCallFilters/AgentLifecycleFilter.cs` | 工具执行生命周期过滤器，发布 BeforeToolExecute / AfterToolExecute 事件 |
 | `src/ManInBlack.AI/Middlewares/EventPublishingMiddleware.cs` | 模型流式输出事件发布者 |
 | `src/ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs` | Agent 循环中间件，发布 AfterLlmCall / AllToolsCompleted 事件 |

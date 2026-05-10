@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
@@ -17,6 +18,14 @@ namespace ManInBlack.AI.ToolCallFilters;
 [ServiceRegister.Scoped]
 public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilter> logger) : ToolCallFilter
 {
+    private static JsonSerializerOptions jsonOptions = new JsonSerializerOptions
+    {
+        WriteIndented = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public override async Task ExecuteAsync(
         ToolExecuteContext context,
         Func<ToolExecuteContext, Task> next
@@ -24,6 +33,9 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
     {
         var agentContext = context.ServiceProvider.GetRequiredService<AgentContext>();
         var key = agentContext.AgentId;
+        var argsJson = context.Arguments is not null
+            ? JsonSerializer.Serialize(context.Arguments, jsonOptions)
+            : null;
 
         // ── BeforeToolExecute 事件 ──
         var beforeEvt = new BeforeToolExecuteEvent
@@ -31,16 +43,15 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
             AgentId = key,
             ToolName = context.ToolName,
             CallId = context.CallId,
-            ArgumentsJson = context.Arguments is not null
-                ? JsonSerializer.Serialize(context.Arguments)
-                : null,
+            ArgumentsJson = argsJson
         };
 
         await eventBus.PublishAsync(key, beforeEvt, default);
 
         if (beforeEvt.IsBlocked)
         {
-            logger.LogWarning("[AgentLifecycleFilter] 工具 {ToolName} 被阻断：{Reason}", context.ToolName, beforeEvt.BlockReason);
+            logger.LogWarning("[AgentLifecycleFilter] 工具 {ToolName} 被阻断：{Reason}", context.ToolName,
+                beforeEvt.BlockReason);
             context.Error = new InvalidOperationException(
                 beforeEvt.BlockReason ?? "Blocked by AgentLifecycleFilter"
             );
@@ -56,9 +67,7 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
             AgentId = key,
             ToolName = context.ToolName,
             CallId = context.CallId,
-            ArgumentsJson = context.Arguments is not null
-                ? JsonSerializer.Serialize(context.Arguments)
-                : null,
+            ArgumentsJson = argsJson,
             ResultJson = context.Result?.ToString(),
             Error = context.Error?.Message,
         }, default);

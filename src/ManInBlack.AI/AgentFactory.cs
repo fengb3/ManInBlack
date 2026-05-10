@@ -33,6 +33,11 @@ public class AgentFactory
     /// </summary>
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _tracking = new();
 
+    /// <summary>
+    /// Agent 实例到根用户 ID 的映射，用于子 Agent 追溯到最初发起请求的用户
+    /// </summary>
+    private readonly ConcurrentDictionary<string, string> _agentToRootUser = new();
+
     public AgentFactory(IServiceScopeFactory scopeFactory, ILogger<AgentFactory> logger, IEnumerable<AgentDefinition> definitions)
     {
         _scopeFactory = scopeFactory;
@@ -143,29 +148,41 @@ public class AgentFactory
             // 3. 解析依赖服务
             var userStorage = sp.GetRequiredService<IUserStorage>();
             var agentContext = sp.GetRequiredService<AgentContext>();
-            // 4. 获取或创建用户
-            var user = await userStorage.GetOrCreateUser(parentId);
+            // 4. 解析根用户 ID（向上追溯父级链直到 ParentType 为 "User"）
+            var rootUserId = parentType == "User"
+                ? parentId
+                : _agentToRootUser.TryGetValue(parentId, out var root)
+                    ? root
+                    : parentId;
 
-            // 5. 设置 AgentContext 属性
+            // 5. 获取或创建根用户
+            var user = await userStorage.GetOrCreateUser(rootUserId);
+
+            // 6. 设置 AgentContext 属性
             agentContext.AgentId = Guid.NewGuid().ToString();
             agentContext.ParentId = parentId;
             agentContext.ParentType = parentType;
-            agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(parentId);
+            agentContext.RootUserId = rootUserId;
+            agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(rootUserId);
             agentContext.SystemPrompt = definition.Instruction;
             agentContext.UserInput = userInput;
+            agentContext.AgentName = definition.Name;
             agentContext.CancellationToken = ct;
 
-            // 6. 调用可选的微调回调
+            // 7. 调用可选的微调回调
             configure?.Invoke(agentContext);
 
-            // 7. 获取管道委托，构建管道
+            // 8. 注册到父子关系映射，供子 Agent 向上追溯（在 configure 之后，用最终的 AgentId）
+            _agentToRootUser[agentContext.AgentId] = rootUserId;
+
+            // 8. 获取管道委托，构建管道
             var pipelineName = definition.PipelineName;
             if (!_pipelineResolvers.TryGetValue(pipelineName, out var pipelineConfigure))
                 throw new KeyNotFoundException($"未找到管道配置：{pipelineName}");
 
             var pipeline = pipelineConfigure(new AgentPipelineBuilder()).Build(sp);
 
-            // 8. 执行管道并 yield return 每个更新
+            // 9. 执行管道并 yield return 每个更新
             var updates = pipeline(agentContext);
             await foreach (var update in updates.WithCancellation(ct))
             {
@@ -174,7 +191,7 @@ public class AgentFactory
         }
         finally
         {
-            // 9. 释放 scope，确保即使异常也不泄露
+            // 10. 清理父子关系映射，释放 scope
             scope.Dispose();
         }
     }

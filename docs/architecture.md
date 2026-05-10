@@ -44,8 +44,8 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | ------------------ | -------------------------------------------------------- |
 | `ChatClient/`      | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini）       |
 | `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
-| `Middlewares/`     | 14 个中间件 + AgentPipelineBuilder                        |
-| `Tools/`           | CommandLineTools、FileTools、SkillTools                  |
+| `Middlewares/`     | 15 个中间件 + AgentPipelineBuilder                        |
+| `Tools/`           | CommandLineTools、FileTools、SkillTools、DelegationTools  |
 | `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter（LargeResultFilter 已注释） |
 | `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
@@ -110,7 +110,7 @@ builder.Use<A>().Use<B>().Use<C>().Build(sp);
 通过 `builder.UseDefault()` 配置的完整管道：
 
 ```
-EventPublishing → ReadPersistence → SavePersistence → Skill → AgentProfile
+EventPublishing → ReadPersistence → SavePersistence → Skill → Delegation → AgentProfile
     → ContextCompress → CommandLineTools → FileTools → [UseSimple]
 
 [UseSimple]

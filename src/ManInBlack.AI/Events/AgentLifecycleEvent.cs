@@ -73,3 +73,26 @@ public record AgentCompletedEvent
     public string? SystemPrompt { get; init; }
     public string? UserInput { get; init; }
 }
+
+/// <summary>
+/// 子 Agent 开始执行事件
+/// </summary>
+public record SubAgentStartedEvent
+{
+    public string ParentAgentId { get; init; } = string.Empty;
+    public string SubAgentName { get; init; } = string.Empty;
+    public string SubAgentId { get; init; } = string.Empty;
+    public string Task { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// 子 Agent 执行完成事件
+/// </summary>
+public record SubAgentCompletedEvent
+{
+    public string ParentAgentId { get; init; } = string.Empty;
+    public string SubAgentName { get; init; } = string.Empty;
+    public string SubAgentId { get; init; } = string.Empty;
+    public string? Result { get; init; }
+    public string? Error { get; init; }
+}
