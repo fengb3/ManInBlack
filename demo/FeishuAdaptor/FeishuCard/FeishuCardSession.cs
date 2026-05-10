@@ -24,6 +24,10 @@ public class FeishuCardSession : IDisposable
     private readonly List<CardViewBase> _streamingCardViews = [];
     private readonly Dictionary<string, ToolExecutionCardView> _toolExecutions = [];
 
+    // 子 Agent 状态
+    private DelegationCardView? _activeDelegationCard;
+    private readonly List<IDisposable> _childSubs = [];
+
     public FeishuCardSession(IServiceProvider sp, string userId, EventBus bus, string key)
     {
         _sp = sp;
@@ -37,6 +41,8 @@ public class FeishuCardSession : IDisposable
         _subs.Add(_bus.Subscribe<ModelContentEvent>(_key, OnModelContent));
         _subs.Add(_bus.Subscribe<BeforeToolExecuteEvent>(_key, OnBeforeToolExecute));
         _subs.Add(_bus.Subscribe<AfterToolExecuteEvent>(_key, OnAfterToolExecute));
+        _subs.Add(_bus.Subscribe<SubAgentStartedEvent>(_key, OnSubAgentStarted));
+        _subs.Add(_bus.Subscribe<SubAgentCompletedEvent>(_key, OnSubAgentCompleted));
     }
 
     private async Task OnModelContent(ModelContentEvent evt, CancellationToken ct)
@@ -85,6 +91,35 @@ public class FeishuCardSession : IDisposable
     {
         _lastLlmType = "";
 
+        // DelegateToAgent 工具 → 创建 DelegationCardView
+        if (evt.ToolName == "DelegateToAgent")
+        {
+            var delegationView = (DelegationCardView)_sp.GetRequiredService<CardView<DelegationViewModel>>();
+            await delegationView.InitializeAsync(ct);
+            await delegationView.SendToUserAsync("user_id", _userId, ct);
+
+            // 解析参数获取 agentName 和 task
+            string agentName = "";
+            string task = "";
+            if (evt.ArgumentsJson is not null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(evt.ArgumentsJson);
+                    if (doc.RootElement.TryGetProperty("agentName", out var nameProp))
+                        agentName = nameProp.GetString() ?? "";
+                    if (doc.RootElement.TryGetProperty("task", out var taskProp))
+                        task = taskProp.GetString() ?? "";
+                }
+                catch { }
+            }
+
+            await delegationView.UpdateForStartAsync(agentName, task, ct);
+            _activeDelegationCard = delegationView;
+            return;
+        }
+
+        // 普通工具 → ToolExecutionCardView
         if (!_toolExecutions.TryGetValue(evt.CallId, out var toolCard))
         {
             toolCard = (ToolExecutionCardView)_sp
@@ -94,14 +129,23 @@ public class FeishuCardSession : IDisposable
             _toolExecutions[evt.CallId] = toolCard;
         }
 
-        var toolName = evt.ToolName ?? "未知工具";
-        var description = ExtractToolDescription(toolName, evt.ArgumentsJson);
+        var description = ExtractToolDescription(evt.ToolName, evt.ArgumentsJson);
         var arguments = evt.ArgumentsJson ?? "无参数";
-        await toolCard.UpdateForToolStartAsync(toolName, arguments, description, ct);
+        await toolCard.UpdateForToolStartAsync(evt.ToolName ?? "未知工具", arguments, description, ct);
     }
 
     private async Task OnAfterToolExecute(AfterToolExecuteEvent evt, CancellationToken ct)
     {
+        // DelegateToAgent 完成 → 释放子 Agent 状态
+        if (evt.ToolName == "DelegateToAgent" && _activeDelegationCard is not null)
+        {
+            await _activeDelegationCard.UpdateForCompletedAsync(ct);
+            DisposeChildSubs();
+            _activeDelegationCard = null;
+            return;
+        }
+
+        // 普通工具结果
         if (!_toolExecutions.TryGetValue(evt.CallId, out var toolCard)) return;
 
         var resultText = evt.ResultJson ?? "";
@@ -113,6 +157,74 @@ public class FeishuCardSession : IDisposable
             isError: evt.Error is not null,
             ct);
     }
+
+    #region 子 Agent 事件
+
+    private async Task OnSubAgentStarted(SubAgentStartedEvent evt, CancellationToken ct)
+    {
+        // 订阅子 Agent 的事件（以子 Agent 的 AgentId 为 key）
+        _childSubs.Add(_bus.Subscribe<ModelContentEvent>(evt.SubAgentId, OnChildModelContent));
+        _childSubs.Add(_bus.Subscribe<BeforeToolExecuteEvent>(evt.SubAgentId, OnChildBeforeToolExecute));
+        _childSubs.Add(_bus.Subscribe<AfterToolExecuteEvent>(evt.SubAgentId, OnChildAfterToolExecute));
+    }
+
+    private async Task OnSubAgentCompleted(SubAgentCompletedEvent evt, CancellationToken ct)
+    {
+        // 最终 FlushAsync（将累积的文本一次性刷到卡片）
+        if (_activeDelegationCard is not null)
+            await _activeDelegationCard.UpdateForCompletedAsync(ct);
+
+        DisposeChildSubs();
+        _activeDelegationCard = null;
+    }
+
+    private async Task OnChildModelContent(ModelContentEvent evt, CancellationToken ct)
+    {
+        if (_activeDelegationCard is null) return;
+
+        switch (evt.Kind)
+        {
+            case ModelContentKind.Reasoning:
+                if (!string.IsNullOrEmpty(evt.Text))
+                    await _activeDelegationCard.AppendReasoningAsync(evt.Text, ct);
+                break;
+            case ModelContentKind.Text:
+                if (!string.IsNullOrEmpty(evt.Text))
+                    await _activeDelegationCard.AppendOutputAsync(evt.Text, ct);
+                break;
+            case ModelContentKind.Completed:
+                // 子 Agent 文本输出结束，FlushAsync 累积的文本
+                await _activeDelegationCard.FlushAsync(ct);
+                break;
+        }
+    }
+
+    private async Task OnChildBeforeToolExecute(BeforeToolExecuteEvent evt, CancellationToken ct)
+    {
+        if (_activeDelegationCard is null) return;
+        await _activeDelegationCard.AddChildToolStartAsync(
+            evt.CallId,
+            evt.ToolName ?? "未知工具",
+            evt.ArgumentsJson ?? "无参数",
+            ct);
+    }
+
+    private async Task OnChildAfterToolExecute(AfterToolExecuteEvent evt, CancellationToken ct)
+    {
+        if (_activeDelegationCard is null) return;
+
+        var resultText = evt.ResultJson ?? "";
+        if (resultText.Length > 500)
+            resultText = string.Concat(resultText.AsSpan(0, 500), "\n...");
+
+        await _activeDelegationCard.UpdateChildToolResultAsync(
+            evt.CallId,
+            string.IsNullOrWhiteSpace(resultText) ? "无返回结果" : resultText,
+            evt.Error is not null,
+            ct);
+    }
+
+    #endregion
 
     private static string ExtractToolDescription(string toolName, string? argumentsJson)
     {
@@ -142,8 +254,15 @@ public class FeishuCardSession : IDisposable
         return (view.ViewModel, view);
     }
 
+    private void DisposeChildSubs()
+    {
+        foreach (var sub in _childSubs) sub.Dispose();
+        _childSubs.Clear();
+    }
+
     public void Dispose()
     {
+        DisposeChildSubs();
         foreach (var sub in _subs) sub.Dispose();
     }
 }
