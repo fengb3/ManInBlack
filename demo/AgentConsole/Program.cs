@@ -7,28 +7,12 @@ using ManInBlack.AI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 
-// 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
+// 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置，包括 Agents 定义）
 var services = new ServiceCollection();
 services.AddManInBlackFromSettings();
 
-// 子 Agent：翻译专家，使用 sub-agent pipeline（有文件工具和事件发布，无 DelegationMiddleware）
-services.AddAgentDefinition(new AgentDefinition
-{
-    Name = "translator",
-    Description = "翻译专家，擅长将翻译成各种语言",
-    Instruction = "你是一个翻译专家。用户会给你一段文本或一个文件路径，你读取文件内容后将其翻译成自然流畅的目标语言，不需要任何额外解释。",
-    PipelineName = "sub-agent"
-});
-
-// 父 Agent：协调者，可以委托给 translator 子 Agent
-services.AddAgentDefinition(new AgentDefinition
-{
-    Name = "console-agent",
-    Instruction = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。",
-    PipelineName = "default",
-    SubAgents = ["translator"]
-});
-
+// Agent 定义现在从 settings.json 的 Agents 字段自动加载，无需 AddAgentDefinition 调用
+// Pipeline 注册仍在代码中（涉及中间件类型）
 
 var rootSp = services.BuildServiceProvider();
 

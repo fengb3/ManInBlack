@@ -32,6 +32,19 @@
       "ModelId": "deepseek-chat"
     }
   },
+  "Agents": {
+    "translator": {
+      "Description": "翻译专家，擅长将文本翻译成各种语言",
+      "Instruction": "你是一个翻译专家。用户会给你一段文本或一个文件路径，你读取文件内容后将其翻译成自然流畅的目标语言，不需要任何额外解释。",
+      "PipelineName": "sub-agent",
+      "ModelChoiceName": "deepseek-chat"
+    },
+    "console-agent": {
+      "Instruction": "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。",
+      "PipelineName": "default",
+      "SubAgents": ["translator"]
+    }
+  },
   "Feishu": {
     "AppId": "",
     "AppSecret": "",
@@ -57,6 +70,18 @@
 | `ModelId`      | 是   | 模型标识符，如 `gpt-4o`、`deepseek-chat`            |
 
 `ModelChoices` 必须包含 `"default"` 条目，启动时校验。
+
+### Agents 字段
+
+| 字段              | 必填 | 说明                                                                        |
+| ----------------- | ---- | --------------------------------------------------------------------------- |
+| `Description`     | 否   | Agent 描述，用于子 Agent 委托时的提示词生成                                  |
+| `Instruction`     | 否   | 系统提示词                                                                  |
+| `PipelineName`    | 否   | 管道名称，决定使用哪套中间件组合。默认 `"default"`                           |
+| `SubAgents`       | 否   | 可委托的子 Agent 名称列表（对应 Agents 字典中的 key）                       |
+| `ModelChoiceName` | 否   | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice                      |
+
+Agents 为字典结构，键即为 Agent 名称（唯一标识）。通过 `AddManInBlackFromSettings()` 或 `AddManInBlackFromConfiguration()` 加载时，会自动注册为 `AgentDefinition`。Pipeline 注册仍在代码中（涉及中间件类型，无法配置化）。
 
 ---
 
@@ -154,6 +179,10 @@ public class MyService(IOptionsMonitor<ManInBlackSettings> monitor)
 - 每个 Provider 的 Schema 为合法值（`"OpenAI"` / `"Anthropic"` / `"Gemini"`）
 - 每个 Provider 的 ApiKey 非空
 - 每个 ModelChoice 的 ProviderName 在 Providers 中存在
+- 每个 Agent 的 PipelineName 非空
+- 每个 Agent 的 SubAgents 引用的 Agent 在 Agents 中存在
+- Agent 不能将自己列为子 Agent
+- Agent 的 ModelChoiceName 若指定，必须在 ModelChoices 中存在
 
 ```csharp
 // 校验失败时抛 OptionsValidationException

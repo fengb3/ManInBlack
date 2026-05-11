@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
+using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -171,6 +172,13 @@ public class AgentFactory
 
             // 7. 调用可选的微调回调
             configure?.Invoke(agentContext);
+
+            // 7.5 解析 per-agent ModelChoice（若指定），存入 Items 供管道使用
+            if (!string.IsNullOrEmpty(definition.ModelChoiceName))
+            {
+                var mibSettings = sp.GetRequiredService<ManInBlackSettings>();
+                agentContext.Items["ModelChoice"] = mibSettings.GetModelChoice(definition.ModelChoiceName);
+            }
 
             // 8. 注册到父子关系映射，供子 Agent 向上追溯（在 configure 之后，用最终的 AgentId）
             _agentToRootUser[agentContext.AgentId] = rootUserId;

@@ -24,6 +24,7 @@
 | `PipelineName`     | `string`   | `"default"` | 管道名称，决定使用哪套中间件组合         |
 | `ParentAgentName`  | `string?`  | `null`     | 父 Agent 名称（可选，用于多 Agent 编排） |
 | `SubAgents`        | `List<string>` | `[]`   | 可委托的子 Agent 名称列表 |
+| `ModelChoiceName`  | `string?`  | `null`     | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice |
 
 ### 管道注册 — 命名管道配置委托
 
@@ -46,6 +47,32 @@
 
 ## 注册 Agent 定义
 
+### 方式一：通过 settings.json 配置（推荐）
+
+在 `~/.man-in-black/settings.json` 中添加 `Agents` 节：
+
+```json
+{
+  "Agents": {
+    "translator": {
+      "Description": "翻译专家，擅长将文本翻译成各种语言",
+      "Instruction": "你是一个翻译专家...",
+      "PipelineName": "sub-agent",
+      "ModelChoiceName": "deepseek-chat"
+    },
+    "console-agent": {
+      "Instruction": "你是一个AI助手...",
+      "PipelineName": "default",
+      "SubAgents": ["translator"]
+    }
+  }
+}
+```
+
+使用 `AddManInBlackFromSettings()` 或 `AddManInBlackFromConfiguration()` 时，Agents 节中的定义会自动注册到 DI，无需额外代码。
+
+### 方式二：通过代码注册
+
 通过 DI 扩展方法 `AddAgentDefinition()` 注册：
 
 ```csharp
@@ -67,6 +94,8 @@ services.AddAgentDefinition(new AgentDefinition
 ```
 
 `AddAgentDefinition()` 将 `AgentDefinition` 注册为 **Singleton**。`AgentFactory` 构造时自动从 DI 中收集所有 `IEnumerable<AgentDefinition>` 并注册到内部字典。
+
+> **注意：** 如果 settings.json 和代码中注册了同名 Agent，`AgentFactory` 会抛出 `ArgumentException`。
 
 > **注意：** 同名 Agent 会抛出 `ArgumentException`。确保每个定义的 `Name` 唯一。
 
@@ -332,15 +361,9 @@ using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-// 1. 构建 DI 容器
+// 1. 构建 DI 容器（Agent 定义从 settings.json 的 Agents 字段自动加载）
 var services = new ServiceCollection();
 services.AddManInBlackFromSettings();
-services.AddAgentDefinition(new AgentDefinition
-{
-    Name = "console-agent",
-    Instruction = "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。",
-    PipelineName = "default"
-});
 
 var rootSp = services.BuildServiceProvider();
 var factory = rootSp.GetRequiredService<AgentFactory>();
@@ -405,16 +428,8 @@ if (usage is not null && (usage.InputTokenCount is not null || usage.OutputToken
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddManInBlackSettings();
 
-// 注册核心服务
+// 注册核心服务（Agent 定义从 settings.json 的 Agents 字段自动加载）
 builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
-
-// 注册 Agent 定义
-builder.Services.AddAgentDefinition(new AgentDefinition
-{
-    Name = "feishu-agent",
-    Instruction = "你是运行在飞书中的智能 agent",
-    PipelineName = "feishu"  // 使用自定义管道
-});
 
 var app = builder.Build();
 
@@ -482,6 +497,27 @@ public class AgentLauncher(
 AgentDefinition 的 `SubAgents` 属性声明了该 Agent 可以委托的子 Agent 列表。当 `SubAgents` 非空时，`DelegationMiddleware` 会自动注入委托工具和提示词。
 
 ### 配置示例
+
+在 `~/.man-in-black/settings.json` 中配置：
+
+```json
+{
+  "Agents": {
+    "researcher": {
+      "Description": "擅长搜索和分析信息",
+      "Instruction": "你是一个研究助手...",
+      "PipelineName": "simple"
+    },
+    "orchestrator": {
+      "Instruction": "你是一个协调者...",
+      "PipelineName": "default",
+      "SubAgents": ["researcher"]
+    }
+  }
+}
+```
+
+或通过代码注册：
 
 ```csharp
 // 子 Agent 使用不包含 DelegationMiddleware 的 pipeline（如 "simple"），防止递归委托

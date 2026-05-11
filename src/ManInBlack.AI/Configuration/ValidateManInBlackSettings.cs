@@ -32,6 +32,26 @@ public class ValidateManInBlackSettings : IValidateOptions<ManInBlackSettings>
                 return ValidateOptionsResult.Fail($"ModelChoice \"{choiceName}\" 缺少 ModelId");
         }
 
+        // 校验 Agents 配置
+        foreach (var (agentName, agent) in options.Agents)
+        {
+            if (string.IsNullOrWhiteSpace(agent.PipelineName))
+                return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 的 PipelineName 不能为空");
+
+            if (agent.SubAgents.Contains(agentName))
+                return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 不能将自己列为子 Agent");
+
+            foreach (var subAgentName in agent.SubAgents)
+            {
+                if (!options.Agents.ContainsKey(subAgentName))
+                    return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 的 SubAgents 引用了不存在的 Agent \"{subAgentName}\"");
+            }
+
+            if (!string.IsNullOrEmpty(agent.ModelChoiceName)
+                && !options.ModelChoices.ContainsKey(agent.ModelChoiceName))
+                return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 的 ModelChoiceName \"{agent.ModelChoiceName}\" 在 ModelChoices 中不存在");
+        }
+
         return ValidateOptionsResult.Success;
     }
 }

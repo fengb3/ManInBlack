@@ -99,6 +99,20 @@ public static class DependencyInjection
             configuration.Bind(settings);
             var modelChoice = settings.GetDefaultModelChoice();
 
+            // 从 settings.json 的 Agents 节自动注册 Agent 定义
+            foreach (var (agentName, agentSettings) in settings.Agents)
+            {
+                services.AddSingleton(new AgentDefinition
+                {
+                    Name = agentName,
+                    Description = agentSettings.Description,
+                    Instruction = agentSettings.Instruction,
+                    PipelineName = agentSettings.PipelineName,
+                    SubAgents = agentSettings.SubAgents,
+                    ModelChoiceName = agentSettings.ModelChoiceName,
+                });
+            }
+
             // 注册完整配置，后续可通过 IOptions<ManInBlackSettings> 按名获取其他 ModelChoice
             services.AddSingleton(settings);
 

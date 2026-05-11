@@ -1,6 +1,7 @@
 using ManInBlack.AI.Abstraction.Middleware;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
@@ -46,10 +47,20 @@ public class AgentPipelineBuilder
         //     _chatClient.GetStreamingResponseAsync(context.Messages, context.Options);
 
         var chatClient = serviceProvider.GetRequiredService<IChatClient>();
+        var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
         // message 第0条为 system prompt，最后1条为 user input，中间为 assistant 和 tool 消息
         Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> pipeline =
-            context => { return chatClient.GetStreamingResponseAsync(context.Messages, context.Options); };
+            context =>
+            {
+                // 若 Agent 指定了 ModelChoiceName，用解析后的 ModelChoice 创建临时客户端
+                if (context.Items.TryGetValue("ModelChoice", out var mc) && mc is ModelChoice choice)
+                {
+                    var client = ChatClientProviderExtensions.CreateChatClient(httpClientFactory, choice);
+                    return client.GetStreamingResponseAsync(context.Messages, context.Options);
+                }
+                return chatClient.GetStreamingResponseAsync(context.Messages, context.Options);
+            };
 
 
         // 反向包裹中间件

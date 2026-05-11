@@ -34,4 +34,9 @@ public class AgentDefinition
     /// 可委托的子 Agent 名称列表。如果非空，DelegationMiddleware 会注入委托工具和提示词。
     /// </summary>
     public List<string> SubAgents { get; set; } = [];
+
+    /// <summary>
+    /// 引用的 ModelChoice 名称（可选）。不填则使用全局默认 ModelChoice。
+    /// </summary>
+    public string? ModelChoiceName { get; set; }
 }
