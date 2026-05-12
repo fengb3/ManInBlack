@@ -183,14 +183,14 @@ public class AgentFactory
             // 8. 注册到父子关系映射，供子 Agent 向上追溯（在 configure 之后，用最终的 AgentId）
             _agentToRootUser[agentContext.AgentId] = rootUserId;
 
-            // 8. 获取管道委托，构建管道
+            // 9. 获取管道委托，构建管道
             var pipelineName = definition.PipelineName;
             if (!_pipelineResolvers.TryGetValue(pipelineName, out var pipelineConfigure))
                 throw new KeyNotFoundException($"未找到管道配置：{pipelineName}");
 
             var pipeline = pipelineConfigure(new AgentPipelineBuilder()).Build(sp);
 
-            // 9. 执行管道并 yield return 每个更新
+            // 10. 执行管道并 yield return 每个更新
             var updates = pipeline(agentContext);
             await foreach (var update in updates.WithCancellation(ct))
             {
@@ -199,7 +199,7 @@ public class AgentFactory
         }
         finally
         {
-            // 10. 清理父子关系映射，释放 scope
+            // 11. 清理父子关系映射，释放 scope
             scope.Dispose();
         }
     }

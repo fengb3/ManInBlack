@@ -41,6 +41,8 @@ public class ValidateManInBlackSettings : IValidateOptions<ManInBlackSettings>
             if (agent.SubAgents.Contains(agentName))
                 return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 不能将自己列为子 Agent");
 
+            // TODO: 检测间接循环引用（如 A→B→A），当前仅捕获直接自引用
+
             foreach (var subAgentName in agent.SubAgents)
             {
                 if (!options.Agents.ContainsKey(subAgentName))

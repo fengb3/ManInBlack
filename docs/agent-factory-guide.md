@@ -97,8 +97,6 @@ services.AddAgentDefinition(new AgentDefinition
 
 > **注意：** 如果 settings.json 和代码中注册了同名 Agent，`AgentFactory` 会抛出 `ArgumentException`。
 
-> **注意：** 同名 Agent 会抛出 `ArgumentException`。确保每个定义的 `Name` 唯一。
-
 ---
 
 ## 注册自定义管道

@@ -137,38 +137,6 @@ public class AgentSettingsTests
         Assert.Equal(ValidateOptionsResult.Success, result);
     }
 
-    // ── AgentSettings → AgentDefinition 映射测试 ──
-
-    [Fact]
-    public void AgentSettings_MapsToDefinition()
-    {
-        var agentSettings = new AgentSettings
-        {
-            Description = "翻译专家",
-            Instruction = "你是翻译专家",
-            PipelineName = "sub-agent",
-            SubAgents = ["researcher"],
-            ModelChoiceName = "cheap",
-        };
-
-        var definition = new AgentDefinition
-        {
-            Name = "translator",
-            Description = agentSettings.Description,
-            Instruction = agentSettings.Instruction,
-            PipelineName = agentSettings.PipelineName,
-            SubAgents = agentSettings.SubAgents,
-            ModelChoiceName = agentSettings.ModelChoiceName,
-        };
-
-        Assert.Equal("translator", definition.Name);
-        Assert.Equal("翻译专家", definition.Description);
-        Assert.Equal("你是翻译专家", definition.Instruction);
-        Assert.Equal("sub-agent", definition.PipelineName);
-        Assert.Equal(["researcher"], definition.SubAgents);
-        Assert.Equal("cheap", definition.ModelChoiceName);
-    }
-
     // ── DI 自动注册测试 ──
 
     [Fact]
