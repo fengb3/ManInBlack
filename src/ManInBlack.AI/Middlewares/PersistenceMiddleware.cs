@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
@@ -91,9 +92,10 @@ public class SavePersistenceMiddleware : AgentMiddleware
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
 
-        // 用包装集合替换原始 Messages，每添加一条消息立即持久化
+        // 用包装集合替换原始 Messages，通过 Channel 异步持久化
         var original = context.Messages;
-        context.Messages = new PersistingMessageCollection(original, sessionStorage, context.SessionId);
+        var persisting = new PersistingMessageCollection(original, sessionStorage, context.SessionId);
+        context.Messages = persisting;
 
         await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
         {
@@ -101,19 +103,38 @@ public class SavePersistenceMiddleware : AgentMiddleware
         }
 
         context.Messages = original;
+        await persisting.FlushAsync();
     }
 
     /// <summary>
-    /// 在消息添加到集合时自动持久化（跳过 system 角色）
+    /// 通过 Channel 异步持久化消息，避免 sync-over-async 死锁
     /// </summary>
-    private class PersistingMessageCollection(IList<ChatMessage> list, ISessionStorage storage, string sessionId)
-        : Collection<ChatMessage>(list)
+    private class PersistingMessageCollection : Collection<ChatMessage>
     {
+        private readonly Channel<ChatMessage> _channel = Channel.CreateUnbounded<ChatMessage>();
+        private readonly Task _consumerTask;
+
+        public PersistingMessageCollection(IList<ChatMessage> list, ISessionStorage storage, string sessionId)
+            : base(list)
+        {
+            _consumerTask = Task.Run(async () =>
+            {
+                await foreach (var msg in _channel.Reader.ReadAllAsync())
+                    await storage.SaveMessage(sessionId, msg);
+            });
+        }
+
         protected override void InsertItem(int index, ChatMessage item)
         {
             base.InsertItem(index, item);
             if (item.Role != ChatRole.System)
-                storage.SaveMessage(sessionId, item).Wait();
+                _channel.Writer.TryWrite(item);
+        }
+
+        public async Task FlushAsync()
+        {
+            _channel.Writer.Complete();
+            await _consumerTask;
         }
     }
 }

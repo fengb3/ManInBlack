@@ -330,7 +330,7 @@ builder.Use(new MyStatelessMiddleware());
 | --- | --------------------------------- | ---------------------------------- |
 | 1   | `EventPublishingMiddleware`       | 在最外层，用于 UI 监听 Agent 事件  |
 | 2   | `ReadPersistenceMiddleware`       | 加载历史消息，处理 reset 命令      |
-| 3   | `SavePersistenceMiddleware`       | 自动持久化新增消息                 |
+| 3   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息    |
 | 4   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
 | 5   | `DelegationMiddleware`            | 注入子 Agent 委托工具和描述       |
 | 6   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
