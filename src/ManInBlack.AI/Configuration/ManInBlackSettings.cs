@@ -10,6 +10,11 @@ public class ManInBlackSettings
     /// 全局钩子配置列表，对所有用户生效。脚本路径相对于 {RootPath}/hooks/ 目录。
     /// </summary>
     public List<HookSettings> Hooks { get; set; } = [];
+
+    /// <summary>
+    /// Agent 定义配置，键为 Agent 名称。从 settings.json 的 "Agents" 节加载，自动注册到 DI。
+    /// </summary>
+    public Dictionary<string, AgentSettings> Agents { get; set; } = new();
 }
 
 /// <summary>
@@ -60,4 +65,35 @@ public class FeishuSettings
     /// 与 <see cref="EnableWebSocket"/> 可同时启用。
     /// </summary>
     public string? WebhookEndpoint { get; set; }
+}
+
+/// <summary>
+/// 单个 Agent 的配置，对应 settings.json 中 "Agents" 字典的一个条目。键即为 Agent 名称。
+/// </summary>
+public class AgentSettings
+{
+    /// <summary>
+    /// Agent 描述，用于子 Agent 委托时的提示词生成
+    /// </summary>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 系统提示词
+    /// </summary>
+    public string Instruction { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 管道名称，决定使用哪套中间件组合。默认 "default"。
+    /// </summary>
+    public string PipelineName { get; set; } = "default";
+
+    /// <summary>
+    /// 可委托的子 Agent 名称列表。如果非空，DelegationMiddleware 会注入委托工具和提示词。
+    /// </summary>
+    public List<string> SubAgents { get; set; } = [];
+
+    /// <summary>
+    /// 引用的 ModelChoice 名称（可选）。不填则使用全局默认 ModelChoice。
+    /// </summary>
+    public string? ModelChoiceName { get; set; }
 }
