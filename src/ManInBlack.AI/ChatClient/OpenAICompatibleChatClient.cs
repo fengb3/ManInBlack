@@ -58,9 +58,6 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         var body = BuildRequestBody(messages, options, stream: true);
         var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-        // Console.WriteLine("Request body:");
-        // Console.WriteLine(body); // Debug log
-
         var request = new HttpRequestMessage(HttpMethod.Post, _endPoint) { Content = content };
         var response = await _httpClient.SendAsync(
             request,
@@ -85,12 +82,6 @@ public sealed class OpenAICompatibleChatClient : IChatClient
         string? line;
         while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
         {
-            // 调试用
-            // Console.ForegroundColor = ConsoleColor.Yellow;
-            // Console.BackgroundColor = ConsoleColor.DarkBlue;
-            // Console.WriteLine($"{line}"); // Debug log
-            // Console.ResetColor();
-
             if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
                 continue;
 

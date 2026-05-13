@@ -120,10 +120,10 @@ services.AddManInBlack(opt =>
 
 ## 按名称获取 ModelChoice
 
-通过 `ManInBlackSettings` 获取非默认的 ModelChoice：
+通过 `IOptions<ManInBlackSettings>` 获取非默认的 ModelChoice：
 
 ```csharp
-var settings = sp.GetRequiredService<ManInBlackSettings>();
+var settings = sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value;
 var choice = settings.GetModelChoice("deepseek-chat");
 var chatClient = ChatClientProviderExtensions.CreateChatClient(
     sp.GetRequiredService<IHttpClientFactory>(), choice);

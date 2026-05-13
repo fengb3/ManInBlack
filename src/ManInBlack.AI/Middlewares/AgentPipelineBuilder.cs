@@ -18,7 +18,6 @@ public class AgentPipelineBuilder
     /// </summary>
     public AgentPipelineBuilder Use(AgentMiddleware middleware)
     {
-        // _middlewares.Add(middleware);
         _middlewareFactories.Add(_ => middleware);
         return this;
     }
@@ -68,8 +67,6 @@ public class AgentPipelineBuilder
 
             pipeline = context =>
             {
-                // ILogger<AgentPipelineBuilder> logger = serviceProvider.GetRequiredService<ILogger<AgentPipelineBuilder>>();
-                // logger.LogInformation("Executing middleware {Middleware} for agent {AgentId}", middlewareFactory.Method.DeclaringType?.Name, context.AgentId);
                 var middle = middlewareFactory.Invoke(context.ServiceProvider);
                 return middle.HandleAsync(context, () => next(context), context.CancellationToken);
             };

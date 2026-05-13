@@ -8,6 +8,7 @@ using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI;
 
@@ -176,7 +177,7 @@ public class AgentFactory
             // 7.5 解析 per-agent ModelChoice（若指定），存入 Items 供管道使用
             if (!string.IsNullOrEmpty(definition.ModelChoiceName))
             {
-                var mibSettings = sp.GetRequiredService<ManInBlackSettings>();
+                var mibSettings = sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value;
                 agentContext.Items["ModelChoice"] = mibSettings.GetModelChoice(definition.ModelChoiceName);
             }
 

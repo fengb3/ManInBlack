@@ -12,7 +12,7 @@ public class HookSettings
     public string HookPoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// 脚本路径。全局钩子相对于 {RootPath}/hooks/，用户钩子相对于 {workspace}/。
+    /// 要执行的 Shell 命令。全局钩子相对于 {RootPath}/hooks/，用户钩子相对于 {workspace}/。
     /// 推荐将脚本放在 {workspace}/.agents/hooks/ 目录下。
     /// </summary>
     public string Script { get; set; } = string.Empty;

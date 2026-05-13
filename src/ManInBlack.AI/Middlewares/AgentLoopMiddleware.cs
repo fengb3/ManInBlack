@@ -93,10 +93,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
 
                 if (toolCtx.Error != null)
                 {
-                    Console.BackgroundColor = ConsoleColor.Red;
-                    Console.ForegroundColor = ConsoleColor.White;
                     logger.LogError(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
-                    Console.ResetColor();
                 }
 
                 var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);

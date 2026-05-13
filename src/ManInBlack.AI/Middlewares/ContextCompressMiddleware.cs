@@ -40,12 +40,6 @@ public class ContextCompressMiddleware : AgentMiddleware
             }
 
         }
-        
-        // Console.BackgroundColor = ConsoleColor.DarkBlue;
-        // Console.ForegroundColor = ConsoleColor.Cyan;
-        // Console.WriteLine($"ContextCompressMiddleware: compressed {compressed} tool results, keeped {transed} tool results.");
-        // Console.ResetColor();
-
 
         await foreach (var response in next().WithCancellation(ct)) yield return response;
     }

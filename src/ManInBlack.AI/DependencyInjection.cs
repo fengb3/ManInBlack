@@ -114,8 +114,6 @@ public static class DependencyInjection
             }
 
             // 注册完整配置，后续可通过 IOptions<ManInBlackSettings> 按名获取其他 ModelChoice
-            services.AddSingleton(settings);
-
             return services.AddManInBlack(opt =>
             {
                 opt.ModelChoice = modelChoice;

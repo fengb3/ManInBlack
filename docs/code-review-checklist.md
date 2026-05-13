@@ -61,11 +61,11 @@
 - [ ] **M10: EventBus 静态存储无清理机制** — handler 列表按 key 隔离但无超时/弱引用清理，订阅泄漏会导致内存增长。`src/ManInBlack.AI/Services/EventBus.cs`
 - [ ] **M11: Hook 系统和 EventBus 双轨制** — 两条路径执行顺序不确定，需要优先级保证的场景（如安全检查）有风险。
 - [ ] **M12: AgentLifecycleFilter CancellationToken 硬编码 default** — 工具执行前后的 EventBus 发布无法取消。`src/ManInBlack.AI/ToolCallFilters/AgentLifecycleFilter.cs:39,54`
-- [ ] **M13: ManInBlackSettings 双轨注册** — 同时注册 IOptions 和直接单例，访问方式不一致。`src/ManInBlack.AI/DependencyInjection.cs`
+- [x] **M13: ManInBlackSettings 双轨注册** — 统一为 IOptions 模式，移除直接单例注册。`src/ManInBlack.AI/DependencyInjection.cs`、`AgentFactory.cs`
 - [ ] **M14: FeishuAdaptor 重复调用 AddAutoRegisteredServices()** — `AddManInBlackFromConfiguration` 内部已调用，外部又调一次。`demo/FeishuAdaptor/Program.cs:72`
 - [ ] **M15: SlidingWindowRateLimiter 竞态条件** — `GetRequiredDelay` 和 `RecordCall` 之间存在时间窗口。`demo/FeishuAdaptor/FeishuCard/SlidingWindowRateLimiter.cs`
-- [ ] **M16: AgentLoopMiddleware 残留 Console 颜色操作** — 库代码不应操控宿主控制台。`src/ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs:96-99`
-- [ ] **M17: HookSettings.Script XML 注释错误** — 写"脚本路径"但实际是原始 shell 命令。`src/ManInBlack.AI/Configuration/HookSettings.cs:15`
+- [x] **M16: AgentLoopMiddleware 残留 Console 颜色操作** — 已删除 Console 颜色操作，保留 logger.LogError。`src/ManInBlack.AI/Middlewares/AgentLoopMiddleware.cs`
+- [x] **M17: HookSettings.Script XML 注释错误** — "脚本路径"改为"要执行的 Shell 命令"。`src/ManInBlack.AI/Configuration/HookSettings.cs`
 - [ ] **M18: HookMiddleware 忽略 HookResult 返回值** — AfterLlmCall/AfterToolExecute/AllToolsCompleted/AgentCompleted 的 handler 不检查 Succeeded。`src/ManInBlack.AI/Middlewares/HookMiddleware.cs:52-117`
 
 ### 测试缺失
@@ -75,13 +75,13 @@
 - [ ] **M21: AgentPipelineBuilder 无测试** — 管道构建顺序、Use<T>() DI 解析未覆盖。`src/ManInBlack.AI/Middlewares/AgentPipelineBuilder.cs`
 - [ ] **M22: AgentProfileMiddleware 无测试** — profile.md 读取和注入逻辑未覆盖。
 - [ ] **M23: 飞书核心组件无测试** — ImMessageReceiveEventHandler、AgentLauncher、CardView 无覆盖。
-- [ ] **M24: FileToolsTests 大量注释掉的测试** — 含路径遍历安全测试，应删除或恢复。`test/ManInBlack.AI.Tests/Tools/FileToolsTests.cs`
+- [x] **M24: FileToolsTests 大量注释掉的测试** — 已删除所有注释掉的测试代码。`test/ManInBlack.AI.Tests/Tools/FileToolsTests.cs`
 
 ### 注释代码/死代码
 
-- [ ] **M25: CommandToolMiddleware.cs 和 FileToolMiddleware.cs 整文件被注释** — 但 `AgentPipelines.cs` 仍引用生成的版本。应删除这些注释文件。
-- [ ] **M26: 多处残留 Console.WriteLine 调试代码** — `SystemPromptInjectionMiddleware.cs:20-23,40-43`、`ContextCompressMiddleware.cs:44-47`、`OpenAICompatibleChatClient.cs:62-64,88-91`
-- [ ] **M27: AgentPipelineBuilder.Build() 残留大量注释代码** — `AgentPipelineBuilder.cs:19-21,44-46,63-64`
+- [x] **M25: CommandToolMiddleware.cs 和 FileToolMiddleware.cs 整文件被注释** — 已删除两个注释文件。
+- [x] **M26: 多处残留 Console.WriteLine 调试代码** — 已清理 SystemPromptInjectionMiddleware、UserInputMiddleware、ContextCompressMiddleware、OpenAICompatibleChatClient 中的调试代码。
+- [x] **M27: AgentPipelineBuilder.Build() 残留大量注释代码** — 已清理。`AgentPipelineBuilder.cs`
 
 ---
 
