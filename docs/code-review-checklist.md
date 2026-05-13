@@ -1,6 +1,6 @@
 # 代码审查待办清单
 
-> 生成时间：2025-05-09 | 最后更新：2025-05-09
+> 生成时间：2025-05-09 | 最后更新：2026-05-14
 > 基于 9 个文档维度的全量代码审查结果，已完成的标记为 ✅，待修复的标记为 ⬜。
 > 提交：67d2a74 🐛 修复 FileTools.Edit、SerializeTools、更新文档
 
@@ -28,8 +28,8 @@
   - [x] `src/ManInBlack.AI/Services/FileUserWorkspace.cs` — `_user` 改为 `Lazy<UserEntry>` 延迟初始化
 - [x] **H6: 飞书卡片逻辑提取为独立类** — 从匿名回调重构为 `FeishuCardSession`。`demo/FeishuAdaptor/FeishuCard/FeishuCardSession.cs`
 - [ ] **H7: InjectTarget 功能不完整** — 只实现了 SystemPrompt 注入，UserMessage 和 ToolResult 分支缺失。`src/ManInBlack.AI/Middlewares/HookMiddleware.cs:129-130`
-- [ ] **H8: SystemPromptInjectionMiddleware 未处理 null** — `context.SystemPrompt.Length` 在 SystemPrompt 为 null 时 NRE。`src/ManInBlack.AI/Middlewares/SystemPromptInjectionMiddleware.cs:25`
-- [ ] **H9: EventPublishingMiddleware 无测试** — 默认管道最外层中间件零覆盖。`test/ManInBlack.AI.Tests/`
+- [x] **H8: SystemPromptInjectionMiddleware 未处理 null** — `SystemPrompt` 加 null 合并为空字符串，同时清理注释掉的 Console 调试代码。`src/ManInBlack.AI/Middlewares/SystemPromptInjectionMiddleware.cs`
+- [x] **H9: EventPublishingMiddleware 无测试** — 已补充 8 个测试用例，覆盖 Text/Reasoning/Usage/未知 Content、多 Content、多 Update、Completed 尾事件。`test/ManInBlack.AI.Tests/Middlewares/EventPublishingMiddlewareTests.cs`
 
 ---
 

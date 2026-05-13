@@ -16,14 +16,9 @@ public class SystemPromptInjectionMiddleware(ILogger<SystemPromptInjectionMiddle
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        
-        // Console.ForegroundColor = ConsoleColor.DarkGreen;
-        // Console.BackgroundColor = ConsoleColor.Magenta;
-        // Console.WriteLine("add system prompt to context: " + context.SystemPrompt);
-        // Console.ResetColor();
-        
-        logger.LogInformation("Inject system prompt with length of {Length} to context", context.SystemPrompt.Length);
-        context.Messages.Insert(0, new ChatMessage(ChatRole.System, context.SystemPrompt));
+        var systemPrompt = context.SystemPrompt ?? string.Empty;
+        logger.LogInformation("Inject system prompt with length of {Length} to context", systemPrompt.Length);
+        context.Messages.Insert(0, new ChatMessage(ChatRole.System, systemPrompt));
 
         await foreach (var update in next().WithCancellation(ct))
             yield return update;
@@ -37,11 +32,6 @@ public class UserInputMiddleware() : AgentMiddleware
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Console.ForegroundColor = ConsoleColor.DarkGreen;
-        // Console.BackgroundColor = ConsoleColor.Magenta;
-        // Console.WriteLine("add user input to context: " + context.UserInput);
-        // Console.ResetColor();
-        
         context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput));
 
         await foreach (var update in next().WithCancellation(ct))

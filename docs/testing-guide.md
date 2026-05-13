@@ -213,7 +213,46 @@ public static async IAsyncEnumerable<T> ThrowOnMoveNext<T>(Exception ex)
 }
 ```
 
-**适用中间件：** Retry, Logging, ContextCompress
+**适用中间件：** Retry, Logging, ContextCompress, EventPublishing
+
+#### 补充：EventPublishingMiddleware（流拦截 + EventBus）
+
+EventPublishingMiddleware 遍历响应流，将 `TextContent`/`TextReasoningContent`/`UsageContent` 转换为 `ModelContentEvent` 并通过 `EventBus` 广播。测试时直接 new EventBus，用 Subscribe 收集事件：
+
+```csharp
+[Fact]
+public async Task HandleAsync_TextContent_ShouldPublishAndYield()
+{
+    // Arrange: 订阅收集事件
+    var bus = new EventBus();
+    var events = new List<ModelContentEvent>();
+    using var sub = bus.Subscribe<ModelContentEvent>("agent-1",
+        (e, _) => { events.Add(e); return Task.CompletedTask; });
+
+    var middleware = new EventPublishingMiddleware(bus);
+    var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "agent-1" };
+
+    // Act
+    var update = new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("hello")]);
+    var results = await middleware.HandleAsync(ctx, () => TestHelpers.AsyncSeq(update))
+        .ToListAsync();
+
+    // Assert: update 原样转发，事件正确发布
+    Assert.Single(results);
+    Assert.Equal("hello", results[0].Text);
+    Assert.Equal(2, events.Count);
+    Assert.Equal(ModelContentKind.Text, events[0].Kind);
+    Assert.Equal(ModelContentKind.Completed, events[1].Kind);
+
+    sub.Dispose();
+}
+```
+
+**关键点：**
+- `EventBus` 直接 `new`，无需 DI 容器
+- 用 `Subscribe` + `List<T>` 收集事件，断言事件数量和属性
+- 流结束后始终发布 `Completed` 事件
+- 未知 `AIContent` 子类型（如 `FunctionCallContent`）不发布事件，但 update 仍转发
 
 ---
 

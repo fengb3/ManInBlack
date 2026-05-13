@@ -62,6 +62,23 @@ public class SystemPromptInjectionMiddlewareTests
         Assert.Single(results);
         Assert.Equal("response", results[0].Text);
     }
+
+    [Fact]
+    public async Task HandleAsync_NullSystemPrompt_ShouldNotThrow()
+    {
+        var middleware = new SystemPromptInjectionMiddleware(NullLogger<SystemPromptInjectionMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
+        {
+            SystemPrompt = null!,
+            Messages = []
+        };
+
+        await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
+
+        Assert.Single(ctx.Messages);
+        Assert.Equal(ChatRole.System, ctx.Messages[0].Role);
+        Assert.Equal("", ctx.Messages[0].Text);
+    }
 }
 
 public class UserInputMiddlewareTests
