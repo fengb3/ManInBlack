@@ -2,14 +2,43 @@
 
 namespace ManInBlack.AI.Abstraction.Storage;
 
+/// <summary>
+/// 工作空间策略模式
+/// </summary>
+public enum WorkspaceMode
+{
+    /// <summary>
+    /// 每个用户独立目录：{RootPath}/workspaces/{userId}
+    /// </summary>
+    UserIsolated = 0,
+
+    /// <summary>
+    /// 使用进程当前工作目录
+    /// </summary>
+    CurrentDirectory = 1,
+
+    /// <summary>
+    /// 使用配置中指定的显式路径
+    /// </summary>
+    CustomPath = 2,
+}
+
+public class WorkspaceSettings
+{
+    public WorkspaceMode Mode { get; set; } = WorkspaceMode.UserIsolated;
+
+    /// <summary>
+    /// CustomPath 模式下的显式路径。仅当 Mode == CustomPath 时生效。
+    /// </summary>
+    public string? CustomPath { get; set; }
+}
+
 public class AgentStorageOptions
 {
     public string RootPath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".man-in-black");
 
-    // public string WorkspaceRootPath { get; set; } = Path.Combine(
-    //     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "man_in_black_workspaces"
-    // );
+    public WorkspaceSettings Workspace { get; set; } = new();
 }
 
 public interface ISessionStorage
