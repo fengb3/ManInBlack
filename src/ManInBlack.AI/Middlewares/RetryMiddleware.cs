@@ -25,7 +25,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
         {
             var yielded = false;
             var shouldRetry = false;
-            var exMessage = "";
+            var fatalError = "";
 
             var enumerator = next().GetAsyncEnumerator(ct);
             while (true)
@@ -37,7 +37,6 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                 }
                 catch (Exception ex) when (ex is IOException or HttpRequestException)
                 {
-                    exMessage = ex.Message;
                     if (!yielded && attempt < MaxRetries)
                     {
                         shouldRetry = true;
@@ -45,8 +44,8 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                     }
 
                     LogRetryExhausted(logger, context.AgentId, attempt + 1);
-                    await enumerator.DisposeAsync();
-                    throw;
+                    fatalError = ex.Message;
+                    break;
                 }
 
                 if (!moved)
@@ -58,22 +57,35 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
 
             await enumerator.DisposeAsync();
 
+            if (fatalError.Length > 0)
+            {
+                yield return new ChatResponseUpdate
+                {
+                    Contents =
+                    [
+                        new TextContent(
+                            $"API 请求失败，已无法重试（已输出部分内容）。错误：{fatalError}"
+                        )
+                    ]
+                };
+                throw new IOException(fatalError);
+            }
+
             if (!shouldRetry)
                 yield break;
 
             var delay = RetryDelays[Math.Min(attempt, RetryDelays.Length - 1)];
             LogRetrying(logger, context.AgentId, attempt + 1, delay);
-            // let the outer ui display know what's happening
-            yield return new ChatResponseUpdate()
+            yield return new ChatResponseUpdate
             {
-                Contents = [
+                Contents =
+                [
                     new TextContent(
                         $"Error when calling api retry {attempt + 1} times in {delay.Seconds} second(s)"
                     )
                 ]
             };
             await Task.Delay(delay, ct);
-
         }
     }
 
