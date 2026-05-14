@@ -16,11 +16,12 @@ public class ReadPersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ShouldRestoreSavedMessages()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         await storage.SaveMessage("session_1", new(ChatRole.Assistant, "saved response"));
         await storage.SaveMessage("session_1", new(ChatRole.Tool, [new FunctionResultContent("call_1", "result")]));
 
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .AddSingleton<IUserStorage>(new FakeUserStorage())
             .BuildServiceProvider();
@@ -46,7 +47,7 @@ public class ReadPersistenceMiddlewareTests
     // [Fact]
     // public async Task HandleAsync_ShouldFilterOutReasoningContent()
     // {
-    //     var storage = new FakeSessionStorage();
+    //     var storage = new FakeAgentStateStorage();
     //     var msgWithReasoning = new ChatMessage(ChatRole.Assistant,
     //     [
     //         new TextContent("hello"),
@@ -78,11 +79,12 @@ public class ReadPersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ClearCommand_ShouldResetAndYieldConfirmation()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         await storage.SaveMessage("s1", new(ChatRole.Assistant, "old"));
 
         var userStorage = new FakeUserStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .AddSingleton<IUserStorage>(userStorage)
             .BuildServiceProvider();
@@ -107,9 +109,10 @@ public class ReadPersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ResetCommand_ShouldAlsoReset()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var userStorage = new FakeUserStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .AddSingleton<IUserStorage>(userStorage)
             .BuildServiceProvider();
@@ -132,9 +135,10 @@ public class ReadPersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_NewCommand_ShouldAlsoReset()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var userStorage = new FakeUserStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .AddSingleton<IUserStorage>(userStorage)
             .BuildServiceProvider();
@@ -157,8 +161,9 @@ public class ReadPersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_NoSavedMessages_ShouldContinue()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .AddSingleton<IUserStorage>(new FakeUserStorage())
             .BuildServiceProvider();
@@ -188,8 +193,9 @@ public class SavePersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ShouldSaveEachAssistantMessage()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .BuildServiceProvider();
 
@@ -218,8 +224,9 @@ public class SavePersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ShouldNotSaveSystemMessages()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .BuildServiceProvider();
 
@@ -247,8 +254,9 @@ public class SavePersistenceMiddlewareTests
     [Fact]
     public async Task HandleAsync_ShouldRestoreOriginalMessages()
     {
-        var storage = new FakeSessionStorage();
+        var storage = new FakeAgentStateStorage();
         var services = new ServiceCollection()
+            .AddSingleton<IAgentStateStorage>(storage)
             .AddSingleton<ISessionStorage>(storage)
             .BuildServiceProvider();
 
