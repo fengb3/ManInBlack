@@ -9,8 +9,8 @@ using Microsoft.Extensions.Options;
 namespace ManInBlack.AI.Services;
 
 [ServiceRegister.Singleton.As<ISessionStorage>]
-public class FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<FileSessionStorage> logger)
-    : ISessionStorage
+public class FileAgentStateStorage(IOptions<AgentStorageOptions> options, ILogger<FileAgentStateStorage> logger)
+    : IAgentStateStorage
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -19,9 +19,6 @@ public class FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<F
     };
 
     private readonly AgentStorageOptions _options = options.Value;
-
-    // TODO 内存里存一份
-    // private Dictionary<string, List<ChatMessage>> _inMemorySessionMessages = new();
 
     private string SessionDir => Path.Combine(_options.RootPath, "sessions");
 
@@ -45,7 +42,7 @@ public class FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<F
 
         if (!File.Exists(sessionFile))
         {
-            await File.Create(sessionFile).DisposeAsync(); // 创建空文件
+            await File.Create(sessionFile).DisposeAsync();
             return messages;
         }
 
@@ -57,5 +54,54 @@ public class FileSessionStorage(IOptions<AgentStorageOptions> options, ILogger<F
         }
 
         return messages;
+    }
+
+    /// <inheritdoc/>
+    public async Task<AgentStateSnapshot?> LoadSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        var snapshotFile = Path.Combine(SessionDir, $"{sessionId}.state.json");
+        if (!File.Exists(snapshotFile))
+            return null;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(snapshotFile, ct);
+            return JsonSerializer.Deserialize<AgentStateSnapshot>(json, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "快照文件损坏，将忽略: {File}", snapshotFile);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task SaveSnapshotAsync(string sessionId, AgentStateSnapshot snapshot, CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(SessionDir);
+        var snapshotFile = Path.Combine(SessionDir, $"{sessionId}.state.json");
+        var tempFile = snapshotFile + ".tmp";
+
+        try
+        {
+            var json = JsonSerializer.Serialize(snapshot, JsonOptions);
+            await File.WriteAllTextAsync(tempFile, json, ct);
+            File.Move(tempFile, snapshotFile, overwrite: true);
+        }
+        catch
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public Task DeleteSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        var snapshotFile = Path.Combine(SessionDir, $"{sessionId}.state.json");
+        if (File.Exists(snapshotFile))
+            File.Delete(snapshotFile);
+        return Task.CompletedTask;
     }
 }
