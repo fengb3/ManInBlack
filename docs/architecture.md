@@ -36,6 +36,8 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 
 此外还包含 `IUserWorkspace` 接口和 `IModelProvider` 接口。
 
+`Storage/` 目录还包含 `IAgentStateStorage`（扩展 `ISessionStorage`，增加快照存取能力）、`ICheckpointPolicy`（检查点保存策略）和 `AgentStateSnapshot`（状态快照 POCO）。
+
 ### ManInBlack.AI — 实现层
 
 所有具体实现：
@@ -47,7 +49,7 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Middlewares/`     | 15 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools、DelegationTools  |
 | `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter（LargeResultFilter 已注释） |
-| `Services/`        | SkillService、EventBus、FileUserWorkspace 等             |
+| `Services/`        | SkillService、EventBus、FileUserWorkspace、FileAgentStateStorage、AfterToolCallPolicy 等 |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 
 此外还包含 `ModelChoice`（纯数据结构：Schema/ApiKey/BaseUrl/ModelId）、`ChatClientProviderExtensions`，以及 DI 注册入口。
@@ -231,6 +233,40 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 
 ---
 
+## 状态持久化（检查点）
+
+### 概述
+
+框架在消息持久化（`.jsonl`）基础上增加了**状态快照**机制，用于崩溃恢复和断点续传。快照保存 Agent 的 `SystemPrompt`、`Items` 字典等运行时状态，与消息文件并行存储。
+
+### 存储接口
+
+- **`ISessionStorage`** — 消息持久化接口（`SaveMessage` / `LoadMessages`）
+- **`IAgentStateStorage`** — 扩展 `ISessionStorage`，增加 `LoadSnapshotAsync`、`SaveSnapshotAsync`、`DeleteSnapshotAsync`
+- **`FileAgentStateStorage`** — 默认实现，同时满足两个接口。快照存储为 `{sessionId}.state.json`，消息存储为 `{sessionId}.jsonl`，位于同一 `sessions/` 目录
+
+### 检查点机制
+
+1. **`ReadPersistenceMiddleware`** 在前置阶段检测并恢复快照（`SystemPrompt`、`Items`），同时向 `context.Items` 注入 `SaveCheckpoint` 回调
+2. **`AgentLoopMiddleware`** 在每轮工具调用完成后调用 `SaveCheckpoint("AfterToolCall")`
+3. **`SavePersistenceMiddleware`** 在管道后置阶段（session 结束时）调用 `SaveCheckpoint("SessionEnd")`
+
+### 保存策略
+
+`ICheckpointPolicy.ShouldSave(phase)` 控制是否实际写入快照。默认实现 `AfterToolCallPolicy` 在 `AfterToolCall` 和 `SessionEnd` 两个阶段都保存。可通过 DI 替换为自定义策略。
+
+### 恢复流程
+
+```
+ReadPersistenceMiddleware
+    ├── 加载 {sessionId}.state.json
+    ├── 恢复 SystemPrompt、Items 到 AgentContext
+    ├── 注入 SaveCheckpoint 回调
+    └── 继续正常管道流程（加载 .jsonl 消息 → 执行）
+```
+
+---
+
 ## 工具调用流程
 
 ```
@@ -277,3 +313,5 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 4. **Scoped 生命周期** — 所有中间件注册为 Scoped，每次请求独立，共享同一作用域内的 AgentContext 和 EventBus。
 
 5. **契约与实现分离** — Abstraction 层只包含接口和 POCO，不依赖任何具体实现包（除 Microsoft.Extensions.AI），使上层可以只引用契约层编写测试和扩展。
+
+6. **检查点通过 Items 回调解耦** — `ReadPersistenceMiddleware` 注入 `SaveCheckpoint` 回调到 `context.Items`，内层中间件（AgentLoop、SavePersistence）通过回调触发保存，无需直接依赖 `IAgentStateStorage`。

@@ -219,6 +219,28 @@ public double Temperature { get; set; } = 1.0;
 
 ---
 
+## 检查点策略配置
+
+状态持久化（检查点）默认自动启用，无需在 `settings.json` 中额外配置。框架使用 `AfterToolCallPolicy` 作为默认策略，在每轮工具调用后和 session 结束时保存快照。
+
+### 替换检查点策略
+
+通过 DI 注册自定义 `ICheckpointPolicy` 实现来控制保存时机：
+
+```csharp
+services.AddSingleton<ICheckpointPolicy, MyCustomPolicy>();
+
+// 示例：仅在 session 结束时保存
+public class SessionEndOnlyPolicy : ICheckpointPolicy
+{
+    public bool ShouldSave(string phase) => phase == "SessionEnd";
+}
+```
+
+> **注意：** `AfterToolCallPolicy` 通过 `TryAddSingleton` 注册，自定义注册会自动覆盖默认实现。
+
+---
+
 ## 配置 API 速查
 
 | API                                              | 用途                                        |
