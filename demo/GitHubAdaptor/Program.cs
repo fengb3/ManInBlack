@@ -1,39 +1,51 @@
+using GitHubAdaptor.Models;
+using GitHubAdaptor.Webhook;
+using ManInBlack.AI;
+using ManInBlack.AI.DependencyInjection;
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Configuration.AddManInBlackSettings();
+
+var githubSettings = new GitHubSettings();
+builder.Configuration.GetSection("GitHub").Bind(githubSettings);
+
+builder.Services.AddSerilog(loggerConfig => loggerConfig.ReadFrom.Configuration(builder.Configuration));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton(githubSettings);
+builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
+builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+var factory = app.Services.GetRequiredService<AgentFactory>();
+factory.RegisterPipeline("github", pipeline => pipeline.UseDefault());
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.UseMiddleware<GitHubWebhookMiddleware>();
 
-app.MapGet("/weatherforecast", () =>
+app.MapPost(githubSettings.WebhookEndpoint, async (
+    HttpContext context,
+    GitHubEventDispatcher dispatcher) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var body = (string)context.Items["RawBody"]!;
+    var eventType = context.Request.Headers["X-GitHub-Event"].FirstOrDefault() ?? "";
+
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await dispatcher.DispatchAsync(eventType, body);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "处理 GitHub 事件失败");
+        }
+    });
+
+    return Results.Ok();
+});
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
