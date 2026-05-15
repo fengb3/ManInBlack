@@ -75,3 +75,36 @@ public static class UserEntryExtensions
     public static string? GetLatestSessionId(this UserEntry userEntry)
         => userEntry.SessionIds.OrderBy(s => s).LastOrDefault();
 }
+
+/// <summary>
+/// Agent 状态存储接口，合并消息持久化和状态快照能力
+/// </summary>
+public interface IAgentStateStorage : ISessionStorage
+{
+    /// <summary>
+    /// 加载状态快照，无快照时返回 null
+    /// </summary>
+    Task<AgentStateSnapshot?> LoadSnapshotAsync(string sessionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 保存状态快照
+    /// </summary>
+    Task SaveSnapshotAsync(string sessionId, AgentStateSnapshot snapshot, CancellationToken ct = default);
+
+    /// <summary>
+    /// 删除状态快照
+    /// </summary>
+    Task DeleteSnapshotAsync(string sessionId, CancellationToken ct = default);
+}
+
+/// <summary>
+/// 检查点保存策略，控制何时触发快照保存
+/// </summary>
+public interface ICheckpointPolicy
+{
+    /// <summary>
+    /// 判断是否应该保存检查点
+    /// </summary>
+    /// <param name="phase">阶段标识："AfterToolCall" 或 "SessionEnd"</param>
+    bool ShouldSave(string phase);
+}

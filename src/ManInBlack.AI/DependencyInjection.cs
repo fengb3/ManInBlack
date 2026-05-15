@@ -8,6 +8,7 @@ using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI;
@@ -52,6 +53,10 @@ public static class DependencyInjection
                 return ChatClientProviderExtensions.CreateChatClient(
                     sp.GetRequiredService<IHttpClientFactory>(), choice);
             });
+
+            services.TryAddSingleton<IAgentStateStorage>(
+                sp => (IAgentStateStorage)sp.GetRequiredService<ISessionStorage>());
+            services.TryAddSingleton<ICheckpointPolicy, AfterToolCallPolicy>();
 
             services.AddScoped<IUserWorkspace>(sp =>
             {

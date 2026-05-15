@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading.Channels;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
@@ -8,6 +9,7 @@ using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Middlewares;
 
@@ -24,6 +26,44 @@ public class ReadPersistenceMiddleware : AgentMiddleware
     )
     {
         var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
+
+        // 恢复状态快照
+        if (sessionStorage is IAgentStateStorage stateStorage)
+        {
+            var snapshot = await stateStorage.LoadSnapshotAsync(context.SessionId, ct);
+            if (snapshot is not null)
+            {
+                foreach (var (key, value) in snapshot.Items)
+                    context.Items[key] = value;
+            }
+        }
+
+        // 注入 SaveCheckpoint 回调
+        context.Items["SaveCheckpoint"] = (Func<string?, CancellationToken, Task>)(async (reason, token) =>
+        {
+            if (sessionStorage is not IAgentStateStorage stateStorage)
+                return;
+            var policy = context.ServiceProvider.GetService(typeof(ICheckpointPolicy)) as ICheckpointPolicy;
+            if (policy is not null && !policy.ShouldSave(reason ?? "Unknown"))
+                return;
+            var snapshot = new AgentStateSnapshot
+            {
+                SessionId = context.SessionId,
+                AgentName = context.AgentName,
+                Items = PersistenceHelper.SerializeItems(context.Items),
+                SavedAt = DateTimeOffset.UtcNow,
+                CheckpointReason = reason,
+            };
+            try
+            {
+                await stateStorage.SaveSnapshotAsync(context.SessionId, snapshot, token);
+            }
+            catch (Exception ex)
+            {
+                var logger = context.ServiceProvider.GetService<ILogger<ReadPersistenceMiddleware>>();
+                logger?.LogWarning(ex, "保存检查点失败: {SessionId}", context.SessionId);
+            }
+        });
 
         // 重置对话 command
         if (
@@ -104,6 +144,12 @@ public class SavePersistenceMiddleware : AgentMiddleware
 
         context.Messages = original;
         await persisting.FlushAsync();
+
+        // session 结束时保存最终检查点
+        if (context.Items.TryGetValue("SaveCheckpoint", out var obj) && obj is Func<string?, CancellationToken, Task> save)
+        {
+            await save("SessionEnd", ct);
+        }
     }
 
     /// <summary>
@@ -136,5 +182,27 @@ public class SavePersistenceMiddleware : AgentMiddleware
             _channel.Writer.Complete();
             await _consumerTask;
         }
+    }
+}
+
+file static class PersistenceHelper
+{
+    public static Dictionary<string, object> SerializeItems(IDictionary<string, object> items)
+    {
+        var result = new Dictionary<string, object>();
+        foreach (var (key, value) in items)
+        {
+            if (key == "SaveCheckpoint") continue;
+            try
+            {
+                JsonSerializer.SerializeToElement(value);
+                result[key] = value;
+            }
+            catch
+            {
+                // 不可序列化的值跳过
+            }
+        }
+        return result;
     }
 }

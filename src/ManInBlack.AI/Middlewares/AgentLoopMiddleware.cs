@@ -108,6 +108,12 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             {
                 AgentId = key,
             }, ct);
+
+            // ── 检查点保存 ──
+            if (context.Items.TryGetValue("SaveCheckpoint", out var obj) && obj is Func<string?, CancellationToken, Task> save)
+            {
+                await save("AfterToolCall", ct);
+            }
         }
     }
 }

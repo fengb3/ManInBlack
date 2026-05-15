@@ -208,7 +208,7 @@ private class EnrichingCollection : Collection<ChatMessage>
 
 不调用 `next()`，直接 `yield return` 后 `yield break`。
 
-**示例 — 命令拦截**（参考 `ReadPersistenceMiddleware`）：
+**示例 — 命令拦截**（参考 `ReadPersistenceMiddleware` 的 reset 命令处理）：
 
 ```csharp
 public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
@@ -234,7 +234,7 @@ public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
 
 模型返回 `FunctionCallContent` 时，执行工具并将结果追加回消息列表，再次调用 `next()` 循环处理，直到模型不再发起工具调用。
 
-**核心结构**（参考 `AgentLoopMiddleware`）：
+**核心结构**（参考 `AgentLoopMiddleware`，含检查点触发）：
 
 ```csharp
 public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
@@ -329,8 +329,8 @@ builder.Use(new MyStatelessMiddleware());
 | #   | 中间件                            | 职责                               |
 | --- | --------------------------------- | ---------------------------------- |
 | 1   | `EventPublishingMiddleware`       | 在最外层，用于 UI 监听 Agent 事件  |
-| 2   | `ReadPersistenceMiddleware`       | 加载历史消息，处理 reset 命令      |
-| 3   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息    |
+| 2   | `ReadPersistenceMiddleware`       | 加载历史消息，恢复状态快照，处理 reset 命令，注入 `SaveCheckpoint` 回调 |
+| 3   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息，session 结束时触发 `SessionEnd` 检查点 |
 | 4   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
 | 5   | `DelegationMiddleware`            | 注入子 Agent 委托工具和描述       |
 | 6   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
@@ -348,7 +348,7 @@ builder.Use(new MyStatelessMiddleware());
 | 13  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
 | 14  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
 | 15  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
-| 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后）         |
+| 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点 |
 
 ### 顺序规则
 
@@ -375,6 +375,12 @@ if (context.Items.TryGetValue("my_key", out var value))
     // ...
 }
 ```
+
+### 内置 Items 键
+
+| 键               | 类型                                  | 注入者                    | 说明                                         |
+| ---------------- | ------------------------------------- | ------------------------- | -------------------------------------------- |
+| `SaveCheckpoint` | `Func<string?, CancellationToken, Task>` | `ReadPersistenceMiddleware` | 检查点保存回调，内层中间件调用触发快照写入 |
 
 ---
 

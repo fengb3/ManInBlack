@@ -86,3 +86,53 @@ public class FakeUserWorkspace : IUserWorkspace
         AgentRoot = Path.Combine(workingDir, ".agents");
     }
 }
+
+/// <summary>
+/// 内存版 IAgentStateStorage，用 Dictionary 代替文件 I/O
+/// </summary>
+public class FakeAgentStateStorage : IAgentStateStorage
+{
+    private readonly Dictionary<string, List<ChatMessage>> _messages = new();
+    private readonly Dictionary<string, AgentStateSnapshot> _snapshots = new();
+
+    public Task SaveMessage(string sessionId, ChatMessage message)
+    {
+        if (!_messages.TryGetValue(sessionId, out var list))
+        {
+            list = [];
+            _messages[sessionId] = list;
+        }
+        list.Add(message);
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<ChatMessage>> LoadMessages(string sessionId)
+    {
+        if (_messages.TryGetValue(sessionId, out var list))
+            return Task.FromResult<IList<ChatMessage>>([.. list]);
+        return Task.FromResult<IList<ChatMessage>>([]);
+    }
+
+    public Task<AgentStateSnapshot?> LoadSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        _snapshots.TryGetValue(sessionId, out var snapshot);
+        return Task.FromResult(snapshot);
+    }
+
+    public Task SaveSnapshotAsync(string sessionId, AgentStateSnapshot snapshot, CancellationToken ct = default)
+    {
+        _snapshots[sessionId] = snapshot;
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        _snapshots.Remove(sessionId);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 获取所有快照，用于断言
+    /// </summary>
+    public IReadOnlyDictionary<string, AgentStateSnapshot> AllSnapshots => _snapshots;
+}
