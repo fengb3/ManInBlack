@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ManInBlack.AI.Abstraction.Storage;
 using Microsoft.Extensions.Configuration;
 
 namespace ManInBlack.AI.Configuration;
@@ -58,6 +59,7 @@ public static class ManInBlackConfigurationBuilder
                         ModelId = "gpt-4o",
                     }
                 },
+                Storage = new StorageSettings(),
             };
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(defaults, JsonWriteOptions));
         }

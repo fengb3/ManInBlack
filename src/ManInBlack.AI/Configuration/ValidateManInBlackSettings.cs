@@ -1,3 +1,4 @@
+using ManInBlack.AI.Abstraction.Storage;
 using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI.Configuration;
@@ -53,6 +54,10 @@ public class ValidateManInBlackSettings : IValidateOptions<ManInBlackSettings>
                 && !options.ModelChoices.ContainsKey(agent.ModelChoiceName))
                 return ValidateOptionsResult.Fail($"Agent \"{agentName}\" 的 ModelChoiceName \"{agent.ModelChoiceName}\" 在 ModelChoices 中不存在");
         }
+
+        if (options.Storage?.Workspace is { Mode: WorkspaceMode.CustomPath } ws
+            && string.IsNullOrWhiteSpace(ws.CustomPath))
+            return ValidateOptionsResult.Fail("Storage.Workspace.Mode 为 CustomPath 但未设置 CustomPath");
 
         return ValidateOptionsResult.Success;
     }

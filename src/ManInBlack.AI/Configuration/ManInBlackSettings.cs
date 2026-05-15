@@ -1,3 +1,5 @@
+using ManInBlack.AI.Abstraction.Storage;
+
 namespace ManInBlack.AI.Configuration;
 
 public class ManInBlackSettings
@@ -15,6 +17,18 @@ public class ManInBlackSettings
     /// Agent 定义配置，键为 Agent 名称。从 settings.json 的 "Agents" 节加载，自动注册到 DI。
     /// </summary>
     public Dictionary<string, AgentSettings> Agents { get; set; } = new();
+
+    /// <summary>
+    /// 存储与工作空间配置
+    /// </summary>
+    public StorageSettings Storage { get; set; } = new();
+}
+
+public class StorageSettings
+{
+    public string? RootPath { get; set; }
+
+    public WorkspaceSettings? Workspace { get; set; }
 }
 
 /// <summary>

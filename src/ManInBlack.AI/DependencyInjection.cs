@@ -34,6 +34,7 @@ public static class DependencyInjection
             services.Configure<AgentStorageOptions>(opt =>
             {
                 opt.RootPath = options.Storage.RootPath;
+                opt.Workspace = options.Storage.Workspace;
             });
 
             services.AddScoped<AgentPipelineBuilder>();
@@ -56,6 +57,21 @@ public static class DependencyInjection
             services.TryAddSingleton<IAgentStateStorage>(
                 sp => (IAgentStateStorage)sp.GetRequiredService<ISessionStorage>());
             services.TryAddSingleton<ICheckpointPolicy, AfterToolCallPolicy>();
+
+            services.AddScoped<IUserWorkspace>(sp =>
+            {
+                var ws = sp.GetRequiredService<IOptions<AgentStorageOptions>>().Value.Workspace;
+                return ws.Mode switch
+                {
+                    WorkspaceMode.CurrentDirectory => new CurrentDirectoryWorkspace(),
+                    WorkspaceMode.CustomPath => new CustomPathWorkspace(
+                        sp.GetRequiredService<IOptions<AgentStorageOptions>>()),
+                    _ => new FileUserWorkspace(
+                        sp.GetRequiredService<IOptions<AgentStorageOptions>>(),
+                        sp.GetRequiredService<AgentContext>(),
+                        sp.GetRequiredService<IUserStorage>())
+                };
+            });
 
             services.AddAutoRegisteredServices();
 
@@ -122,6 +138,10 @@ public static class DependencyInjection
             return services.AddManInBlack(opt =>
             {
                 opt.ModelChoice = modelChoice;
+                if (settings.Storage?.RootPath is not null)
+                    opt.Storage.RootPath = settings.Storage.RootPath;
+                if (settings.Storage?.Workspace is not null)
+                    opt.Storage.Workspace = settings.Storage.Workspace;
                 configure?.Invoke(opt);
             });
         }
