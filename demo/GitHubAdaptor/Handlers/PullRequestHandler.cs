@@ -1,7 +1,7 @@
 using GitHubAdaptor.Models;
 using GitHubAdaptor.Services;
 using ManInBlack.AI;
-using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Attributes;
 using Microsoft.Extensions.Logging;
 
 namespace GitHubAdaptor.Handlers;
@@ -56,13 +56,12 @@ public class PullRequestHandler(
 
                         审查流程:
                         1. 分析 diff，识别潜在问题
-                        2. 对不确定的上下文，用 `gh api repos/{repo}/contents/{{path}}` 读取完整文件
-                        3. 用以下命令提交 review:
-                           gh api repos/{repo}/pulls/{prNumber}/reviews --input - <<'REVIEW_EOF'
-                           {{"body":"总结内容","event":"COMMENT","comments":[{{"path":"文件路径","position":行号,"body":"评论内容"}}]}}
-                           REVIEW_EOF
-                        4. 根据严重程度选择 event: APPROVE / REQUEST_CHANGES / COMMENT
-                        5. position 是 diff 中的行号（从 1 开始），不是文件行号
+                        2. 对不确定的上下文，用 `gh api repos/{repo}/contents/<文件路径>` 读取完整文件
+                        3. 用 `gh api repos/{repo}/pulls/{prNumber}/reviews` 提交 review，body 为 JSON:
+                           - body: 总结内容
+                           - event: APPROVE / REQUEST_CHANGES / COMMENT
+                           - comments[]: 每个 comment 包含 path（文件路径）、position（diff 中的行号，从 1 开始）、body（评论内容）
+                        4. position 是 diff 中的行号（从 1 开始），不是文件行号
                         </github-context>
                         """;
                 },

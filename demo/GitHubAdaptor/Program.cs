@@ -1,7 +1,8 @@
+using GitHubAdaptor;
 using GitHubAdaptor.Models;
 using GitHubAdaptor.Webhook;
 using ManInBlack.AI;
-using ManInBlack.AI.DependencyInjection;
+using ManInBlack.AI.Configuration;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);

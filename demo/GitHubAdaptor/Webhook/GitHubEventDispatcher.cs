@@ -1,6 +1,6 @@
 using GitHubAdaptor.Handlers;
 using GitHubAdaptor.Models;
-using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Attributes;
 using Microsoft.Extensions.Logging;
 
 namespace GitHubAdaptor.Webhook;
