@@ -33,7 +33,6 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             var snapshot = await stateStorage.LoadSnapshotAsync(context.SessionId, ct);
             if (snapshot is not null)
             {
-                context.SystemPrompt = snapshot.SystemPrompt;
                 foreach (var (key, value) in snapshot.Items)
                     context.Items[key] = value;
             }
@@ -51,7 +50,6 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             {
                 SessionId = context.SessionId,
                 AgentName = context.AgentName,
-                SystemPrompt = context.SystemPrompt,
                 Items = PersistenceHelper.SerializeItems(context.Items),
                 SavedAt = DateTimeOffset.UtcNow,
                 CheckpointReason = reason,

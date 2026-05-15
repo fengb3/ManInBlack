@@ -84,7 +84,8 @@ public class CheckpointTests
 
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
-        Assert.Equal("restored prompt", ctx.SystemPrompt);
+        // SystemPrompt 不从快照恢复（由 AgentFactory + SystemPromptInjectionMiddleware 重新生成）
+        Assert.Equal("original prompt", ctx.SystemPrompt);
         Assert.Equal("myValue", ctx.Items["myKey"]);
     }
 
