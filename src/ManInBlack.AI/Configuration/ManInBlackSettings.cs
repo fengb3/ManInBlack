@@ -22,6 +22,11 @@ public class ManInBlackSettings
     /// 存储与工作空间配置
     /// </summary>
     public StorageSettings Storage { get; set; } = new();
+
+    /// <summary>
+    /// 是否启用 Linux 下的 bubblewrap 沙盒执行命令。默认 false。
+    /// </summary>
+    public bool UseSandbox { get; set; }
 }
 
 public class StorageSettings
