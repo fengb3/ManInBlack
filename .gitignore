@@ -487,6 +487,9 @@ $RECYCLE.BIN/
 # agent session context persistence file
 *.session
 
+# C# Language Server cache
+*.lscache
+
 # AI tools
 /*/*/agent-workspace
 demo/FeishuAdaptor/deploy.ps1
