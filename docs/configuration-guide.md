@@ -45,6 +45,7 @@
       "SubAgents": ["translator"]
     }
   },
+  "UseSandbox": false,
   "Feishu": {
     "AppId": "",
     "AppSecret": "",
@@ -202,6 +203,24 @@ public ValidateOptionsResult Validate(string? name, ManInBlackSettings options)
     return ValidateOptionsResult.Success;
 }
 ```
+
+---
+
+## 沙盒配置
+
+| 字段         | 默认值  | 说明                                                                         |
+| ------------ | ------- | ---------------------------------------------------------------------------- |
+| `UseSandbox` | `false` | 是否启用 Linux 下的 bubblewrap 沙盒执行命令。仅 Linux 生效，其他平台忽略     |
+
+沙盒通过 `bubblewrap`（bwrap）隔离文件系统和网络，适用于不可信输入场景。启用后 agent 执行的 shell 命令将在沙盒中运行，无法访问宿主文件系统。
+
+```json
+{
+  "UseSandbox": true
+}
+```
+
+> **注意：** 容器部署时需确保镜像中安装了 `bubblewrap`。沙盒会隔离文件系统，通过环境变量（如 `GH_TOKEN`）传递凭证的方式不受影响。
 
 ---
 

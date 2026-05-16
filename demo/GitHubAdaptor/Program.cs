@@ -40,7 +40,7 @@ app.MapPost(githubSettings.WebhookEndpoint, async (
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "处理 GitHub 事件失败");
+            Log.Error(ex, "处理 GitHub 事件失败，event: {EventType}", eventType);
         }
     });
 

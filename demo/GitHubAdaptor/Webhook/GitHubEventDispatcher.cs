@@ -28,7 +28,7 @@ public class GitHubEventDispatcher(
         var payload = JsonSerializer.Deserialize<PullRequestPayload>(body, JsonOptions);
         if (payload is null)
         {
-            logger.LogWarning("无法解析 pull_request payload");
+            logger.LogError("无法解析 pull_request payload");
             return;
         }
 

@@ -12,24 +12,20 @@ public class GitHubAppTokenService(
     ILogger<GitHubAppTokenService> logger)
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private string? _cachedToken;
-    private long _cachedInstallationId;
-    private DateTime _tokenExpiresAt = DateTime.MinValue;
+    private readonly Dictionary<long, (string Token, DateTime ExpiresAt)> _tokenCache = [];
 
     public async Task<string> GetInstallationTokenAsync(long installationId, CancellationToken ct = default)
     {
         await _lock.WaitAsync(ct);
         try
         {
-            if (_cachedToken != null && _cachedInstallationId == installationId && DateTime.UtcNow < _tokenExpiresAt)
-                return _cachedToken;
+            if (_tokenCache.TryGetValue(installationId, out var cached) && DateTime.UtcNow < cached.ExpiresAt)
+                return cached.Token;
 
             var jwt = GenerateJwt();
             var token = await ExchangeInstallationTokenAsync(jwt, installationId, ct);
 
-            _cachedToken = token;
-            _cachedInstallationId = installationId;
-            _tokenExpiresAt = DateTime.UtcNow.AddMinutes(55);
+            _tokenCache[installationId] = (token, DateTime.UtcNow.AddMinutes(55));
 
             logger.LogInformation("获取 installation token 成功，installation_id: {InstallationId}", installationId);
             return token;
@@ -50,7 +46,7 @@ public class GitHubAppTokenService(
         var payloadBytes = Encoding.UTF8.GetBytes(payload);
         var message = $"{Base64UrlUrlEncode(headerBytes)}.{Base64UrlUrlEncode(payloadBytes)}";
 
-        var rsa = RSA.Create();
+        using var rsa = RSA.Create();
         rsa.ImportFromPem(File.ReadAllText(settings.PrivateKeyPath));
 
         var signature = rsa.SignData(
@@ -64,6 +60,7 @@ public class GitHubAppTokenService(
     private async Task<string> ExchangeInstallationTokenAsync(string jwt, long installationId, CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(30);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("GitHubAdaptor", "1.0"));

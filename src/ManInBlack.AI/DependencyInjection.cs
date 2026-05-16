@@ -17,6 +17,11 @@ public class ManInBlackOptions
 {
     public ModelChoice ModelChoice { get; set; } = default!;
     public AgentStorageOptions Storage { get; set; } = new();
+
+    /// <summary>
+    /// 是否启用 Linux 下的 bubblewrap 沙盒执行命令。默认 false。
+    /// </summary>
+    public bool UseSandbox { get; set; }
 }
 
 public static class DependencyInjection
@@ -75,8 +80,8 @@ public static class DependencyInjection
 
             services.AddAutoRegisteredServices();
 
-            // Linux 使用 Bwarp 沙盒执行，Windows/macOS 直接 Process.Start
-            if (OperatingSystem.IsLinux())
+            // 仅在 Linux 且 UseSandbox=true 时使用 Bwarp 沙盒，否则直接 Process.Start
+            if (OperatingSystem.IsLinux() && options.UseSandbox)
                 services.AddScoped<IShellExecutor, BwarpShellExecutor>();
             else
                 services.AddScoped<IShellExecutor, ProcessShellExecutor>();
@@ -142,6 +147,7 @@ public static class DependencyInjection
                     opt.Storage.RootPath = settings.Storage.RootPath;
                 if (settings.Storage?.Workspace is not null)
                     opt.Storage.Workspace = settings.Storage.Workspace;
+                opt.UseSandbox = settings.UseSandbox;
                 configure?.Invoke(opt);
             });
         }
