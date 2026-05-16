@@ -19,8 +19,7 @@ public static class AgentPipelineBuilderExtensions
             .Use<DelegationMiddleware>()
             .Use<AgentProfileMiddleware>()
             .Use<ContextCompressMiddleware>()
-            .Use<CommandLineToolsMiddleware>()
-            .Use<FileToolsMiddleware>()
+            .Use<ToolsMiddleware>()
             .UseSimple();
     
     

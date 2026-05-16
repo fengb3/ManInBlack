@@ -75,7 +75,7 @@ factory.RegisterPipeline("feishu", pipeline => pipeline.UseDefault());
 // 子 Agent 专用 pipeline：有文件工具和事件发布，无 DelegationMiddleware
 factory.RegisterPipeline("sub-agent", builder => builder
     .Use<EventPublishingMiddleware>()
-    .Use<FileToolsMiddleware>()
+    .Use<ToolsMiddleware>()
     .UseSimple());
 
 // 愿你健康, 开心, 美满, 幸福

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace ManInBlack.AI.SourceGenerator;
 
 /// <summary>
-/// 扫描到的 [Tool] 方法的模型数据
+/// 扫描到的 [AiTool] 方法的模型数据，同时包含执行信息和声明信息
 /// </summary>
 public sealed class ToolMethodModel
 {
@@ -11,6 +11,7 @@ public sealed class ToolMethodModel
     public string ContainingTypeName { get; set; } = "";        // 全称，用于代码生成
     public string ContainingTypeShortName { get; set; } = "";   // 短名，用于 ToolName 冲突解析
     public string FullyQualifiedTypeName { get; set; } = "";
+    public string ContainingNamespace { get; set; } = "";
     public string ToolName { get; set; } = "";
     public bool IsStatic { get; set; }
     public bool IsAsync { get; set; }
@@ -18,6 +19,15 @@ public sealed class ToolMethodModel
     public string ReturnType { get; set; } = "void";
     public List<ToolParameterModel> Parameters { get; set; } = [];
     public List<string> FilterTypes { get; set; } = [];
+
+    // 声明信息（来自 XML 文档）
+    public string? Summary { get; set; }
+    public Dictionary<string, string> ParamDescriptions { get; set; } = [];
+    public string? ReturnsDescription { get; set; }
+
+    // 诊断信息
+    public bool IsPartialClass { get; set; }
+    public bool IsStaticClass { get; set; }
 }
 
 /// <summary>

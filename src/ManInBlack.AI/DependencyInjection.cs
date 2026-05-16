@@ -85,8 +85,7 @@ public static class DependencyInjection
                 services.AddScoped<IShellExecutor, BwarpShellExecutor>();
             else
                 services.AddScoped<IShellExecutor, ProcessShellExecutor>();
-            services.AddToolExecutor();
-            services.AddToolMiddlewares();
+            services.AddToolHandlers();
             return services;
         }
 

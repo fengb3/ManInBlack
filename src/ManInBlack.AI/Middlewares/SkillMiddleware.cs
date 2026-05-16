@@ -32,12 +32,6 @@ public class SkillMiddleware(SkillService skillService) : AgentMiddleware
 
                  When a task matches one of the skills above, call the `LoadSkill` tool first to load the full skill instructions, then follow them.
                  """;
-
-            // 注入 skill tool 声明
-            context.Options       ??= new ChatOptions();
-            context.Options.Tools ??= [];
-            foreach (var tool in SkillTools.AllToolDeclarations)
-                context.Options.Tools.Add(tool);
         }
 
         await foreach (var update in next().WithCancellation(ct))

@@ -36,12 +36,6 @@ public class DelegationMiddleware(AgentFactory agentFactory) : AgentMiddleware
                 当任务匹配某个子 Agent 的能力时，调用 `DelegateToAgent` 工具将任务委托给它。
                 在 task 参数中提供足够的上下文信息，让子 Agent 能够独立完成任务。
                 """;
-
-            // 注入委托工具声明
-            context.Options ??= new ChatOptions();
-            context.Options.Tools ??= [];
-            foreach (var tool in DelegationTools.AllToolDeclarations)
-                context.Options.Tools.Add(tool);
         }
 
         await foreach (var update in next().WithCancellation(ct))

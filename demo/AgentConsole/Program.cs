@@ -20,7 +20,7 @@ var rootSp = services.BuildServiceProvider();
 var factory = rootSp.GetRequiredService<AgentFactory>();
 factory.RegisterPipeline("sub-agent", builder => builder
     .Use<EventPublishingMiddleware>()
-    .Use<FileToolsMiddleware>()
+    .Use<ToolsMiddleware>()
     .UseSimple());
 
 AgentContext? capturedContext = null;
