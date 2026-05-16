@@ -2,9 +2,21 @@
 
 > 本文档是 CLAUDE.md 的子文档，Agent 在修改工具（Tools）、ToolCallFilter 相关代码前应先阅读此文档。
 
+## 架构概览
+
+工具系统由三个核心组件组成：
+
+| 组件 | 职责 | DI 注入 |
+|------|------|---------|
+| `ToolRegistry` | 声明集中管理 | `IEnumerable<IToolDeclaration>` |
+| `ToolExecutor` | 执行集中分发 | `IEnumerable<IToolHandler>` |
+| `ToolsMiddleware` | 按 group 选择注入声明到 pipeline | 引用 `ToolRegistry` |
+
+源生成器为每个 `[AiTool]` 方法生成独立的 `IToolHandler` 实现和 `IToolDeclaration` 注册，通过 DI 自动组合跨项目的工具。
+
 ## 工具类概览
 
-所有工具类标记 `[ServiceRegister.Scoped]`，方法标记 `[AiTool]`，由源生成器自动生成声明和分发代码。
+所有工具类标记 `[ServiceRegister.Scoped]`，方法标记 `[AiTool]`，由源生成器自动生成 handler 和声明注册代码。
 
 ### CommandLineTools
 
@@ -75,7 +87,7 @@
 1. 创建类，标记 `[ServiceRegister.Scoped]` 和 `partial`
 2. 方法标记 `[AiTool]`，参数标记 `[param]` XML 文档
 3. 可选：添加 `[AiTool.HasFilter<T>]` 应用过滤器
-4. 源生成器自动处理声明生成和调用分发
+4. 源生成器自动生成 handler、声明和 DI 注册
 
 ```csharp
 [ServiceRegister.Scoped]
@@ -90,6 +102,20 @@ public partial class MyTools
     [AiTool.HasFilter<LoggingFilter>]
     public string MyMethod(string input) => $"Result: {input}";
 }
+```
+
+自定义工具只需定义在引用了 `ManInBlack.AI.SourceGenerator` 的项目中，源生成器会自动生成 handler 和声明注册，与内置工具一起通过 DI 自动组合。
+
+### 在自定义 Pipeline 中使用工具
+
+```csharp
+// 注入所有工具
+builder.Use<ToolsMiddleware>()
+
+// 按组选择工具（Group 为工具类短名）
+builder.Use(sp => new ToolsMiddleware(
+    sp.GetRequiredService<ToolRegistry>(),
+    ["FileTools", "MyTools"]))
 ```
 
 详见 [Source Generator & 诊断规则](./sourcegenerator-guide.md) 了解源生成器和 XML 文档要求。

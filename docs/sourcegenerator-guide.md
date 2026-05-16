@@ -6,9 +6,13 @@
 
 | Generator                      | Purpose                                                                            |
 |--------------------------------|------------------------------------------------------------------------------------|
-| `ToolCallerGenerator`          | Dispatches `[AiTool]` method calls via `IServiceProvider`                          |
-| `ToolDeclarationGenerator`     | Generates `AIFunctionDeclaration` + JSON Schema from `[AiTool]` methods + XML docs |
+| `ToolCallerGenerator`          | 为每个 `[AiTool]` 方法生成独立 `IToolHandler` + `IToolDeclaration`，注册到 DI      |
 | `ServiceRegistrationGenerator` | DI registration for `[ServiceRegister]`-attributed classes                         |
+
+`ToolCallerGenerator` 同时负责：
+- 生成 per-tool handler 类（实现 `IToolHandler`）
+- 生成工具声明（`ToolFunctionDeclaration`）并注册为 `IToolDeclaration`
+- 生成 `ToolExecutor`（字典查找分发）和 `AddToolHandlers()` DI 扩展方法
 
 All emitters use **Fengb3.EasyCodeBuilder** (`Code.Create().Using(...).Namespace(ns => ...)` /
 `Code.Build(option, new CodeBuilder())`).
