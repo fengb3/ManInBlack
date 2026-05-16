@@ -7,6 +7,8 @@ namespace GitHubAdaptor.Services;
 [ServiceRegister.Singleton]
 public class GitHubCliSetup(ILogger<GitHubCliSetup> logger)
 {
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(5);
+
     public async Task LoginAsync(string token, CancellationToken ct = default)
     {
         await RunProcessAsync("auth login --with-token", token, ct);
@@ -53,12 +55,15 @@ public class GitHubCliSetup(ILogger<GitHubCliSetup> logger)
             process.StandardInput.Close();
         }
 
-        var stdout = await process.StandardOutput.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ProcessTimeout);
+
+        var stdout = await process.StandardOutput.ReadToEndAsync(cts.Token);
+        await process.WaitForExitAsync(cts.Token);
 
         if (process.ExitCode != 0)
         {
-            var stderr = await process.StandardError.ReadToEndAsync(ct);
+            var stderr = await process.StandardError.ReadToEndAsync(cts.Token);
             throw new InvalidOperationException($"gh {args} 失败 (exit {process.ExitCode}): {stderr}");
         }
 

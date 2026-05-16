@@ -18,7 +18,7 @@ RUN dotnet publish "./GitHubAdaptor.csproj" -c $BUILD_CONFIGURATION -o /app/publ
 FROM base AS final
 WORKDIR /app
 
-# 安装 gh CLI 和 bubblewrap（沙盒执行）
+# 安装 gh CLI（bubblewrap 可选，沙盒执行需 UseSandbox=true）
 RUN apt-get update && apt-get install -y gh bubblewrap && rm -rf /var/lib/apt/lists/*
 
 COPY --from=publish /app/publish .

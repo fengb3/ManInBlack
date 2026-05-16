@@ -9,11 +9,24 @@ public class GitHubWebhookMiddleware(
     GitHubSettings settings,
     ILogger<GitHubWebhookMiddleware> logger)
 {
+    /// <summary>
+    /// Webhook payload 最大 10MB，防止 DoS
+    /// </summary>
+    private const int MaxPayloadSize = 10 * 1024 * 1024;
+
     public async Task InvokeAsync(HttpContext context)
     {
         if (!context.Request.Path.StartsWithSegments(settings.WebhookEndpoint, StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
+            return;
+        }
+
+        if (context.Request.ContentLength > MaxPayloadSize)
+        {
+            logger.LogWarning("Webhook payload 过大: {Size} bytes", context.Request.ContentLength);
+            context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            await context.Response.WriteAsync("Payload too large");
             return;
         }
 
