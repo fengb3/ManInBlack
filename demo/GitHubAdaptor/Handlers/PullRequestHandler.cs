@@ -30,7 +30,9 @@ public class PullRequestHandler(
 
         var token = await tokenService.GetInstallationTokenAsync(installationId, ct);
 
-        await cliSetup.LoginAsync(token, ct);
+        // 用环境变量传递 token，bwrap 沙盒会继承环境变量但隔离文件系统
+        Environment.SetEnvironmentVariable("GH_TOKEN", token);
+
         try
         {
             var diff = await cliSetup.RunGhAsync($"pr diff {prNumber} --repo {repo}", ct);
@@ -73,7 +75,7 @@ public class PullRequestHandler(
         }
         finally
         {
-            await cliSetup.LogoutAsync(ct);
+            Environment.SetEnvironmentVariable("GH_TOKEN", null);
         }
     }
 }
