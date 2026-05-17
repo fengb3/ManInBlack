@@ -30,6 +30,7 @@
   <Folder Name="/Demo/">
     <Project Path="demo/AgentConsole/AgentConsole.csproj" />
     <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
+    <Project Path="demo/GitHubAdaptor/GitHubAdaptor.csproj" />
     <Project Path="demo/Playground/Playground.csproj" />
   </Folder>
   <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
