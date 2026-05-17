@@ -1,3 +1,4 @@
+using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
@@ -5,19 +6,14 @@ using System.Runtime.CompilerServices;
 
 namespace ManInBlack.AI.Middlewares;
 
-public class ToolsMiddleware : AgentMiddleware
+[ServiceRegister.Scoped]
+public partial class ToolsMiddleware(ToolRegistry registry) : AgentMiddleware
 {
-    private readonly ToolRegistry _registry;
+    private readonly ToolRegistry _registry = registry;
     private readonly string[]? _groups;
 
-    public ToolsMiddleware(ToolRegistry registry)
+    public ToolsMiddleware(ToolRegistry registry, string[] groups) : this(registry)
     {
-        _registry = registry;
-    }
-
-    public ToolsMiddleware(ToolRegistry registry, string[] groups)
-    {
-        _registry = registry;
         _groups = groups;
     }
 
