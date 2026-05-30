@@ -17,9 +17,9 @@ public class LoggingMiddlewareTests
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "test-agent",
-            UserInput = "hello",
             Messages = []
         };
+        ctx.Items["UserInput"] = "hello";
 
         var update = new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("response")]);
         var results = await middleware.HandleAsync(ctx,
@@ -36,9 +36,9 @@ public class LoggingMiddlewareTests
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
             AgentId = "test",
-            UserInput = "",
             Messages = []
         };
+        ctx.Items["UserInput"] = "";
 
         // 不抛异常即通过
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();

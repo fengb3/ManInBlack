@@ -68,7 +68,7 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         // 重置对话 command
         if (
             UserInputCommandHelper.FetchCommand(
-                context.UserInput,
+                (string)context.Items["UserInput"],
                 out var command,
                 out var parameters
             )
@@ -78,7 +78,7 @@ public class ReadPersistenceMiddleware : AgentMiddleware
             if (command is "clear" or "reset" or "new")
             {
                 var userStorage = context.ServiceProvider.GetRequiredService<IUserStorage>();
-                context.SessionId = await userStorage.CreateNewSessionIdAsync(context.ParentId);
+                context.SessionId = await userStorage.CreateNewSessionIdAsync((string)context.Items["ParentId"]);
                 context.Messages.Clear();
                 yield return new ChatResponseUpdate
                 {
@@ -192,7 +192,7 @@ file static class PersistenceHelper
         var result = new Dictionary<string, object>();
         foreach (var (key, value) in items)
         {
-            if (key == "SaveCheckpoint") continue;
+            if (key is "SaveCheckpoint" or "ModelChoice" or "UserInput") continue;
             try
             {
                 JsonSerializer.SerializeToElement(value);

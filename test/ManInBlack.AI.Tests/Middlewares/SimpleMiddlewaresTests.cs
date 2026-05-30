@@ -89,9 +89,9 @@ public class UserInputMiddlewareTests
         var middleware = new UserInputMiddleware();
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
-            UserInput = "Hello AI",
             Messages = [new(ChatRole.System, "system prompt")]
         };
+        ctx.Items["UserInput"] = "Hello AI";
 
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -106,9 +106,9 @@ public class UserInputMiddlewareTests
         var middleware = new UserInputMiddleware();
         var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
-            UserInput = "",
             Messages = []
         };
+        ctx.Items["UserInput"] = "";
 
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 

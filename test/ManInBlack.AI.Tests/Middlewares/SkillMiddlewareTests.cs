@@ -23,11 +23,11 @@ public class SkillMiddlewareTests
         var workspace = new FakeUserWorkspace("test-user");
         var agentContext = new AgentContext(TestHelpers.EmptyServiceProvider)
         {
-            ParentId = "test-user",
             SystemPrompt = "original prompt",
             Options = new ChatOptions(),
             Messages = [new(ChatRole.User, "hello")]
         };
+        agentContext.Items["ParentId"] = "test-user";
         var options = new AgentStorageOptions {  }; // 指向用户根目录，确保 skills 目录不存在
         var iOptions = Microsoft.Extensions.Options.Options.Create(options);
 

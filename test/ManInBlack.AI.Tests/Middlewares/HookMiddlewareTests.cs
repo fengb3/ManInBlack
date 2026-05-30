@@ -33,8 +33,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-1",
             SystemPrompt = "你是助手",
-            UserInput = "你好",
         };
+        ctx.Items["UserInput"] = "你好";
 
         // Act
         _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)
@@ -61,8 +61,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-2",
             SystemPrompt = "你是助手",
-            UserInput = "hello",
         };
+        ctx.Items["UserInput"] = "hello";
 
         // Act
         _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)
@@ -90,8 +90,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-3",
             SystemPrompt = "基础提示词",
-            UserInput = "test",
         };
+        ctx.Items["UserInput"] = "test";
 
         // Act
         _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)
@@ -111,8 +111,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-4",
             SystemPrompt = "sys",
-            UserInput = "hi",
         };
+        ctx.Items["UserInput"] = "hi";
 
         var updates = new[]
         {
@@ -139,8 +139,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-5",
             SystemPrompt = "sys",
-            UserInput = "call tool",
         };
+        ctx.Items["UserInput"] = "call tool";
 
         var updates = new[]
         {
@@ -171,8 +171,8 @@ public class HookMiddlewareTests
         {
             AgentId = "agent-6",
             SystemPrompt = "原始提示词",
-            UserInput = "test",
         };
+        ctx.Items["UserInput"] = "test";
 
         // Act
         _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)

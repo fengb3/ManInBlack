@@ -162,12 +162,12 @@ public class AgentFactory
 
             // 6. 设置 AgentContext 属性
             agentContext.AgentId = Guid.NewGuid().ToString();
-            agentContext.ParentId = parentId;
+            agentContext.Items["ParentId"] = parentId;
             agentContext.ParentType = parentType;
             agentContext.RootUserId = rootUserId;
             agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(rootUserId);
             agentContext.SystemPrompt = definition.Instruction;
-            agentContext.UserInput = userInput;
+            agentContext.Items["UserInput"] = userInput;
             agentContext.AgentName = definition.Name;
             agentContext.CancellationToken = ct;
 

@@ -17,7 +17,7 @@ public partial class LoggingMiddleware(ILogger<LoggingMiddleware> logger) : Agen
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        LogAgentAgentIdReceivedInputInput(logger, context.AgentId, context.UserInput);
+        LogAgentAgentIdReceivedInputInput(logger, context.AgentId, (string)context.Items["UserInput"]);
 
         await foreach (var update in next().WithCancellation(ct)) yield return update;
         
