@@ -148,7 +148,7 @@ public class FeishuCardSession : IDisposable
         // 普通工具结果
         if (!_toolExecutions.TryGetValue(evt.CallId, out var toolCard)) return;
 
-        var resultText = evt.ResultJson ?? "";
+        var resultText = evt.Error ?? evt.ResultJson ?? "";
         if (resultText.Length > 500)
             resultText = string.Concat(resultText.AsSpan(0, 500), "\n...");
 
@@ -213,7 +213,7 @@ public class FeishuCardSession : IDisposable
     {
         if (_activeDelegationCard is null) return;
 
-        var resultText = evt.ResultJson ?? "";
+        var resultText = evt.Error ?? evt.ResultJson ?? "";
         if (resultText.Length > 500)
             resultText = string.Concat(resultText.AsSpan(0, 500), "\n...");
 

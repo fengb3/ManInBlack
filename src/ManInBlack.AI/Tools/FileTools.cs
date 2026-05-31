@@ -118,13 +118,13 @@ public partial class FileTools(IUserWorkspace workspace)
     {
         filePath = ResolvePath(filePath);
         if (!File.Exists(filePath))
-            return $"Error: File not found: {filePath}";
+            throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
         if (IsBinaryFile(filePath))
-            return $"Error: 不支持读取二进制文件: {filePath}";
+            throw new InvalidOperationException($"不支持读取二进制文件: {filePath}");
         if (offset < 0)
-            return "Error: Offset must be non-negative";
+            throw new ArgumentOutOfRangeException(nameof(offset), "Offset 必须为非负数");
         if (length < -1)
-            return "Error: Length must be -1 (for all lines) or a non-negative integer";
+            throw new ArgumentOutOfRangeException(nameof(length), "Length 必须为 -1（读取全部行）或非负整数");
 
         var selectedLines = new List<string>();
         var lineIndex = 0;
@@ -140,7 +140,7 @@ public partial class FileTools(IUserWorkspace workspace)
         }
 
         if (offset >= lineIndex)
-            return $"Error: Offset {offset} exceeds file length ({lineIndex} lines)";
+            throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} 超出文件行数 ({lineIndex} 行)");
 
         return string.Join(Environment.NewLine, selectedLines);
     }
@@ -160,7 +160,7 @@ public partial class FileTools(IUserWorkspace workspace)
     {
         filePath = ResolvePath(filePath);
         if (!IsInsideAllowedDirectory(filePath))
-            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
+            throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {filePath}");
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -185,15 +185,15 @@ public partial class FileTools(IUserWorkspace workspace)
     {
         filePath = ResolvePath(filePath);
         if (!IsInsideAllowedDirectory(filePath))
-            return $"{OutOfAllowedDirectoryError} Path: {filePath}";
+            throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {filePath}");
         if (!File.Exists(filePath))
-            return $"File not found: {filePath}";
+            throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
 
         var currentContent = File.ReadAllText(filePath);
 
         var index = currentContent.IndexOf(originalContent, StringComparison.Ordinal);
         if (index < 0)
-            return "Update aborted: the file has been modified since it was last read. Please re-read the file and try again.\n" + $"File: {filePath}";
+            throw new InvalidOperationException($"文件自上次读取后已被修改，中止操作。请重新读取文件后再试。\nFile: {filePath}");
 
         var updatedContent = string.Concat(
             currentContent.AsSpan(0, index),
@@ -217,7 +217,7 @@ public partial class FileTools(IUserWorkspace workspace)
     {
         var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
-            return $"Directory not found: {searchDir}";
+            throw new DirectoryNotFoundException($"目录不存在: {searchDir}");
 
         var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
         matcher.AddInclude(pattern);
@@ -247,7 +247,7 @@ public partial class FileTools(IUserWorkspace workspace)
     {
         var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
         if (!Directory.Exists(searchDir))
-            return $"Directory not found: {searchDir}";
+            throw new DirectoryNotFoundException($"目录不存在: {searchDir}");
 
         var regex = new Regex(pattern, RegexOptions.Compiled);
         var files = Directory.EnumerateFiles(searchDir, glob, SearchOption.AllDirectories);

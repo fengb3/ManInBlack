@@ -59,7 +59,14 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
         }
 
         // ── 执行实际工具调用 ──
-        await next(context);
+        try
+        {
+            await next(context);
+        }
+        catch (Exception ex)
+        {
+            context.Error = ex;
+        }
 
         // ── AfterToolExecute 事件 ──
         await eventBus.PublishAsync(key, new AfterToolExecuteEvent

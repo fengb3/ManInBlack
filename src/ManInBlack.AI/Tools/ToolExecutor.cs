@@ -19,6 +19,14 @@ public sealed class ToolExecutor : IToolExecutor
     {
         if (!_handlers.TryGetValue(ctx.ToolName, out var handler))
             throw new ArgumentException($"Unknown tool: '{ctx.ToolName}'.");
-        await handler.ExecuteAsync(ctx, ct);
+
+        try
+        {
+            await handler.ExecuteAsync(ctx, ct);
+        }
+        catch (Exception ex)
+        {
+            ctx.Error = ex;
+        }
     }
 }

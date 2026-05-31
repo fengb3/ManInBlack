@@ -8,7 +8,7 @@ using Fengb3.EasyCodeBuilder.Csharp.OptionConfigurations;
 namespace ManInBlack.AI.SourceGenerator;
 
 /// <summary>
-/// 使用 EasyCodeBuilder 生成 per-tool handler + declaration 注册 + ToolExecutor + ToolRegistry
+/// 使用 EasyCodeBuilder 生成 per-tool handler + declaration 注册，DI 中直接注入手写的 ToolExecutor
 /// </summary>
 public static class ToolCallerEmitter
 {
@@ -19,7 +19,6 @@ public static class ToolCallerEmitter
             .Using(
                 "System",
                 "System.Collections.Generic",
-                "System.Collections.Concurrent",
                 "System.Threading",
                 "System.Threading.Tasks",
                 "ManInBlack.AI.Abstraction.Tools",
@@ -33,9 +32,6 @@ public static class ToolCallerEmitter
                 // 为每个 [AiTool] 方法生成 handler 类
                 foreach (var tool in tools)
                     BuildHandlerClass(ns, tool);
-
-                // 生成 ToolExecutor（字典查找）
-                BuildToolExecutorClass(ns);
 
                 // 生成 AddToolHandlers() DI 注册扩展方法
                 BuildServiceCollectionExtensions(ns, tools);
@@ -83,40 +79,6 @@ public static class ToolCallerEmitter
                     m.AppendLine(BuildFilterPipelineLines(tool, "ctx"));
                 else
                     m.AppendLine(BuildCoreInvocationLines(tool, "ctx"));
-            });
-        });
-    }
-
-    private static void BuildToolExecutorClass(NamespaceOption ns)
-    {
-        ns.Public.Sealed.Class(cls =>
-        {
-            cls.WithName("ToolExecutor");
-            cls.Inherit("IToolExecutor");
-
-            cls.Field(f =>
-            {
-                f.WithKeyword("private").WithKeyword("readonly")
-                    .WithType("ConcurrentDictionary<string, IToolHandler>").WithName("_handlers");
-            });
-
-            cls.Constructor(ctor =>
-            {
-                ctor.WithKeyword("public").WithName("ToolExecutor")
-                    .WithParameter("IEnumerable<IToolHandler> handlers");
-                ctor.AppendLine("_handlers = new ConcurrentDictionary<string, IToolHandler>(handlers.ToDictionary(h => h.ToolName));");
-            });
-
-            cls.Public.Method(m =>
-            {
-                m.WithName("ExecuteAsync")
-                    .WithReturnType("Task")
-                    .WithParameters("ToolExecuteContext ctx, CancellationToken ct")
-                    .WithKeyword("async");
-
-                m.AppendLine("if (!_handlers.TryGetValue(ctx.ToolName, out var handler))");
-                m.AppendLine("    throw new ArgumentException($\"Unknown tool: '{ctx.ToolName}'.\");");
-                m.AppendLine("await handler.ExecuteAsync(ctx, ct);");
             });
         });
     }
