@@ -37,11 +37,12 @@ Retry → AgentLoop ← IChatClient
 | `Messages`                | `IList<ChatMessage>`          | 聊天消息列表，中间件可读写                                       |
 | `Options`                 | `ChatOptions?`                | 模型调用选项（Tools、Temperature 等）                            |
 | `SystemPrompt`            | `string`                      | 系统提示词，在 `SystemPromptInjectionMiddleware` 中拼入 Messages |
-| `Items`                   | `IDictionary<string, object>` | 中间件间共享状态字典（含 `UserInput`、`ParentId`、`ModelChoice` 等） |
+| `UserInput`               | `string`                      | 本轮用户输入原文                                                 |
+| `Items`                   | `IDictionary<string, object>` | 中间件间共享状态字典                                             |
 | `ServiceProvider`         | `IServiceProvider`            | DI 容器，用于解析服务                                            |
 | `AgentId`                 | `string`                      | Agent 实例标识                                                   |
 | `AgentName`               | `string`                      | Agent 定义名称，对应 `AgentDefinition.Name`                     |
-| `ParentType`              | `string`                      | 父级类型（"User" 或 "Agent"）                                    |
+| `ParentId` / `ParentType` | `string`                      | 父级标识和类型（用户或另一个 Agent）                             |
 | `AccumulatedUsage`        | `UsageDetails`                | 累积的 Token 用量                                                |
 | `CancellationToken`       | `CancellationToken`           | 取消令牌                                                         |
 
@@ -214,7 +215,7 @@ public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
     AgentContext context, ChatResponseUpdateHandler next,
     [EnumeratorCancellation] CancellationToken ct = default)
 {
-    if (IsResetCommand((string?)context.Items["UserInput"] ?? ""))
+    if (IsResetCommand(context.UserInput))
     {
         yield return new ChatResponseUpdate
         {
@@ -345,14 +346,14 @@ builder.Use(new MyStatelessMiddleware());
 | 11  | `MessageEnrichMiddleware`         | 为消息补全 `CreatedAt` 元数据      |
 | 12  | `HookMiddleware`                  | 执行用户自定义钩子脚本             |
 | 13  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
-| 14  | `UserInputMiddleware`             | 将 `Items["UserInput"]` 追加为用户消息 |
+| 14  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
 | 15  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
 | 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点 |
 
 ### 顺序规则
 
 - **修改 `SystemPrompt` 的中间件** 必须在 `SystemPromptInjectionMiddleware` 之前
-- **修改 `Items["UserInput"]` 的中间件** 必须在 `UserInputMiddleware` 之前
+- **修改 `UserInput` 的中间件** 必须在 `UserInputMiddleware` 之前
 - **添加 Tool 声明的中间件** 必须在 `AgentLoopMiddleware` 之前
 - **`AgentLoopMiddleware`** 必须是最后一个中间件
 - **持久化相关中间件** 包裹管道中部，确保所有消息变更都被捕获

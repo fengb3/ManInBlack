@@ -23,6 +23,11 @@ public class AgentContext(IServiceProvider serviceProvider)
     public string AgentId { get; set; } = string.Empty;
     
     /// <summary>
+    /// Agent 的父级标识，如果有的话，表示这个 Agent 是由哪个实体（用户或另一个 Agent）触发的
+    /// </summary>
+    public string ParentId { get; set; } = string.Empty;
+    
+    /// <summary>
     /// 会话标识，表示这个 Agent 所属的对话会话，可以用来关联多个 Agent 实例到同一个对话上下文
     /// </summary>
     public string SessionId { get; set; } = string.Empty;
@@ -37,11 +42,16 @@ public class AgentContext(IServiceProvider serviceProvider)
     /// 当 ParentType 为 "User" 时等于 ParentId；为 "Agent" 时由 AgentFactory 向上解析。
     /// </summary>
     public string RootUserId { get; set; } = string.Empty;
-
+    
     /// <summary>
     /// 系统提示词
     /// </summary>
     public string SystemPrompt { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// 本轮用户输入的原始文本，供中间件参考，但不一定会直接发送给模型
+    /// </summary>
+    public string UserInput { get; set; } = string.Empty;
 
     /// <summary>
     /// 聊天消息列表，中间件可对其进行修改

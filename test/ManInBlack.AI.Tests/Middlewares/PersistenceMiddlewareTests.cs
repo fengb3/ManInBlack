@@ -30,10 +30,10 @@ public class ReadPersistenceMiddlewareTests
         var ctx = new AgentContext(services)
         {
             SessionId = "session_1",
+            ParentId = "user_1",
+            UserInput = "hello",
             Messages = [new(ChatRole.User, "hello")]
         };
-        ctx.Items["ParentId"] = "user_1";
-        ctx.Items["UserInput"] = "hello";
 
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -93,10 +93,10 @@ public class ReadPersistenceMiddlewareTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "/clear",
             Messages = [new(ChatRole.User, "/clear")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "/clear";
 
         var results = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -121,10 +121,10 @@ public class ReadPersistenceMiddlewareTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "/reset",
             Messages = [new(ChatRole.User, "/reset")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "/reset";
 
         var results = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -147,10 +147,10 @@ public class ReadPersistenceMiddlewareTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "/new",
             Messages = [new(ChatRole.User, "/new")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "/new";
 
         var results = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -172,10 +172,10 @@ public class ReadPersistenceMiddlewareTests
         var ctx = new AgentContext(services)
         {
             SessionId = "session_empty",
+            ParentId = "u1",
+            UserInput = "first message",
             Messages = [new(ChatRole.User, "first message")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "first message";
 
         var results = await middleware.HandleAsync(ctx,
             () => TestHelpers.AsyncSeq(

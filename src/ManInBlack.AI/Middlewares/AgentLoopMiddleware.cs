@@ -72,7 +72,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             {
                 AgentId = key,
                 SystemPrompt = context.SystemPrompt,
-                UserInput = context.Items.TryGetValue("UserInput", out var ui) ? (string)ui : "",
+                UserInput = context.UserInput,
             }, ct);
 
             if (functionCalls.Count == 0)

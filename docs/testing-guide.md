@@ -26,10 +26,10 @@ var middleware = new MyMiddleware(/* 构造依赖 */);
 var ctx = new AgentContext(TestHelpers.EmptyServiceProvider)
 {
     AgentId   = "test-agent",
+    UserInput = "hello",
     Messages  = [new(ChatRole.User, "hello")],
     Options   = new ChatOptions(),
 };
-ctx.Items["UserInput"] = "hello";
 
 ChatResponseUpdateHandler fakeNext = () => TestHelpers.AsyncSeq(
     new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("response")])
@@ -279,10 +279,9 @@ public async Task HandleAsync_ShouldRestoreSavedMessages()
     var ctx = new AgentContext(services)
     {
         SessionId = "session_1",
+        ParentId  = "user_1",
+        UserInput = "hello",
         Messages  = [new(ChatRole.User, "hello")]
-    };
-    ctx.Items["ParentId"] = "user_1";
-    ctx.Items["UserInput"] = "hello";
     };
 
     await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream)

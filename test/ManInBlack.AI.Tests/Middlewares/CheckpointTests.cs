@@ -76,11 +76,11 @@ public class CheckpointTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "hello",
             SystemPrompt = "original prompt",
             Messages = [new(ChatRole.User, "hello")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "hello";
 
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 
@@ -106,10 +106,10 @@ public class CheckpointTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "hello",
             Messages = [new(ChatRole.User, "hello")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "hello";
 
         // 执行中间件以注入 SaveCheckpoint 回调
         await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
@@ -147,11 +147,11 @@ public class CheckpointTests
         var ctx = new AgentContext(services)
         {
             SessionId = "s1",
+            ParentId = "u1",
+            UserInput = "hello",
             SystemPrompt = "test prompt",
             Messages = [new(ChatRole.User, "hello")]
         };
-        ctx.Items["ParentId"] = "u1";
-        ctx.Items["UserInput"] = "hello";
 
         await readMiddleware.HandleAsync(ctx, () => TestHelpers.EmptyStream).ToListAsync();
 

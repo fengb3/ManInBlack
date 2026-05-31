@@ -28,7 +28,7 @@ public partial class SkillService
         }
         else
         {
-            logger.LogInformation("Loaded {Count} skills: {Skills} for user: {UserId}", _skills.Count, string.Join(", ", _skills.Keys), agentContext.Items["ParentId"]);
+            logger.LogInformation("Loaded {Count} skills: {Skills} for user: {UserId}", _skills.Count, string.Join(", ", _skills.Keys), agentContext.ParentId);
         }
     }
 

@@ -27,7 +27,6 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var key = context.AgentId;
-        var userInput = context.Items.TryGetValue("UserInput", out var ui) ? (string)ui : "";
         var bus = context.ServiceProvider.GetRequiredService<EventBus>();
         var subs = new List<IDisposable>();
 
@@ -122,7 +121,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         {
             AgentId = key,
             SystemPrompt = context.SystemPrompt,
-            UserInput = userInput,
+            UserInput = context.UserInput,
         };
         await bus.PublishAsync(key, beforeEvt, ct);
 
@@ -166,7 +165,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             {
                 AgentId = key,
                 SystemPrompt = context.SystemPrompt,
-                UserInput = userInput,
+                UserInput = context.UserInput,
             }, ct);
         }
 

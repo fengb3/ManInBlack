@@ -12,7 +12,7 @@ public class FileUserWorkspace(IOptions<AgentStorageOptions> options, AgentConte
 {
     private readonly Lazy<UserEntry> _user = new(() =>
         userStorage.GetOrCreateUser(
-            !string.IsNullOrEmpty(agentContext.RootUserId) ? agentContext.RootUserId : (string)agentContext.Items["ParentId"]
+            !string.IsNullOrEmpty(agentContext.RootUserId) ? agentContext.RootUserId : agentContext.ParentId
         ).GetAwaiter().GetResult());
 
     /// <inheritdoc />

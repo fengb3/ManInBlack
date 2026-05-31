@@ -32,7 +32,7 @@ public class UserInputMiddleware() : AgentMiddleware
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        context.Messages.Add(new ChatMessage(ChatRole.User, (string)context.Items["UserInput"]));
+        context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput));
 
         await foreach (var update in next().WithCancellation(ct))
             yield return update;
