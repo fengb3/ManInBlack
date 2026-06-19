@@ -15,10 +15,16 @@ namespace ManInBlack.AI.Middlewares;
 /// <summary>
 /// Agent 循环中间件，自动处理模型返回的 tool call 并将结果追加到消息历史。
 /// 通过 EventBus 发布 AfterLlmCallEvent 和 AllToolsCompletedEvent。
+/// 工具调用以并行方式执行，最大并发度可通过 <see cref="MaxToolConcurrency"/> 控制。
 /// </summary>
 [ServiceRegister.Scoped]
 public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContext> logger) : AgentMiddleware
 {
+    /// <summary>
+    /// 单批次内工具调用的最大并发数
+    /// </summary>
+    private const int MaxToolConcurrency = 5;
+
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -78,25 +84,44 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             if (functionCalls.Count == 0)
                 yield break;
 
-            // 执行每个 tool call 并将结果通过流式输出
+            // ── 并行执行工具调用，限制最大并发数 ──
             var toolResults = new List<AIContent>();
-            foreach (var fc in functionCalls)
+            var results = new (FunctionCallContent Fc, FunctionResultContent Result)[functionCalls.Count];
+
+            using var semaphore = new SemaphoreSlim(MaxToolConcurrency);
+            var tasks = functionCalls.Select(async (fc, i) =>
             {
-                var toolCtx = new ToolExecuteContext(context.ServiceProvider)
+                await semaphore.WaitAsync(ct);
+                try
                 {
-                    ToolName  = fc.Name,
-                    CallId    = fc.CallId,
-                    Arguments = fc.Arguments
-                };
+                    var toolCtx = new ToolExecuteContext(context.ServiceProvider)
+                    {
+                        ToolName  = fc.Name,
+                        CallId    = fc.CallId,
+                        Arguments = fc.Arguments
+                    };
 
-                await toolExecutor.ExecuteAsync(toolCtx, ct);
+                    await toolExecutor.ExecuteAsync(toolCtx, ct);
 
-                if (toolCtx.Error != null)
-                {
-                    logger.LogError(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
+                    if (toolCtx.Error != null)
+                    {
+                        logger.LogInformation(toolCtx.Error, "Error executing tool {ToolName} in agent {AgentId}", toolCtx.ToolName, context.AgentId);
+                    }
+
+                    var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
+                    results[i] = (fc, result);
                 }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToArray();
 
-                var result = new FunctionResultContent(fc.CallId, toolCtx.Error?.Message ?? toolCtx.Result);
+            await Task.WhenAll(tasks);
+
+            // 按原始顺序 yield 结果
+            foreach (var (_, result) in results)
+            {
                 toolResults.Add(result);
                 yield return new ChatResponseUpdate(ChatRole.Tool, [result]);
             }

@@ -35,7 +35,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                 {
                     moved = await enumerator.MoveNextAsync();
                 }
-                catch (Exception ex) when (ex is IOException or HttpRequestException)
+                catch (Exception ex)
                 {
                     if (!yielded && attempt < MaxRetries)
                     {
