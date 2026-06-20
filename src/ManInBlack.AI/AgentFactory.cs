@@ -5,6 +5,7 @@ using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -146,6 +147,9 @@ public class AgentFactory
         try
         {
             var sp = scope.ServiceProvider;
+
+            // 确保 MCP server 已连接（兼容 BuildServiceProvider 的 console 场景；IHost 应用由 HostedService 先触发，幂等）
+            await sp.GetRequiredService<McpClientHostedService>().EnsureStartedAsync(ct);
 
             // 3. 解析依赖服务
             var userStorage = sp.GetRequiredService<IUserStorage>();

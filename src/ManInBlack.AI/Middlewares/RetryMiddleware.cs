@@ -37,6 +37,10 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                 }
                 catch (Exception ex)
                 {
+                    // 非可重试异常（逻辑错误等）立即抛，不重试
+                    if (!yielded && !IsRetryable(ex))
+                        throw;
+
                     if (!yielded && attempt < MaxRetries)
                     {
                         shouldRetry = true;
@@ -94,4 +98,10 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
 
     [LoggerMessage(LogLevel.Error, "Agent {agentId} 流式请求重试 {attempt} 次后仍然失败")]
     static partial void LogRetryExhausted(ILogger<RetryMiddleware> logger, string agentId, int attempt);
+
+    /// <summary>
+    /// 判断异常是否值得重试（网络/TLS/超时类瞬时错误）。逻辑错误（如 InvalidOperationException）不重试，立即抛。
+    /// </summary>
+    private static bool IsRetryable(Exception ex) =>
+        ex is IOException or HttpRequestException or System.Net.Sockets.SocketException or TimeoutException;
 }

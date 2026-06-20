@@ -27,6 +27,12 @@ public class ManInBlackSettings
     /// 是否启用 Linux 下的 bubblewrap 沙盒执行命令。默认 false。
     /// </summary>
     public bool UseSandbox { get; set; }
+
+    /// <summary>
+    /// MCP server 配置，键为 server 名称。应用启动时按此连接 MCP client，
+    /// 其提供的工具以 "{serverName}__{toolName}" 命名注入。详见 docs/mcp-guide.md。
+    /// </summary>
+    public Dictionary<string, McpServerSettings> McpServers { get; set; } = new();
 }
 
 public class StorageSettings
@@ -115,4 +121,43 @@ public class AgentSettings
     /// 引用的 ModelChoice 名称（可选）。不填则使用全局默认 ModelChoice。
     /// </summary>
     public string? ModelChoiceName { get; set; }
+}
+
+/// <summary>
+/// 单个 MCP server 的连接配置。Transport 决定走 stdio（子进程）还是 http（SSE/Streamable HTTP）。
+/// </summary>
+public class McpServerSettings
+{
+    /// <summary>"stdio" | "http"。留空时按 Endpoint/Command 自动推断。</summary>
+    public string Transport { get; set; } = "";
+
+    /// <summary>stdio: 可执行命令（如 "npx"、"node"、"dotnet"）。</summary>
+    public string? Command { get; set; }
+
+    /// <summary>stdio: 命令参数。</summary>
+    public List<string>? Arguments { get; set; }
+
+    /// <summary>stdio: 子进程工作目录。</summary>
+    public string? WorkingDirectory { get; set; }
+
+    /// <summary>stdio: 子进程环境变量。</summary>
+    public Dictionary<string, string?>? Environment { get; set; }
+
+    /// <summary>http: MCP server 端点（如 "https://mcp.tavily.com/mcp"）。</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>http: 额外请求头（常用于放 Authorization / API key）。</summary>
+    public Dictionary<string, string>? Headers { get; set; }
+
+    /// <summary>http: 传输模式 "AutoDetect"|"Sse"|"StreamableHttp"。默认 AutoDetect。</summary>
+    public string? TransportMode { get; set; } = "AutoDetect";
+
+    /// <summary>连接/初始化超时（秒）。默认 30。stdio 首次启动建议 60+。</summary>
+    public int ConnectionTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>stdio: 子进程关闭超时（秒）。默认 5。独立于连接超时，避免重启时等待过久。</summary>
+    public int ShutdownTimeoutSeconds { get; set; } = 5;
+
+    /// <summary>是否启用。false 则跳过此 server。默认 true。</summary>
+    public bool Enabled { get; set; } = true;
 }
