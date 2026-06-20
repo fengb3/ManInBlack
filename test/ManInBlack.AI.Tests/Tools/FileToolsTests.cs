@@ -61,9 +61,9 @@ public class FileToolsTests : IDisposable
     {
         var filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "should-not-write.txt");
 
-        var result = _tools.Write(filePath, "bad content");
-
-        Assert.Contains("不允许", result);
+        // 安全检查抛 UnauthorizedAccessException（由框架 ToolExecutor 统一捕获为工具错误）
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Write(filePath, "bad content"));
+        Assert.Contains("不允许", ex.Message);
         Assert.False(File.Exists(filePath));
     }
 
@@ -88,9 +88,8 @@ public class FileToolsTests : IDisposable
     {
         var filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "should-not-update.txt");
 
-        var result = _tools.Edit(filePath, "old", "new");
-
-        Assert.Contains("不允许", result);
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Edit(filePath, "old", "new"));
+        Assert.Contains("不允许", ex.Message);
     }
 
     #endregion

@@ -104,33 +104,37 @@ public sealed class GeminiCompatibleChatClient : IChatClient
                 };
             }
 
-            var parts = result?.Candidates?.FirstOrDefault()?.Content?.Parts;
-            if (parts is null) continue;
+            var candidate = result?.Candidates?.FirstOrDefault();
+            var parts = candidate?.Content?.Parts;
 
-            foreach (var part in parts)
+            if (parts is not null)
             {
-                if (part.Text is not null)
+                foreach (var part in parts)
                 {
-                    yield return new ChatResponseUpdate
+                    if (part.Text is not null)
                     {
-                        Role = ChatRole.Assistant,
-                        Contents = [new TextContent(part.Text)]
-                    };
-                }
-                else if (part.FunctionCall is not null)
-                {
-                    var fc = part.FunctionCall;
-                    var args = fc.Args.HasValue
-                        ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
-                        : new Dictionary<string, object?>();
-                    var callId = $"call_{callIdCounter++}";
-                    yield return new ChatResponseUpdate
+                        yield return new ChatResponseUpdate
+                        {
+                            Role = ChatRole.Assistant,
+                            Contents = [new TextContent(part.Text)]
+                        };
+                    }
+                    else if (part.FunctionCall is not null)
                     {
-                        Role = ChatRole.Assistant,
-                        Contents = [new FunctionCallContent(callId, fc.Name ?? "", args)]
-                    };
+                        var fc = part.FunctionCall;
+                        var args = fc.Args.HasValue
+                            ? JsonSerializer.Deserialize<Dictionary<string, object?>>(fc.Args.Value.GetRawText()) ?? new()
+                            : new Dictionary<string, object?>();
+                        var callId = $"call_{callIdCounter++}";
+                        yield return new ChatResponseUpdate
+                        {
+                            Role = ChatRole.Assistant,
+                            Contents = [new FunctionCallContent(callId, fc.Name ?? "", args)]
+                        };
+                    }
                 }
             }
+
         }
 
         // 流结束后输出 usage
@@ -259,11 +263,10 @@ public sealed class GeminiCompatibleChatClient : IChatClient
             declarations.Add(obj);
         }
 
-        // Gemini tools 格式：[{ functionDeclarations: [...] }]
-        return new JsonArray
-        {
-            new JsonObject { ["functionDeclarations"] = declarations }
-        };
+        var result = new JsonArray();
+        if (declarations.Count > 0)
+            result.Add(new JsonObject { ["functionDeclarations"] = declarations });
+        return result;
     }
 
     private ChatResponse ParseResponse(string responseJson)

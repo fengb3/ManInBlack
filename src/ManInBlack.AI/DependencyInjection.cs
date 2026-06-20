@@ -4,11 +4,13 @@ using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Mcp;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace ManInBlack.AI;
@@ -86,6 +88,12 @@ public static class DependencyInjection
             else
                 services.AddScoped<IShellExecutor, ProcessShellExecutor>();
             services.AddToolHandlers();
+
+            // MCP：单例 client 池（HostedService 启动时连接 server + 注册工具声明）+ 工具执行 provider
+            services.AddSingleton<McpClientHostedService>();
+            services.AddSingleton<IMcpToolProvider, McpToolProvider>();
+            services.AddHostedService(sp => sp.GetRequiredService<McpClientHostedService>());
+
             return services;
         }
 
