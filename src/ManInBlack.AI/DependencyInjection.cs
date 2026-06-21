@@ -31,18 +31,23 @@ public static class DependencyInjection
     extension(IServiceCollection services)
     {
         /// <summary>
-        /// 注册 ManInBlack 核心服务、基础中间件和工具
+        /// 注册 ManInBlack 全部核心服务，返回流式 builder。
+        /// 默认不读取任何文件；需 JSON 时链式调用 .UseJson()，需复用 IConfiguration 时调用 .UseConfiguration(cfg)。
         /// </summary>
-        public IServiceCollection AddManInBlack(Action<ManInBlackOptions> configure)
+        public IManInBlackBuilder AddManInBlack()
         {
-            var options = new ManInBlackOptions();
-            configure(options);
+            // 合并基础设施：贡献 → IConfigureOptions<ManInBlackSettings>，再走现有校验器
+            services.AddOptions();
+            services.AddSingleton<IConfigureOptions<ManInBlackSettings>>(
+                sp => new ManInBlackSettingsBuilder(sp.GetServices<IManInBlackContribution>()));
+            services.AddSingleton<IValidateOptions<ManInBlackSettings>, ValidateManInBlackSettings>();
 
-            services.Configure<AgentStorageOptions>(opt =>
-            {
-                opt.RootPath = options.Storage.RootPath;
-                opt.Workspace = options.Storage.Workspace;
-            });
+            // AgentStorageOptions：从合并后的 settings.Storage 映射（resolve 期工厂）
+            services.AddSingleton<IConfigureOptions<AgentStorageOptions>, AgentStorageOptionsConfigurer>();
+
+            // 默认 ModelChoice 单例：从合并后的 settings 解析
+            services.AddSingleton<ModelChoice>(sp =>
+                sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value.GetDefaultModelChoice());
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
@@ -51,8 +56,6 @@ public static class DependencyInjection
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() =>
                     new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
-
-            services.AddSingleton(options.ModelChoice);
 
             services.AddScoped<IChatClient>(sp =>
             {
@@ -82,11 +85,14 @@ public static class DependencyInjection
 
             services.AddAutoRegisteredServices();
 
-            // 仅在 Linux 且 UseSandbox=true 时使用 Bwarp 沙盒，否则直接 Process.Start
-            if (OperatingSystem.IsLinux() && options.UseSandbox)
-                services.AddScoped<IShellExecutor, BwarpShellExecutor>();
-            else
-                services.AddScoped<IShellExecutor, ProcessShellExecutor>();
+            // 沙盒：UseSandbox 在 IOptions resolve 时才确定，故做成 resolve 期工厂
+            services.AddScoped<IShellExecutor>(sp =>
+            {
+                var useSandbox = sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value.UseSandbox;
+                if (OperatingSystem.IsLinux() && useSandbox)
+                    return new BwarpShellExecutor();
+                return new ProcessShellExecutor();
+            });
             services.AddToolHandlers();
 
             // MCP：单例 client 池（HostedService 启动时连接 server + 注册工具声明）+ 工具执行 provider
@@ -94,17 +100,42 @@ public static class DependencyInjection
             services.AddSingleton<IMcpToolProvider, McpToolProvider>();
             services.AddHostedService(sp => sp.GetRequiredService<McpClientHostedService>());
 
-            return services;
+            return new ManInBlackBuilder(services);
         }
 
         /// <summary>
-        /// 从 ~/.man-in-black/settings.json 加载配置并注册所有服务。
+        /// 从 ~/.man-in-black/settings.json 加载配置并注册所有服务（旧入口，等价于 AddManInBlack().UseJson()）。
         /// 设置文件变更会被自动跟踪；通过 IOptionsMonitor&lt;ManInBlackSettings&gt; 可获取最新值。
         /// </summary>
         public IServiceCollection AddManInBlackFromSettings(Action<ManInBlackOptions>? configure = null)
         {
-            var configuration = ManInBlackConfigurationBuilder.BuildConfiguration();
-            return services.AddManInBlackFromConfiguration(configuration, configure);
+            var builder = services.AddManInBlack().UseJson();
+            ApplyLegacyOptions(builder, configure);
+            return services;
+        }
+
+        /// <summary>
+        /// 从给定 IConfiguration 加载配置并注册所有服务（旧入口，等价于 AddManInBlack().UseConfiguration(cfg)）。
+        /// 适用于已构建 WebApplicationBuilder 等场景，可复用其 Configuration。
+        /// </summary>
+        public IServiceCollection AddManInBlackFromConfiguration(
+            IConfiguration configuration,
+            Action<ManInBlackOptions>? configure = null)
+        {
+            var builder = services.AddManInBlack().UseConfiguration(configuration);
+            ApplyLegacyOptions(builder, configure);
+            return services;
+        }
+
+        /// <summary>
+        /// [Obsolete] 旧的窄委托入口。改用 services.AddManInBlack().AddProvider/... 流式 API。
+        /// </summary>
+        [Obsolete("改用 services.AddManInBlack().AddProvider(...).AddModelChoice(...) 流式 API")]
+        public IServiceCollection AddManInBlack(Action<ManInBlackOptions> configure)
+        {
+            // 复用与 FromSettings/FromConfiguration 相同的旧选项映射逻辑（见 ApplyLegacyOptions），避免重复
+            ApplyLegacyOptions(services.AddManInBlack(), configure);
+            return services;
         }
 
         /// <summary>
@@ -115,48 +146,29 @@ public static class DependencyInjection
             services.AddSingleton(definition);
             return services;
         }
+    }
 
-        /// <summary>
-        /// 从给定的 IConfiguration 加载配置并注册所有服务。
-        /// 适用于已构建 WebApplicationBuilder 等场景，可复用其 Configuration。
-        /// </summary>
-        public IServiceCollection AddManInBlackFromConfiguration(
-            IConfiguration configuration,
-            Action<ManInBlackOptions>? configure = null)
-        {
-            services.Configure<ManInBlackSettings>(configuration);
-            services.AddSingleton<IValidateOptions<ManInBlackSettings>, ValidateManInBlackSettings>();
-            services.Configure<FeishuSettings>(configuration.GetSection("Feishu"));
-
-            var settings = new ManInBlackSettings();
-            configuration.Bind(settings);
-            var modelChoice = settings.GetDefaultModelChoice();
-
-            // 从 settings.json 的 Agents 节自动注册 Agent 定义
-            foreach (var (agentName, agentSettings) in settings.Agents)
+    /// <summary>
+    /// 把旧入口的 <see cref="Action{ManInBlackOptions}"/> 透传委托映射到流式 builder。
+    /// 多数场景 <paramref name="configure"/> 为 null，此时直接返回（已由 .UseJson()/.UseConfiguration() 完成配置）。
+    /// </summary>
+    private static void ApplyLegacyOptions(IManInBlackBuilder builder, Action<ManInBlackOptions>? configure)
+    {
+        if (configure is null) return;
+        var options = new ManInBlackOptions();
+        configure(options);
+        builder.AddProvider("default", p => p
+            .Schema(options.ModelChoice.Schema)
+            .ApiKey(options.ModelChoice.ApiKey)
+            .BaseUrl(string.IsNullOrEmpty(options.ModelChoice.BaseUrl) ? null : options.ModelChoice.BaseUrl));
+        builder.AddModelChoice("default", c => c.Provider("default").ModelId(options.ModelChoice.ModelId));
+        if (options.Storage.RootPath is not null || options.Storage.Workspace is not null)
+            builder.UseStorage(s =>
             {
-                services.AddSingleton(new AgentDefinition
-                {
-                    Name = agentName,
-                    Description = agentSettings.Description,
-                    Instruction = agentSettings.Instruction,
-                    PipelineName = agentSettings.PipelineName,
-                    SubAgents = agentSettings.SubAgents,
-                    ModelChoiceName = agentSettings.ModelChoiceName,
-                });
-            }
-
-            // 注册完整配置，后续可通过 IOptions<ManInBlackSettings> 按名获取其他 ModelChoice
-            return services.AddManInBlack(opt =>
-            {
-                opt.ModelChoice = modelChoice;
-                if (settings.Storage?.RootPath is not null)
-                    opt.Storage.RootPath = settings.Storage.RootPath;
-                if (settings.Storage?.Workspace is not null)
-                    opt.Storage.Workspace = settings.Storage.Workspace;
-                opt.UseSandbox = settings.UseSandbox;
-                configure?.Invoke(opt);
+                if (options.Storage.RootPath is not null) s.RootPath(options.Storage.RootPath);
+                if (options.Storage.Workspace is not null) s.Workspace(w => w.Mode(options.Storage.Workspace.Mode).CustomPath(options.Storage.Workspace.CustomPath));
             });
-        }
+        if (options.UseSandbox)
+            builder.UseSandbox();
     }
 }
