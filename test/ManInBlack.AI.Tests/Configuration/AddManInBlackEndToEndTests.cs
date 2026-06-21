@@ -1,4 +1,5 @@
 using ManInBlack.AI;
+using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,9 @@ public class AddManInBlackEndToEndTests
 
         var factory = sp.GetRequiredService<AgentFactory>();
         Assert.Equal("a1", factory.GetDefinition("a1").Name);
+
+        var choice = sp.GetRequiredService<ModelChoice>();
+        Assert.Equal("gpt-4o", choice.ModelId);
     }
 
     [Fact]

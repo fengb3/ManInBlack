@@ -105,7 +105,6 @@ public static class DependencyInjection
 
         /// <summary>
         /// 从 ~/.man-in-black/settings.json 加载配置并注册所有服务（旧入口，等价于 AddManInBlack().UseJson()）。
-        /// 设置文件变更会被自动跟踪；通过 IOptionsMonitor&lt;ManInBlackSettings&gt; 可获取最新值。
         /// </summary>
         public IServiceCollection AddManInBlackFromSettings(Action<ManInBlackOptions>? configure = null)
         {
@@ -166,7 +165,7 @@ public static class DependencyInjection
             builder.UseStorage(s =>
             {
                 if (options.Storage.RootPath is not null) s.RootPath(options.Storage.RootPath);
-                if (options.Storage.Workspace is not null) s.Workspace(w => w.Mode(options.Storage.Workspace.Mode).CustomPath(options.Storage.Workspace.CustomPath));
+                if (options.Storage.Workspace is not null) s.Workspace(w => w.Mode(options.Storage.Workspace.Mode).CustomPath(options.Storage.Workspace.CustomPath ?? ""));
             });
         if (options.UseSandbox)
             builder.UseSandbox();
