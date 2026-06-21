@@ -59,24 +59,20 @@ builder.Services.AddSerilog(loggerConfig =>
         );
 });
 
-builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
-
 // Agent 定义现在从 settings.json 的 Agents 字段自动加载，无需 AddAgentDefinition 调用
-// Pipeline 注册仍在代码中（涉及中间件类型）
+
+builder.Services.AddManInBlack()
+    .UseConfiguration(builder.Configuration)
+    .AddFeishu(f => builder.Configuration.GetSection("Feishu").Bind(f))
+    .AddPipeline("feishu", pipeline => pipeline.UseDefault())
+    .AddPipeline("sub-agent", builder => builder
+        .Use<EventPublishingMiddleware>()
+        .Use<ToolsMiddleware>()
+        .UseSimple());
 
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
-
-// 注册飞书自定义管道（需在 Build 后获取 Factory 实例）
-var factory = app.Services.GetRequiredService<AgentFactory>();
-factory.RegisterPipeline("feishu", pipeline => pipeline.UseDefault());
-
-// 子 Agent 专用 pipeline：有文件工具和事件发布，无 DelegationMiddleware
-factory.RegisterPipeline("sub-agent", builder => builder
-    .Use<EventPublishingMiddleware>()
-    .Use<ToolsMiddleware>()
-    .UseSimple());
 
 // 愿你健康, 开心, 美满, 幸福
 app.MapGet(

@@ -9,19 +9,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 // 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置，包括 Agents 定义）
 var services = new ServiceCollection();
-services.AddManInBlackFromSettings();
+services.AddManInBlack()
+    .UseJson()
+    .AddPipeline("sub-agent", builder => builder
+        .Use<EventPublishingMiddleware>()
+        .Use<ToolsMiddleware>()
+        .UseSimple());
 
 // Agent 定义现在从 settings.json 的 Agents 字段自动加载，无需 AddAgentDefinition 调用
-// Pipeline 注册仍在代码中（涉及中间件类型）
 
 var rootSp = services.BuildServiceProvider();
 
-// 注册子 Agent 专用 pipeline：有工具和事件发布，无 DelegationMiddleware
 var factory = rootSp.GetRequiredService<AgentFactory>();
-factory.RegisterPipeline("sub-agent", builder => builder
-    .Use<EventPublishingMiddleware>()
-    .Use<ToolsMiddleware>()
-    .UseSimple());
 
 AgentContext? capturedContext = null;
 var subs = new List<IDisposable>();

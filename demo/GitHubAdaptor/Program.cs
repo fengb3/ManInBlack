@@ -15,13 +15,12 @@ builder.Configuration.GetSection("GitHub").Bind(githubSettings);
 builder.Services.AddSerilog(loggerConfig => loggerConfig.ReadFrom.Configuration(builder.Configuration));
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton(githubSettings);
-builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
+builder.Services.AddManInBlack()
+    .UseConfiguration(builder.Configuration)
+    .AddPipeline("github", pipeline => pipeline.UseDefault());
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
-
-var factory = app.Services.GetRequiredService<AgentFactory>();
-factory.RegisterPipeline("github", pipeline => pipeline.UseDefault());
 
 app.UseMiddleware<GitHubWebhookMiddleware>();
 
