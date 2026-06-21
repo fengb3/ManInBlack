@@ -23,6 +23,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="ManInBlack.AI.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <Content Include="DefaultSkills\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="DefaultSkills\" />
     </ItemGroup>
 
