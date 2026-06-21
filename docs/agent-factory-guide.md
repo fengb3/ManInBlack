@@ -33,7 +33,7 @@
 - `"default"` — `builder.UseDefault()`，完整管道（含工具、持久化、压缩等）
 - `"simple"` — `builder.UseSimple()`，精简管道（不含工具和持久化）
 
-自定义管道通过 `factory.RegisterPipeline()` 注册。
+自定义管道推荐通过 `.AddPipeline()` 在 DI 期注册，也可通过 `factory.RegisterPipeline()` 运行时动态注册（见[注册自定义管道](#注册自定义管道)）。
 
 ### 执行追踪 — 同用户并发管理
 
@@ -69,11 +69,11 @@
 }
 ```
 
-使用 `AddManInBlackFromSettings()` 或 `AddManInBlackFromConfiguration()` 时，Agents 节中的定义会自动注册到 DI，无需额外代码。
+使用 `AddManInBlack().UseJson()` 或 `AddManInBlackFromConfiguration()` 时，Agents 节中的定义会自动注册到 DI，无需额外代码。
 
 ### 方式二：通过代码注册
 
-通过 DI 扩展方法 `AddAgentDefinition()` 注册：
+通过流式 Builder 的 `.AddAgent()` 或独立的 `AddAgentDefinition()` 扩展方法注册：
 
 ```csharp
 using ManInBlack.AI;
@@ -81,10 +81,19 @@ using ManInBlack.AI.Abstraction;
 
 var services = new ServiceCollection();
 
-// 注册核心服务
+// 流式 Builder 注册（推荐）
+services.AddManInBlack()
+    .UseJson()
+    .AddAgent("my-agent", a => a
+        .Instruction("你是一个AI助手，可以用工具帮助用户完成任务。请用中文回复。")
+        .Pipeline("default"));
+```
+
+也可以继续使用独立的 `AddAgentDefinition()` 方法：
+
+```csharp
 services.AddManInBlackFromSettings();
 
-// 注册 Agent 定义
 services.AddAgentDefinition(new AgentDefinition
 {
     Name = "my-agent",
@@ -101,20 +110,23 @@ services.AddAgentDefinition(new AgentDefinition
 
 ## 注册自定义管道
 
-### RegisterPipeline 方法
+### 方式一：DI 期注册（推荐）
+
+在 DI 配置阶段通过 `.AddPipeline()` 注册，管道定义随 DI 容器一起构建，`AgentFactory` 构造时自动收集：
 
 ```csharp
-/// <summary>
-/// 注册管道配置委托
-/// </summary>
-/// <param name="name">管道名称</param>
-/// <param name="configure">配置委托，接收 AgentPipelineBuilder 并返回配置后的 builder</param>
-void RegisterPipeline(string name, Func<AgentPipelineBuilder, AgentPipelineBuilder> configure)
+services.AddManInBlack()
+    .UseJson()
+    .AddPipeline("feishu", pipeline => pipeline
+        .Use<MyCustomMiddleware>()
+        .UseDefault());
 ```
 
-### 使用场景
+> **注意：** `.AddPipeline()` 是覆盖式注册。如果名称与内置管道（`"default"`、`"simple"`）相同，新委托会替换旧的。
 
-当内置的 `"default"` 和 `"simple"` 不满足需求时，可以注册自定义管道。例如在飞书场景中注入一个自定义中间件：
+### 方式二：运行时动态注册（逃生口）
+
+如果在 DI 容器构建之后才需要确定管道配置，可以使用 `AgentFactory.RegisterPipeline()`。典型场景：Web 应用在 `Build()` 之后根据运行时条件注册管道。
 
 ```csharp
 // 在 WebApplication.Build() 之后获取 Factory
@@ -128,7 +140,7 @@ factory.RegisterPipeline("feishu", pipeline => pipeline
 // 对应的 Agent 定义需要指定 PipelineName = "feishu"
 ```
 
-> **注意：** `RegisterPipeline` 是**覆盖式注册**。如果名称已存在，新委托会替换旧的。内置的 `"default"` 和 `"simple"` 也可以被覆盖，但通常不建议这样做。
+> **注意：** `RegisterPipeline` 是覆盖式注册，语义与 `.AddPipeline()` 相同。推荐优先使用 `.AddPipeline()`，仅在确实需要运行时动态注册时才用此逃生口。
 
 ---
 
@@ -361,7 +373,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 // 1. 构建 DI 容器（Agent 定义从 settings.json 的 Agents 字段自动加载）
 var services = new ServiceCollection();
-services.AddManInBlackFromSettings();
+services.AddManInBlack()
+    .UseJson();
 
 var rootSp = services.BuildServiceProvider();
 var factory = rootSp.GetRequiredService<AgentFactory>();
@@ -424,14 +437,14 @@ if (usage is not null && (usage.InputTokenCount is not null || usage.OutputToken
 // ── Program.cs ──
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.AddManInBlackSettings();
 
 // 注册核心服务（Agent 定义从 settings.json 的 Agents 字段自动加载）
-builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
+builder.Services.AddManInBlack()
+    .UseConfiguration(builder.Configuration);
 
 var app = builder.Build();
 
-// 注册自定义管道（Build 之后才能获取 Factory）
+// 注册自定义管道（Build 之后才能获取 Factory）——推荐使用 .AddPipeline() 在 DI 期注册
 var factory = app.Services.GetRequiredService<AgentFactory>();
 factory.RegisterPipeline("feishu", pipeline => pipeline
     .Use<MyCustomMiddleware>()  // 自定义中间件

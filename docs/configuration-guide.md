@@ -82,13 +82,63 @@
 | `SubAgents`       | 否   | 可委托的子 Agent 名称列表（对应 Agents 字典中的 key）                       |
 | `ModelChoiceName` | 否   | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice                      |
 
-Agents 为字典结构，键即为 Agent 名称（唯一标识）。通过 `AddManInBlackFromSettings()` 或 `AddManInBlackFromConfiguration()` 加载时，会自动注册为 `AgentDefinition`。Pipeline 注册仍在代码中（涉及中间件类型，无法配置化）。
+Agents 为字典结构，键即为 Agent 名称（唯一标识）。通过 `AddManInBlackFromSettings()`、`AddManInBlackFromConfiguration()` 或流式 Builder 的 `.UseJson()` / `.UseConfiguration()` 加载时，会自动注册为 `AgentDefinition`。Pipeline 可通过 `.AddPipeline(...)` 在 DI 期注册（见下文）。
 
 ---
 
 ## DI 注册方式
 
-### 方式一：AddManInBlackFromSettings（控制台 / 测试）
+### 方式一：AddManInBlack()（流式 Builder，推荐）
+
+`services.AddManInBlack()` 返回 `IManInBlackBuilder`，支持链式配置。默认不读取任何文件，需手动链入配置源。
+
+```csharp
+var services = new ServiceCollection();
+services.AddManInBlack()
+    .UseJson()                                                    // 载入 ~/.man-in-black/settings.json（缺失则创建默认）
+    .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.openai.com"))
+    .AddModelChoice("default", c => c.Provider("default").ModelId("gpt-4o"))
+    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline("default"))
+    .AddPipeline("custom", builder => builder.Use<MyMiddleware>().UseDefault())
+    .UseSandbox();
+```
+
+> **注意：** 也可以不链入 `.UseJson()`，完全用代码配置。`.UseJson()` 显式载入 `~/.man-in-black/settings.json`，其位置决定合并层——放链首则后续的 `.AddProvider()` 等委托会覆盖 JSON 中的同名条目。
+
+#### 合并语义
+
+配置源按链式调用顺序逐层合并。每层可以是 JSON 文件（`.UseJson()`）或 `IConfiguration`（`.UseConfiguration(cfg)`），也可以是委托（`.AddProvider()` 等子 Builder）。规则：
+
+- **同名 key 覆盖**：后注册的覆盖先注册的（按调用顺序）。
+- **不同 key 累加**：字典类型（Providers、ModelChoices、Agents 等）中不同名称的条目会累积。
+- **`.UseJson()` 显式载入**：不自动读取文件，需手动链入。缺失 `settings.json` 时自动创建默认文件。
+
+#### 对象重载
+
+每个 `.AddXxx` 方法都有两个重载——委托形式和对象形式：
+
+```csharp
+// 委托形式
+.AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.openai.com"))
+
+// 对象形式
+.AddProvider("default", new ProviderSettings { Schema = "OpenAI", ApiKey = "sk-xxx", BaseUrl = "https://api.openai.com" })
+```
+
+`AddModelChoice`、`AddMcpServer` 同理支持对象重载。
+
+#### 子 Builder 方法速查
+
+| 子 Builder         | 关键方法                                                                 | 说明               |
+| ------------------ | ------------------------------------------------------------------------ | ------------------ |
+| `ProviderBuilder`  | `.Schema()` / `.ApiKey()` / `.BaseUrl()`                                | AI 提供商配置      |
+| `ModelChoiceBuilder` | `.Provider()` / `.ModelId()`                                          | 模型选择配置       |
+| `AgentBuilder`     | `.Description()` / `.Instruction()` / `.Pipeline()` / `.SubAgents()` / `.ModelChoice()` | Agent 定义配置  |
+| `HookBuilder`      | `.Name()` / `.HookPoint()` / `.Run()` / `.ToolName()` / `.TimeoutMs()` / `.Enabled()` | 钩子配置    |
+| `McpServerBuilder` | `.Transport()` / `.Command()` / `.Arguments()` / `.Endpoint()` / `.Header()` / `.Enabled()` | MCP 服务器配置 |
+| `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode().CustomPath())`                  | 存储与工作空间配置 |
+
+### 方式二：AddManInBlackFromSettings（控制台 / 测试）
 
 自动从 `~/.man-in-black/settings.json` 构建 `IConfiguration` 并注册所有服务：
 
@@ -98,7 +148,7 @@ services.AddManInBlackFromSettings();
 
 内部调用 `ManInBlackConfigurationBuilder.BuildConfiguration()` 构建 `IConfiguration`，启用 `reloadOnChange: true`。
 
-### 方式二：AddManInBlackFromConfiguration（WebApplicationBuilder）
+### 方式三：AddManInBlackFromConfiguration（WebApplicationBuilder）
 
 将配置源添加到宿主的 `IConfiguration`，适合 ASP.NET Core 等已有宿主配置的场景：
 
@@ -116,11 +166,14 @@ builder.Configuration.GetSection("Feishu").Bind(feishuSettings);
 builder.Services.AddManInBlackFromConfiguration(builder.Configuration);
 ```
 
-### 方式三：AddManInBlack（手动配置）
+### 方式四：AddManInBlack(Action\<ManInBlackOptions\>) `[Obsolete]`
 
-不读取 settings.json，在代码中直接指定：
+> **已弃用。** 改用 `services.AddManInBlack().AddProvider(...).AddModelChoice(...)` 流式 API。
+
+此方式接受 `Action<ManInBlackOptions>` 委托，内部自动转换为流式 Builder 调用。仍可正常工作，但不推荐新项目使用。
 
 ```csharp
+// 旧写法（已弃用）
 services.AddManInBlack(opt =>
 {
     opt.ModelChoice = new ModelChoice
@@ -131,9 +184,12 @@ services.AddManInBlack(opt =>
         ModelId = "deepseek-chat",
     };
 });
-```
 
-此方式不注册 `IOptions<ManInBlackSettings>`，无法使用配置跟踪和校验。
+// 新写法（推荐）
+services.AddManInBlack()
+    .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.deepseek.com"))
+    .AddModelChoice("default", c => c.Provider("default").ModelId("deepseek-chat"));
+```
 
 ---
 
@@ -264,11 +320,12 @@ public class SessionEndOnlyPolicy : ICheckpointPolicy
 
 | API                                              | 用途                                        |
 | ------------------------------------------------ | ------------------------------------------- |
+| `services.AddManInBlack()`                       | 流式 Builder 入口（推荐）                   |
 | `ManInBlackConfigurationBuilder.BuildConfiguration()` | 独立构建 IConfiguration               |
 | `IConfigurationBuilder.AddManInBlackSettings()`  | 将配置源加入已有 IConfigurationBuilder       |
-| `services.AddManInBlackFromSettings()`           | 便捷注册：构建配置 + 注册服务                |
-| `services.AddManInBlackFromConfiguration(IConfiguration)` | 从已有 IConfiguration 注册服务      |
-| `services.AddManInBlack(Action<ManInBlackOptions>)` | 手动配置，不读取 settings.json           |
+| `services.AddManInBlackFromSettings()`           | 便捷注册：从 settings.json 构建配置 + 注册服务（≡ `AddManInBlack().UseJson()`） |
+| `services.AddManInBlackFromConfiguration(IConfiguration)` | 从已有 IConfiguration 注册服务（≡ `AddManInBlack().UseConfiguration(cfg)`） |
+| `services.AddManInBlack(Action<ManInBlackOptions>)` | [Obsolete] 手动配置，改用流式 API           |
 
 ---
 

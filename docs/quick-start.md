@@ -88,7 +88,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 // 构建 DI 容器（从 ~/.man-in-black/settings.json 读取配置）
 var services = new ServiceCollection();
-services.AddManInBlackFromSettings();
+services.AddManInBlack()
+    .UseJson();   // 从 ~/.man-in-black/settings.json 读取
 
 // 注册 Agent 定义
 services.AddAgentDefinition(new AgentDefinition
@@ -186,25 +187,17 @@ Token 用量 — 输入: 42, 输出: 128
 
 ## 手动配置（不使用 settings.json）
 
-如果需要在代码中直接配置（不依赖 `settings.json`），使用 `AddManInBlack`：
+如果需要在代码中直接配置（不依赖 `settings.json`），使用流式 Builder API：
 
 ```csharp
-services.AddManInBlack(opt =>
-{
-    // ModelChoice 是运行时使用的模型选择对象，包含协议、密钥、地址和模型 ID
-    opt.ModelChoice = new ModelChoice
-    {
-        Schema = "OpenAI",
-        ApiKey = "sk-xxx",
-        BaseUrl = "https://api.deepseek.com",
-        ModelId = "deepseek-chat",
-    };
-});
+services.AddManInBlack()
+    .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.deepseek.com"))
+    .AddModelChoice("default", c => c.Provider("default").ModelId("deepseek-chat"));
 ```
 
-> **注意**：`ModelChoice` 是代码中使用的运行时类型，而 `settings.json` 中使用的是 `ModelChoiceSettings`（仅包含 `ProviderName` + `ModelId`，通过引用 `Providers` 字典中的条目间接获取密钥和地址）。两者不可混用——`AddManInBlack` 接受 `ModelChoice`，`AddManInBlackFromSettings` 内部会将 `ModelChoiceSettings` + `ProviderSettings` 解析为 `ModelChoice`。
+也可以只链入部分配置（如 `.UseJson()` 载入文件后用 `.AddProvider()` 覆盖某个 Provider）。
 
-详见 [Provider 配置指南](./provider-guide.md)。
+详见 [配置指南](./configuration-guide.md) 和 [Provider 配置指南](./provider-guide.md)。
 
 ---
 
@@ -223,18 +216,17 @@ services.AddAgentDefinition(new AgentDefinition
 
 `simple` 管道不包含持久化和压缩，更适合一次性对话。
 
-也可以注册自定义管道：
+也可以在 DI 期注册自定义管道：
 
 ```csharp
-// 在 DI 容器构建完成后，从 ServiceProvider 获取 AgentFactory
-var sp = services.BuildServiceProvider();
-var factory = sp.GetRequiredService<AgentFactory>();
-
-// RegisterPipeline 需要在 RunAsync 之前调用
-factory.RegisterPipeline("my-pipeline", builder => builder
-    .Use<MyCustomMiddleware>()
-    .UseSimple());
+services.AddManInBlack()
+    .UseJson()
+    .AddPipeline("my-pipeline", builder => builder
+        .Use<MyCustomMiddleware>()
+        .UseSimple());
 ```
+
+> **运行时动态注册：** 如果需要在 DI 容器构建之后才确定管道配置，可以使用 `AgentFactory.RegisterPipeline()`（见 [Agent 工厂指南](./agent-factory-guide.md)）。
 
 ---
 
