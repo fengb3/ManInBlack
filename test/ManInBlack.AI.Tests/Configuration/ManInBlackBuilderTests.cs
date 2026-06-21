@@ -1,4 +1,5 @@
 using ManInBlack.AI.Abstraction;
+using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.DependencyInjection;
@@ -150,5 +151,63 @@ public class ManInBlackBuilderTests
 
         var regs = services.BuildServiceProvider().GetServices<PipelineRegistration>();
         Assert.Single(regs, r => r.Name == "custom");
+    }
+
+    [Fact]
+    public void AddHook_Accumulates()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddHook(h => h.HookPoint("before_run").Run("echo a"));
+        builder.AddHook(h => h.HookPoint("after_run").Run("echo b"));
+
+        var settings = Merge(services);
+
+        Assert.Equal(2, settings.Hooks.Count);
+        Assert.Equal("before_run", settings.Hooks[0].HookPoint);
+        Assert.Equal("echo b", settings.Hooks[1].Script);
+    }
+
+    [Fact]
+    public void AddMcpServer_Delegate_WritesServer()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddMcpServer("tavily", m => m.Endpoint("https://mcp.tavily.com/mcp").Header("Authorization", "Bearer xxx"));
+
+        var settings = Merge(services);
+
+        Assert.Equal("https://mcp.tavily.com/mcp", settings.McpServers["tavily"].Endpoint);
+        Assert.Equal("Bearer xxx", settings.McpServers["tavily"].Headers!["Authorization"]);
+    }
+
+    [Fact]
+    public void UseStorage_Delegate_WritesStorage()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.UseStorage(s => s.RootPath("/data/mib").Workspace(w => w.Mode(WorkspaceMode.CustomPath).CustomPath("/ws")));
+
+        var settings = Merge(services);
+
+        Assert.Equal("/data/mib", settings.Storage!.RootPath);
+        Assert.Equal(WorkspaceMode.CustomPath, settings.Storage!.Workspace!.Mode);
+        Assert.Equal("/ws", settings.Storage!.Workspace!.CustomPath);
+    }
+
+    [Fact]
+    public void UseSandbox_SetsFlag()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.UseSandbox();
+
+        var settings = Merge(services);
+
+        Assert.True(settings.UseSandbox);
     }
 }

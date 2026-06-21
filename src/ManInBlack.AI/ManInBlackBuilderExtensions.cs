@@ -69,4 +69,39 @@ public static class ManInBlackBuilderExtensions
         ((ManInBlackBuilder)builder).Services.AddSingleton(new PipelineRegistration(name, resolver));
         return builder;
     }
+
+    public static IManInBlackBuilder AddHook(this IManInBlackBuilder builder, Action<HookBuilder> configure)
+    {
+        var h = new HookBuilder();
+        configure(h);
+        ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.Hooks.Add(h.Settings)));
+        return builder;
+    }
+
+    public static IManInBlackBuilder AddMcpServer(this IManInBlackBuilder builder, string name, Action<McpServerBuilder> configure)
+    {
+        var m = new McpServerBuilder();
+        configure(m);
+        return builder.AddMcpServer(name, m.Settings);
+    }
+
+    public static IManInBlackBuilder AddMcpServer(this IManInBlackBuilder builder, string name, McpServerSettings server)
+    {
+        ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.McpServers[name] = server));
+        return builder;
+    }
+
+    public static IManInBlackBuilder UseStorage(this IManInBlackBuilder builder, Action<StorageBuilder> configure)
+    {
+        var s = new StorageBuilder();
+        configure(s);
+        ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(settings => settings.Storage = s.Settings));
+        return builder;
+    }
+
+    public static IManInBlackBuilder UseSandbox(this IManInBlackBuilder builder)
+    {
+        ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.UseSandbox = true));
+        return builder;
+    }
 }
