@@ -123,6 +123,7 @@ public static class ManInBlackBuilderExtensions
     {
         var loaded = new ManInBlackSettings();
         configuration.Bind(loaded);
+        // Configure 仅注册 IConfigureOptions，延迟到 IOptions<T> 首次访问才解析，与下方 ApplySource 顺序无关。
         builder.Services.Configure<FeishuSettings>(configuration.GetSection("Feishu"));
         return ApplySource(builder, loaded);
     }

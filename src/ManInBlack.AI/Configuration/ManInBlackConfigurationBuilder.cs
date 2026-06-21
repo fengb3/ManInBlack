@@ -39,7 +39,6 @@ public static class ManInBlackConfigurationBuilder
     /// </summary>
     public static ManInBlackSettings LoadSettings()
     {
-        EnsureSettingsFile();
         var settings = new ManInBlackSettings();
         BuildConfiguration().Bind(settings);
         return settings;

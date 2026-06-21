@@ -242,11 +242,13 @@ public class ManInBlackBuilderTests
         Assert.Single(services.BuildServiceProvider().GetServices<AgentDefinition>(), d => d.Name == "console-agent");
     }
 
+    // UseJson 与 UseConfiguration 共用私有 ApplySource（合并 + 即时注册 AgentDefinition），
+    // 此处用 UseConfiguration 模拟源以避免触碰真实文件系统；
+    // UseJson 的文件读取路径（LoadSettings）属既有行为，不在本单测覆盖。
     [Fact]
-    public void UseJson_ThenAddProvider_DelegateOverridesJsonByKey()
+    public void UseConfiguration_ThenAddProvider_DelegateOverridesSourceByKey()
     {
-        // 构造一个临时 settings.json 路径需要触及用户目录；改为直接验证 UseJson 内部用的是 LoadSettings+SettingsMerger：
-        // 这里用 UseConfiguration 模拟 JSON 源，再追加委托覆盖，验证 last-write-wins。
+        // 用 UseConfiguration 模拟 JSON 源，再追加委托覆盖，验证 last-write-wins。
         var dict = new Dictionary<string, string?>
         {
             ["Providers:default:Schema"] = "OpenAI",
