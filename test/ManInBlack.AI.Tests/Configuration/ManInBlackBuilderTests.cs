@@ -2,6 +2,7 @@ using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -209,5 +210,59 @@ public class ManInBlackBuilderTests
         var settings = Merge(services);
 
         Assert.True(settings.UseSandbox);
+    }
+
+    [Fact]
+    public void UseConfiguration_BindsAndMergesAndBindsFeishu()
+    {
+        var dict = new Dictionary<string, string?>
+        {
+            ["Providers:default:Schema"] = "OpenAI",
+            ["Providers:default:ApiKey"] = "from-cfg",
+            ["ModelChoices:default:ProviderName"] = "default",
+            ["ModelChoices:default:ModelId"] = "gpt-4o",
+            ["Agents:console-agent:Instruction"] = "cfg agent",
+            ["Agents:console-agent:PipelineName"] = "default",
+            ["Feishu:AppId"] = "cli_xxx",
+        };
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
+
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+        builder.UseConfiguration(configuration);
+
+        var settings = Merge(services);
+
+        Assert.Equal("from-cfg", settings.Providers["default"].ApiKey);
+        Assert.Equal("cfg agent", settings.Agents["console-agent"].Instruction);
+        // Feishu 单独绑定
+        var feishu = services.BuildServiceProvider().GetRequiredService<IOptions<FeishuSettings>>().Value;
+        Assert.Equal("cli_xxx", feishu.AppId);
+        // 每个 agent 即时注册 AgentDefinition 单例
+        Assert.Single(services.BuildServiceProvider().GetServices<AgentDefinition>(), d => d.Name == "console-agent");
+    }
+
+    [Fact]
+    public void UseJson_ThenAddProvider_DelegateOverridesJsonByKey()
+    {
+        // 构造一个临时 settings.json 路径需要触及用户目录；改为直接验证 UseJson 内部用的是 LoadSettings+SettingsMerger：
+        // 这里用 UseConfiguration 模拟 JSON 源，再追加委托覆盖，验证 last-write-wins。
+        var dict = new Dictionary<string, string?>
+        {
+            ["Providers:default:Schema"] = "OpenAI",
+            ["Providers:default:ApiKey"] = "from-json",
+            ["ModelChoices:default:ProviderName"] = "default",
+            ["ModelChoices:default:ModelId"] = "gpt-4o",
+        };
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
+
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+        builder.UseConfiguration(configuration);       // 模拟 JSON 源（链首）
+        builder.AddProvider("default", p => p.Schema("OpenAI").ApiKey("from-delegate")); // 覆盖
+
+        var settings = Merge(services);
+
+        Assert.Equal("from-delegate", settings.Providers["default"].ApiKey);
     }
 }

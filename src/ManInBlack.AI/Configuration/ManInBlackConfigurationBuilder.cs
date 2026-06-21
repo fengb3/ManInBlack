@@ -34,6 +34,18 @@ public static class ManInBlackConfigurationBuilder
     }
 
     /// <summary>
+    /// 读取 ~/.man-in-black/settings.json（缺失则创建默认）并绑定到 ManInBlackSettings。
+    /// 供 .UseJson() 复用。
+    /// </summary>
+    public static ManInBlackSettings LoadSettings()
+    {
+        EnsureSettingsFile();
+        var settings = new ManInBlackSettings();
+        BuildConfiguration().Bind(settings);
+        return settings;
+    }
+
+    /// <summary>
     /// 确保配置文件存在，不存在则创建默认配置
     /// </summary>
     internal static void EnsureSettingsFile()

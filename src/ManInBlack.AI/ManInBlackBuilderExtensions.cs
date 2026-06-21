@@ -1,6 +1,7 @@
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ManInBlack.AI;
@@ -102,6 +103,51 @@ public static class ManInBlackBuilderExtensions
     public static IManInBlackBuilder UseSandbox(this IManInBlackBuilder builder)
     {
         ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.UseSandbox = true));
+        return builder;
+    }
+
+    /// <summary>
+    /// 载入 ~/.man-in-black/settings.json 作为配置源（缺失则创建默认）。
+    /// 位置决定合并层：放链首则后续委托覆盖 JSON 同名 key。
+    /// </summary>
+    public static IManInBlackBuilder UseJson(this IManInBlackBuilder builder)
+    {
+        var loaded = ManInBlackConfigurationBuilder.LoadSettings();
+        return ApplySource(builder, loaded);
+    }
+
+    /// <summary>
+    /// 复用已有 IConfiguration（Web 场景）作为配置源。同时绑定 FeishuSettings 供适配器读取。
+    /// </summary>
+    public static IManInBlackBuilder UseConfiguration(this IManInBlackBuilder builder, IConfiguration configuration)
+    {
+        var loaded = new ManInBlackSettings();
+        configuration.Bind(loaded);
+        builder.Services.Configure<FeishuSettings>(configuration.GetSection("Feishu"));
+        return ApplySource(builder, loaded);
+    }
+
+    /// <summary>
+    /// 将配置源应用到 builder：即时注册 AgentDefinition 单例，并贡献按 key 合并。
+    /// </summary>
+    private static IManInBlackBuilder ApplySource(IManInBlackBuilder builder, ManInBlackSettings source)
+    {
+        var concrete = (ManInBlackBuilder)builder;
+        // A：即时注册每个 agent 的 AgentDefinition 单例
+        foreach (var (name, agent) in source.Agents)
+        {
+            concrete.Services.AddSingleton(new AgentDefinition
+            {
+                Name = name,
+                Description = agent.Description,
+                Instruction = agent.Instruction,
+                PipelineName = agent.PipelineName,
+                SubAgents = agent.SubAgents,
+                ModelChoiceName = agent.ModelChoiceName,
+            });
+        }
+        // B：贡献合并文件/IConfiguration 内容进 settings
+        concrete.AddContribution(new ActionContribution(s => SettingsMerger.Merge(s, source)));
         return builder;
     }
 }
