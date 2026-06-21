@@ -41,18 +41,25 @@ public class AgentFactory
     /// </summary>
     private readonly ConcurrentDictionary<string, string> _agentToRootUser = new();
 
-    public AgentFactory(IServiceScopeFactory scopeFactory, ILogger<AgentFactory> logger, IEnumerable<AgentDefinition> definitions)
+    public AgentFactory(
+        IServiceScopeFactory scopeFactory,
+        ILogger<AgentFactory> logger,
+        IEnumerable<AgentDefinition> definitions,
+        IEnumerable<PipelineRegistration> pipelines)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
 
-        // 注册所有 DI 中收集的 Agent 定义
         foreach (var def in definitions)
             RegisterDefinition(def);
 
         // 内置管道预设
         _pipelineResolvers["default"] = builder => builder.UseDefault();
         _pipelineResolvers["simple"] = builder => builder.UseSimple();
+
+        // 收集 builder 期（.AddPipeline）注册的 pipeline，覆盖同名内置
+        foreach (var reg in pipelines)
+            _pipelineResolvers[reg.Name] = reg.Resolver;
     }
 
     /// <summary>

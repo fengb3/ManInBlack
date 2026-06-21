@@ -12,7 +12,7 @@ public class AgentFactoryTests
     {
         var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
-        return new AgentFactory(scopeFactory, NullLogger<AgentFactory>.Instance, []);
+        return new AgentFactory(scopeFactory, NullLogger<AgentFactory>.Instance, [], []);
     }
 
     private static AgentDefinition MakeDefinition(string name, string? pipelineName = null)

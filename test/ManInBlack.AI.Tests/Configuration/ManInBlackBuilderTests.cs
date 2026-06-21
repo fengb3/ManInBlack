@@ -1,4 +1,6 @@
+using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Configuration;
+using ManInBlack.AI.Middlewares;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -115,5 +117,38 @@ public class ManInBlackBuilderTests
 
         Assert.Equal("default", settings.ModelChoices["default"].ProviderName);
         Assert.Equal("gpt-4o", settings.ModelChoices["default"].ModelId);
+    }
+
+    [Fact]
+    public void AddAgent_Delegate_RegistersDefinitionAndWritesSettings()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddAgent("console-agent", a => a
+            .Instruction("你是AI助手")
+            .Pipeline("default")
+            .SubAgents("sub"));
+
+        var settings = Merge(services);
+
+        // settings.Agents 供校验
+        Assert.Equal("你是AI助手", settings.Agents["console-agent"].Instruction);
+        Assert.Contains("sub", settings.Agents["console-agent"].SubAgents);
+        // AgentDefinition 即时注册为单例
+        var defs = services.BuildServiceProvider().GetServices<AgentDefinition>();
+        Assert.Single(defs, d => d.Name == "console-agent" && d.PipelineName == "default");
+    }
+
+    [Fact]
+    public void AddPipeline_RegistersPipelineRegistrationSingleton()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddPipeline("custom", b => b.UseSimple());
+
+        var regs = services.BuildServiceProvider().GetServices<PipelineRegistration>();
+        Assert.Single(regs, r => r.Name == "custom");
     }
 }
