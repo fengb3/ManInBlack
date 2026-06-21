@@ -74,4 +74,46 @@ public class ManInBlackBuilderTests
         Assert.True(target.Providers.ContainsKey("new"));
         Assert.True(target.UseSandbox);
     }
+
+    [Fact]
+    public void AddProvider_Delegate_WritesProvider()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.deepseek.com"));
+
+        var settings = Merge(services);
+
+        Assert.Equal("OpenAI", settings.Providers["default"].Schema);
+        Assert.Equal("sk-xxx", settings.Providers["default"].ApiKey);
+        Assert.Equal("https://api.deepseek.com", settings.Providers["default"].BaseUrl);
+    }
+
+    [Fact]
+    public void AddProvider_ObjectOverload_WritesProvider()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddProvider("default", new ProviderSettings { Schema = "Anthropic", ApiKey = "k" });
+
+        var settings = Merge(services);
+
+        Assert.Equal("Anthropic", settings.Providers["default"].Schema);
+    }
+
+    [Fact]
+    public void AddModelChoice_Delegate_WritesChoice()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.AddModelChoice("default", c => c.Provider("default").ModelId("gpt-4o"));
+
+        var settings = Merge(services);
+
+        Assert.Equal("default", settings.ModelChoices["default"].ProviderName);
+        Assert.Equal("gpt-4o", settings.ModelChoices["default"].ModelId);
+    }
 }
