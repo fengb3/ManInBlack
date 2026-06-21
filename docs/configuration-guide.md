@@ -136,17 +136,17 @@ services.AddManInBlack()
 | `AgentBuilder`     | `.Description()` / `.Instruction()` / `.Pipeline()` / `.SubAgents()` / `.ModelChoice()` | Agent 定义配置  |
 | `HookBuilder`      | `.Name()` / `.HookPoint()` / `.Run()` / `.ToolName()` / `.TimeoutMs()` / `.Enabled()` | 钩子配置    |
 | `McpServerBuilder` | `.Transport()` / `.Command()` / `.Arguments()` / `.Endpoint()` / `.Header()` / `.Enabled()` | MCP 服务器配置 |
-| `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode().CustomPath())`                  | 存储与工作空间配置 |
+| `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode(WorkspaceMode.CustomPath).CustomPath(...))` | 存储与工作空间配置 |
 
 ### 方式二：AddManInBlackFromSettings（控制台 / 测试）
 
-自动从 `~/.man-in-black/settings.json` 构建 `IConfiguration` 并注册所有服务：
+自动从 `~/.man-in-black/settings.json` 加载配置并注册所有服务：
 
 ```csharp
 services.AddManInBlackFromSettings();
 ```
 
-内部调用 `ManInBlackConfigurationBuilder.BuildConfiguration()` 构建 `IConfiguration`，启用 `reloadOnChange: true`。
+内部等价于 `AddManInBlack().UseJson()`，行为与手动链式调用完全相同。
 
 ### 方式三：AddManInBlackFromConfiguration（WebApplicationBuilder）
 
