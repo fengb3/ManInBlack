@@ -125,7 +125,7 @@ services.AddManInBlack()
 .AddProvider("default", new ProviderSettings { Schema = "OpenAI", ApiKey = "sk-xxx", BaseUrl = "https://api.openai.com" })
 ```
 
-`AddModelChoice`、`AddMcpServer` 同理支持对象重载。
+`AddModelChoice`、`AddAgent`、`AddMcpServer` 同理支持对象重载。
 
 #### 子 Builder 方法速查
 

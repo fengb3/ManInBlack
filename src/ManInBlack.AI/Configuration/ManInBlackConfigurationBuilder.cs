@@ -39,8 +39,17 @@ public static class ManInBlackConfigurationBuilder
     /// </summary>
     public static ManInBlackSettings LoadSettings()
     {
+        EnsureSettingsFile();
+        return LoadSettingsFromFile(SettingsPath);
+    }
+
+    /// <summary>
+    /// 从指定路径读取 JSON 配置并绑定到 ManInBlackSettings（不确保文件存在，调用方负责）。
+    /// </summary>
+    internal static ManInBlackSettings LoadSettingsFromFile(string path)
+    {
         var settings = new ManInBlackSettings();
-        BuildConfiguration().Bind(settings);
+        new ConfigurationBuilder().AddJsonFile(path, optional: false).Build().Bind(settings);
         return settings;
     }
 

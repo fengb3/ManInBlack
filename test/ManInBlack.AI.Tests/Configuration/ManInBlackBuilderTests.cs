@@ -242,6 +242,54 @@ public class ManInBlackBuilderTests
         Assert.Single(services.BuildServiceProvider().GetServices<AgentDefinition>(), d => d.Name == "console-agent");
     }
 
+    [Fact]
+    public void LoadSettingsFromFile_ReadsArbitraryJsonFile()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            var json = """
+                {
+                  "Providers": {
+                    "test-provider": { "Schema": "OpenAI", "ApiKey": "sk-test" }
+                  },
+                  "ModelChoices": {
+                    "test-model": { "ProviderName": "test-provider", "ModelId": "gpt-4o" }
+                  },
+                  "Agents": {
+                    "test-agent": {
+                      "Description": "测试 Agent",
+                      "Instruction": "你是测试助手",
+                      "PipelineName": "default",
+                      "SubAgents": [ "sub1" ],
+                      "ModelChoiceName": "test-model"
+                    }
+                  }
+                }
+                """;
+            File.WriteAllText(tempFile, json);
+
+            var settings = ManInBlackConfigurationBuilder.LoadSettingsFromFile(tempFile);
+
+            Assert.Single(settings.Providers);
+            Assert.Equal("sk-test", settings.Providers["test-provider"].ApiKey);
+            Assert.Equal("OpenAI", settings.Providers["test-provider"].Schema);
+            Assert.Single(settings.ModelChoices);
+            Assert.Equal("test-provider", settings.ModelChoices["test-model"].ProviderName);
+            Assert.Equal("gpt-4o", settings.ModelChoices["test-model"].ModelId);
+            Assert.Single(settings.Agents);
+            Assert.Equal("测试 Agent", settings.Agents["test-agent"].Description);
+            Assert.Equal("你是测试助手", settings.Agents["test-agent"].Instruction);
+            Assert.Equal("default", settings.Agents["test-agent"].PipelineName);
+            Assert.Contains("sub1", settings.Agents["test-agent"].SubAgents);
+            Assert.Equal("test-model", settings.Agents["test-agent"].ModelChoiceName);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     // UseJson 与 UseConfiguration 共用私有 ApplySource（合并 + 即时注册 AgentDefinition），
     // 此处用 UseConfiguration 模拟源以避免触碰真实文件系统；
     // UseJson 的文件读取路径（LoadSettings）属既有行为，不在本单测覆盖。

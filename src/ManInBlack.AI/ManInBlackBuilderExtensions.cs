@@ -11,6 +11,9 @@ namespace ManInBlack.AI;
 /// </summary>
 public static class ManInBlackBuilderExtensions
 {
+    /// <summary>
+    /// 以委托形式添加 Provider 配置。
+    /// </summary>
     public static IManInBlackBuilder AddProvider(this IManInBlackBuilder builder, string name, Action<ProviderBuilder> configure)
     {
         var b = new ProviderBuilder();
@@ -18,12 +21,18 @@ public static class ManInBlackBuilderExtensions
         return builder.AddProvider(name, b.Settings);
     }
 
+    /// <summary>
+    /// 以对象形式添加 Provider 配置。
+    /// </summary>
     public static IManInBlackBuilder AddProvider(this IManInBlackBuilder builder, string name, ProviderSettings provider)
     {
         ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.Providers[name] = provider));
         return builder;
     }
 
+    /// <summary>
+    /// 以委托形式添加 ModelChoice 配置。
+    /// </summary>
     public static IManInBlackBuilder AddModelChoice(this IManInBlackBuilder builder, string name, Action<ModelChoiceBuilder> configure)
     {
         var b = new ModelChoiceBuilder();
@@ -31,12 +40,18 @@ public static class ManInBlackBuilderExtensions
         return builder.AddModelChoice(name, b.Settings);
     }
 
+    /// <summary>
+    /// 以对象形式添加 ModelChoice 配置。
+    /// </summary>
     public static IManInBlackBuilder AddModelChoice(this IManInBlackBuilder builder, string name, ModelChoiceSettings choice)
     {
         ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.ModelChoices[name] = choice));
         return builder;
     }
 
+    /// <summary>
+    /// 以委托形式添加 Agent 配置，构建并注册 AgentDefinition 单例。
+    /// </summary>
     public static IManInBlackBuilder AddAgent(this IManInBlackBuilder builder, string name, Action<AgentBuilder> configure)
     {
         var a = new AgentBuilder(name);
@@ -44,6 +59,9 @@ public static class ManInBlackBuilderExtensions
         return builder.AddAgent(a.Build());
     }
 
+    /// <summary>
+    /// 以对象形式添加 Agent 配置，注册 AgentDefinition 单例并写入 settings 供校验。
+    /// </summary>
     public static IManInBlackBuilder AddAgent(this IManInBlackBuilder builder, AgentDefinition definition)
     {
         var concrete = (ManInBlackBuilder)builder;
@@ -64,6 +82,9 @@ public static class ManInBlackBuilderExtensions
         return builder;
     }
 
+    /// <summary>
+    /// 注册命名管道，即时注册 PipelineRegistration 单例供 AgentFactory 收集。
+    /// </summary>
     public static IManInBlackBuilder AddPipeline(this IManInBlackBuilder builder, string name, Func<AgentPipelineBuilder, AgentPipelineBuilder> resolver)
     {
         // 即时注册 PipelineRegistration 单例（AgentFactory ctor 收集）
@@ -71,6 +92,9 @@ public static class ManInBlackBuilderExtensions
         return builder;
     }
 
+    /// <summary>
+    /// 添加 Hook 配置，按添加顺序累积。
+    /// </summary>
     public static IManInBlackBuilder AddHook(this IManInBlackBuilder builder, Action<HookBuilder> configure)
     {
         var h = new HookBuilder();
@@ -79,6 +103,9 @@ public static class ManInBlackBuilderExtensions
         return builder;
     }
 
+    /// <summary>
+    /// 以委托形式添加 MCP Server 配置。
+    /// </summary>
     public static IManInBlackBuilder AddMcpServer(this IManInBlackBuilder builder, string name, Action<McpServerBuilder> configure)
     {
         var m = new McpServerBuilder();
@@ -86,12 +113,18 @@ public static class ManInBlackBuilderExtensions
         return builder.AddMcpServer(name, m.Settings);
     }
 
+    /// <summary>
+    /// 以对象形式添加 MCP Server 配置。
+    /// </summary>
     public static IManInBlackBuilder AddMcpServer(this IManInBlackBuilder builder, string name, McpServerSettings server)
     {
         ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.McpServers[name] = server));
         return builder;
     }
 
+    /// <summary>
+    /// 配置存储设置（根路径、工作空间等）。
+    /// </summary>
     public static IManInBlackBuilder UseStorage(this IManInBlackBuilder builder, Action<StorageBuilder> configure)
     {
         var s = new StorageBuilder();
@@ -100,6 +133,9 @@ public static class ManInBlackBuilderExtensions
         return builder;
     }
 
+    /// <summary>
+    /// 启用 bubblewrap 沙盒执行模式。
+    /// </summary>
     public static IManInBlackBuilder UseSandbox(this IManInBlackBuilder builder)
     {
         ((ManInBlackBuilder)builder).AddContribution(new ActionContribution(s => s.UseSandbox = true));
