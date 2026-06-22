@@ -609,7 +609,9 @@ namespace ManInBlack.AI.Services;
 
 /// <summary>
 /// 基于 Bwarp (bubblewrap) 沙盒的 Shell 执行器,用于 Linux。
-/// 隔离由 FileAccessPolicy 驱动:只暴露 workspace(可写)+ 配置只读根 + 精选系统路径。
+/// 可写目录为调用方传入的 workingDirectory(IShellExecutor 契约):CommandLineTools 传用户 workspace,
+/// HookExecutor 传 hooks/ 或 workspace。FileAccessPolicy 仅提供 ReadableRoots(额外只读根);
+/// 精选系统路径由 Sandbox.Confine 的 baseline 默认只读挂载。其他一切默认不可见。
 /// </summary>
 public class BwarpShellExecutor(FileAccessPolicy policy) : IShellExecutor
 {
@@ -619,7 +621,9 @@ public class BwarpShellExecutor(FileAccessPolicy policy) : IShellExecutor
 
         try
         {
-            var result = Sandbox.Confine(policy.Workspace, command, policy.ReadableRoots)
+            // 可写目录 = 调用方 workingDirectory(IShellExecutor 契约);不用 policy.Workspace,
+            // 否则全局钩子({RootPath}/hooks/)会丢失脚本目录与 CWD。
+            var result = Sandbox.Confine(workingDirectory, command, policy.ReadableRoots)
                 .ExecuteAsync(cts.Token)
                 .GetAwaiter()
                 .GetResult();
@@ -639,7 +643,9 @@ public class BwarpShellExecutor(FileAccessPolicy policy) : IShellExecutor
 }
 ```
 
-> `Execute` 仍实现 `IShellExecutor`,保留 `workingDirectory` 参数仅为匹配接口签名;实际工作目录以 `policy.Workspace`(由 resolver 从 `IUserWorkspace.WorkingDirectory` 派生,与调用方传入值一致)为准。Task 7 工厂注入解析后的 policy。
+> `Execute` 实现 `IShellExecutor`,可写沙盒目录取**调用方传入的 `workingDirectory`**(契约):`CommandLineTools` 传用户 workspace(== policy.Workspace),`HookExecutor` 全局钩子传 `{RootPath}/hooks/`。若改用 `policy.Workspace`,全局钩子会丢失脚本目录与 CWD——故 `workingDirectory` 必须被使用,`policy` 仅提供 `ReadableRoots`。Task 7 工厂注入解析后的 policy。
+>
+> 已知范围外限制:`HookExecutor` 把上下文写入宿主 `/tmp` 临时文件再传给脚本,而沙盒挂载的是私有 `/tmp` tmpfs —— 因此「全局钩子 + UseSandbox」组合下该临时文件对脚本不可见。这是既有问题(旧 `ro-bind /` 同样如此),本期不修;如需支持,后续让钩子经 stdin/env 传上下文,或把宿主 `/tmp` 以可写 bind 挂入沙盒。
 
 - [ ] **Step 2: Build to verify it compiles**
 

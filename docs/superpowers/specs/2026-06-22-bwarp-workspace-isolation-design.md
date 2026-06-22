@@ -106,22 +106,25 @@ public SandboxBuilder ConfineBaseline() { ... }
 
 **`Sandbox.Confine`** 内部改为:`ConfineBaseline()` + 绑定 workspace + `.TryBind(home/.cache, ...)` + `DieWithParent`/`NewSession`/`WithWorkingDirectory`。
 
-**`BwarpShellExecutor` 侧**:注入 `FileAccessPolicy`,按策略组装:
+**`BwarpShellExecutor` 侧**:注入 `FileAccessPolicy`,调用 `Sandbox.Confine(workingDirectory, command, policy.ReadableRoots)`。**可写目录取调用方传入的 `workingDirectory`**(`IShellExecutor` 契约:`CommandLineTools` 传用户 workspace,`HookExecutor` 全局钩子传 `{RootPath}/hooks/`),`policy` 仅提供 `ReadableRoots`;系统路径由 baseline 默认挂载:
 
 ```
+# Sandbox.Confine(workingDirectory, command, readableRoots) 内部等价于:
 var sb = new SandboxBuilder()
     .WithCommand("/bin/bash", "-c", command)
     .ConfineBaseline();                              # 精选系统路径 ro + proc/dev/tmp(不绑定 /)
-# —— workspace 可写 ——
-CreateDir(ws 祖先链); sb.Bind(ws, ws)                # 用户 workspace 可读写
+# —— 调用方 workingDirectory 可写(= workspace 或 hooks/)——
+CreateDir(workingDirectory 祖先链); sb.Bind(workingDirectory, workingDirectory)
 # —— 配置的额外只读根 ——
 foreach r in policy.ReadableRoots:
     CreateDir(r 祖先链); sb.BindReadOnly(r, r)
 sb.TryBind(home/.cache, home/.cache)
-  .DieWithParent().NewSession().WithWorkingDirectory(ws)
+  .DieWithParent().NewSession().WithWorkingDirectory(workingDirectory)
 ```
 
-效果:沙盒内只有「精选系统路径(只读,供命令运行)+ workspace(可写)+ 配置只读根(只读)」。同级 workspace、`settings.json`、`sessions/` **根本未被挂载**,不可见。命令仍可运行(有 `/usr` 等)。
+> 不用 `policy.Workspace` 作可写目录:`IShellExecutor` 被两类调用方共用,全局钩子的工作目录是 `{RootPath}/hooks/` 而非用户 workspace;若强行用 `policy.Workspace`,全局钩子的脚本目录与 CWD 会丢失。
+
+效果:沙盒内只有「精选系统路径(只读,供命令运行)+ 调用方 workingDirectory(可写)+ 配置只读根(只读)」。同级 workspace、`settings.json`、`sessions/` **根本未被挂载**,不可见。命令仍可运行(有 `/usr` 等)。
 
 > 精选系统路径列表是 default-deny 的代价:若某命令需要未列入的路径(如 `/nix`、`/var/cache`),经配置把该路径加入只读根,或扩充默认列表。默认列表覆盖主流场景。
 
@@ -168,6 +171,7 @@ public StorageBuilder AddReadableRoot(string root) { ... }
 - **行为收紧(全模式)**:允许列表始终启用,`CurrentDirectory` / `CustomPath` 模式的 `Read`/`Glob`/`Grep` 也被限定在 workspace + 配置只读根内(今日为任意可读)。这是「默认只有 workspace」的必然结果;若某些场景需放宽,经配置加只读根。
 - **bwarp 精选路径风险**:`ConfineBaseline` 的系统路径列表若遗漏某命令所需路径,该命令失败;经配置加只读根或扩充默认列表解决。
 - **部分隔离态**:`UseSandbox=false` 时 `FileTools` 受限(经 .NET 校验),但 `CommandLineTools` 走 `ProcessShellExecutor` **不受限**(bwarp 是它唯一隔离手段)。要双工具全隔离须开 `UseSandbox`。
+- **全局钩子 + UseSandbox(范围外,既有问题)**:`IShellExecutor` 被 `CommandLineTools` 与 `HookExecutor` 共用;`BwarpShellExecutor` 故意以调用方 `workingDirectory`(而非 `policy.Workspace`)为可写目录,使全局钩子的 `{RootPath}/hooks/` 脚本目录与 CWD 可用。但 `HookExecutor` 另把上下文写入宿主 `/tmp` 临时文件再传给脚本,而沙盒挂载的是私有 `/tmp` tmpfs——故该组合下临时文件对脚本不可见。此问题在旧 `ro-bind /` 下同样存在,本期不修;如需支持,后续让钩子经 stdin/env 传上下文,或把宿主 `/tmp` 以可写 bind 挂入沙盒。
 - **Windows / 非 Linux**:bwarp 不跑(`OperatingSystem.IsLinux()` 门);`FileTools` 路径校验照常生效。
 - **路径比较**:沿用现有 `OrdinalIgnoreCase`(Linux 实际路径全小写,无实际影响),记为既有约束。
 - **`Temp` 默认可写**:作为系统暂存区默认开启;若要更严(仅 workspace 可写),后续可经配置移出,本期不动。
