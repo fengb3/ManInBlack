@@ -148,6 +148,30 @@ public sealed class SandboxBuilder
         return this;
     }
 
+    /// <summary>
+    /// default-deny 基线:只读绑定精选系统路径(供命令运行所需)+ proc/dev/tmp + 命名空间隔离 + die/newsession。
+    /// 故意<strong>不</strong>绑定整个 "/",不绑定用户数据。调用方随后绑定 workspace(可写)与额外只读根。
+    /// </summary>
+    public SandboxBuilder ConfineBaseline()
+    {
+        return this
+            .Unshare(Namespaces.User | Namespaces.Pid | Namespaces.Ipc | Namespaces.Uts)
+            .UnshareCgroupTry()
+            .BindReadOnly("/usr", "/usr")
+            .TryBindReadOnly("/lib", "/lib")
+            .TryBindReadOnly("/lib64", "/lib64")
+            .TryBindReadOnly("/bin", "/bin")
+            .TryBindReadOnly("/sbin", "/sbin")
+            .BindReadOnly("/etc", "/etc")
+            .TryBindReadOnly("/run", "/run")
+            .TryBindReadOnly("/opt", "/opt")
+            .MountProc()
+            .MountDev()
+            .MountTmpfs("/tmp")
+            .DieWithParent()
+            .NewSession();
+    }
+
     // --- Environment ---
 
     public SandboxBuilder ClearEnvironment()
