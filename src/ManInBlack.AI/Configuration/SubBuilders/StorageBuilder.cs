@@ -20,6 +20,14 @@ public sealed class StorageBuilder
         Settings.Workspace = b.Settings;
         return this;
     }
+
+    /// <summary>追加一个额外只读根(bwarp 与 FileTools 均据此放行)。</summary>
+    public StorageBuilder AddReadableRoot(string root)
+    {
+        Settings.FileIsolation ??= new FileIsolationSettings();
+        Settings.FileIsolation.ReadableRoots.Add(root);
+        return this;
+    }
 }
 
 /// <summary>

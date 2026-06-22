@@ -40,6 +40,18 @@ public class StorageSettings
     public string? RootPath { get; set; }
 
     public WorkspaceSettings? Workspace { get; set; }
+
+    /// <summary>文件隔离配置(额外只读根)。经 StorageBuilder.AddReadableRoot 写入。</summary>
+    public FileIsolationSettings? FileIsolation { get; set; }
+}
+
+/// <summary>
+/// 文件隔离配置:经配置显式追加的只读根。同时供 bwarp 挂载与 FileTools 校验。
+/// </summary>
+public class FileIsolationSettings
+{
+    /// <summary>额外只读根(系统运行时路径、MIB 指定路径等)。</summary>
+    public List<string> ReadableRoots { get; set; } = [];
 }
 
 /// <summary>
