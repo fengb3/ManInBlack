@@ -66,7 +66,7 @@ public partial class FileTools(FileAccessPolicyResolver resolver)
     private string ResolvePath(string path) =>
         Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_policy.Workspace, path));
 
-    private const string OutOfAllowedDirectoryError = "Error: 不允许在工作空间和临时目录外修改、创建或删除文件。你只能修改工作空间内或临时目录内的文件。";
+    private const string OutOfAllowedDirectoryError = "Error: 不允许在工作空间、临时目录及配置的只读根之外访问文件。你只能在允许范围内读取,并在工作空间或临时目录内修改、创建或删除文件。";
 
     /// <summary>
     /// Reads a file and returns its content. Supports reading the entire file or a specific range of lines.
@@ -252,7 +252,7 @@ public partial class FileTools(FileAccessPolicyResolver resolver)
     // public string DeleteFile(string filePath)
     // {
     //     filePath = ResolvePath(filePath);
-    //     if (!IsInsideAllowedDirectory(filePath))
+    //     if (!_policy.IsWritable(filePath))
     //         return $"{OutOfAllowedDirectoryError} Path: {filePath}";
     //     if (!File.Exists(filePath))
     //         return $"Error: File not found: {filePath}";
@@ -273,7 +273,7 @@ public partial class FileTools(FileAccessPolicyResolver resolver)
     // public string DeleteDirectory(string directoryPath)
     // {
     //     directoryPath = ResolvePath(directoryPath);
-    //     if (!IsInsideAllowedDirectory(directoryPath))
+    //     if (!_policy.IsWritable(directoryPath))
     //         return $"{OutOfAllowedDirectoryError} Path: {directoryPath}";
     //     if (!Directory.Exists(directoryPath))
     //         return $"Error: Directory not found: {directoryPath}";

@@ -162,5 +162,37 @@ public class FileToolsTests : IDisposable
         Assert.Contains(inside, result);
     }
 
+    [Fact]
+    public async Task Read_配置只读根内_成功_但不可写()
+    {
+        // 只读根必须在工作空间与临时目录之外,否则会被当作可写
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $"mib_test_root_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "shared.txt");
+        File.WriteAllText(file, "shared");
+        try
+        {
+            var settings = new ManInBlackSettings
+            {
+                Storage = new StorageSettings
+                {
+                    FileIsolation = new FileIsolationSettings { ReadableRoots = [root] }
+                }
+            };
+            var ws = new FakeUserWorkspace("test-user", _workspaceDir);
+            var tools = new FileTools(new FileAccessPolicyResolver(ws, Options.Create(settings)));
+
+            var content = await tools.Read(file);
+            Assert.Equal("shared", content);
+
+            // 只读根可读但不可写
+            Assert.Throws<UnauthorizedAccessException>(() => tools.Write(file, "x"));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     #endregion
 }
