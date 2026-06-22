@@ -2,6 +2,7 @@
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Configuration;
 using ManInBlack.AI.ToolCallFilters;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
@@ -9,10 +10,9 @@ using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 namespace ManInBlack.AI.Tools;
 
 [ServiceRegister.Scoped]
-public partial class FileTools(IUserWorkspace workspace)
+public partial class FileTools(FileAccessPolicyResolver resolver)
 {
-    private readonly string _userWorkspace = workspace.WorkingDirectory;
-    private readonly string _tempDirectory = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    private readonly FileAccessPolicy _policy = resolver.Resolve();
 
     private static readonly HashSet<string> BinaryExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -64,43 +64,7 @@ public partial class FileTools(IUserWorkspace workspace)
     }
     
     private string ResolvePath(string path) =>
-        Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_userWorkspace, path));
-
-    private bool IsInsideWorkspace(string resolvedPath)
-    {
-        var normalized = Path.GetFullPath(resolvedPath);
-        var workspaceRoot = Path.GetFullPath(_userWorkspace);
-        return normalized.StartsWith(workspaceRoot, StringComparison.OrdinalIgnoreCase) &&
-               (normalized.Length == workspaceRoot.Length ||
-                normalized[workspaceRoot.Length] == Path.DirectorySeparatorChar ||
-                normalized[workspaceRoot.Length] == Path.AltDirectorySeparatorChar);
-    }
-
-    private bool IsInsideTempDirectory(string resolvedPath)
-    {
-        var normalized = Path.GetFullPath(resolvedPath);
-        var tempRoot = Path.GetFullPath(_tempDirectory);
-        return normalized.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase) &&
-               (normalized.Length == tempRoot.Length ||
-                normalized[tempRoot.Length] == Path.DirectorySeparatorChar ||
-                normalized[tempRoot.Length] == Path.AltDirectorySeparatorChar);
-    }
-
-    private bool IsInsideAllowedDirectory(string resolvedPath)
-    {
-        // 根目录本身不允许操作（防止删除工作空间/临时目录根）
-        if (IsExactPath(resolvedPath, _userWorkspace) || IsExactPath(resolvedPath, _tempDirectory))
-            return false;
-
-        return IsInsideWorkspace(resolvedPath) || IsInsideTempDirectory(resolvedPath);
-    }
-
-    private static bool IsExactPath(string resolvedPath, string root)
-    {
-        var normalized = Path.GetFullPath(resolvedPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Equals(normalized, normalizedRoot, StringComparison.OrdinalIgnoreCase);
-    }
+        Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(_policy.Workspace, path));
 
     private const string OutOfAllowedDirectoryError = "Error: 不允许在工作空间和临时目录外修改、创建或删除文件。你只能修改工作空间内或临时目录内的文件。";
 
@@ -117,6 +81,8 @@ public partial class FileTools(IUserWorkspace workspace)
     public async Task<string> Read(string filePath, int offset = 0, int length = -1)
     {
         filePath = ResolvePath(filePath);
+        if (!_policy.IsReadable(filePath))
+            throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {filePath}");
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
         if (IsBinaryFile(filePath))
@@ -159,7 +125,7 @@ public partial class FileTools(IUserWorkspace workspace)
     public string Write(string filePath, string content)
     {
         filePath = ResolvePath(filePath);
-        if (!IsInsideAllowedDirectory(filePath))
+        if (!_policy.IsWritable(filePath))
             throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {filePath}");
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(directory))
@@ -184,7 +150,7 @@ public partial class FileTools(IUserWorkspace workspace)
     public string Edit(string filePath, string originalContent, string newContent)
     {
         filePath = ResolvePath(filePath);
-        if (!IsInsideAllowedDirectory(filePath))
+        if (!_policy.IsWritable(filePath))
             throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {filePath}");
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
@@ -215,7 +181,9 @@ public partial class FileTools(IUserWorkspace workspace)
     [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string Glob(string pattern, string? directory = null)
     {
-        var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
+        var searchDir = directory is null ? _policy.Workspace : ResolvePath(directory);
+        if (!_policy.IsReadable(searchDir))
+            throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {searchDir}");
         if (!Directory.Exists(searchDir))
             throw new DirectoryNotFoundException($"目录不存在: {searchDir}");
 
@@ -245,7 +213,9 @@ public partial class FileTools(IUserWorkspace workspace)
     [AiTool.HasFilter<AgentLifecycleFilter, LoggingFilter>]
     public string Grep(string pattern, string? directory = null, string glob = "*")
     {
-        var searchDir = directory is null ? _userWorkspace : ResolvePath(directory);
+        var searchDir = directory is null ? _policy.Workspace : ResolvePath(directory);
+        if (!_policy.IsReadable(searchDir))
+            throw new UnauthorizedAccessException($"{OutOfAllowedDirectoryError} Path: {searchDir}");
         if (!Directory.Exists(searchDir))
             throw new DirectoryNotFoundException($"目录不存在: {searchDir}");
 

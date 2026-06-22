@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Tests.Helpers;
 using ManInBlack.AI.Tools;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace ManInBlack.AI.Tests.Tools;
@@ -21,7 +23,8 @@ public class FileToolsTests : IDisposable
         Directory.CreateDirectory(_tempDir);
 
         var workspace = new FakeUserWorkspace("test-user", _workspaceDir);
-        _tools = new FileTools(workspace);
+        var resolver = new FileAccessPolicyResolver(workspace, Options.Create(new ManInBlackSettings()));
+        _tools = new FileTools(resolver);
     }
 
     public void Dispose()
@@ -90,6 +93,73 @@ public class FileToolsTests : IDisposable
 
         var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Edit(filePath, "old", "new"));
         Assert.Contains("不允许", ex.Message);
+    }
+
+    #endregion
+
+    #region Read 隔离测试
+
+    [Fact]
+    public async Task Read_workspace内_成功()
+    {
+        var filePath = Path.Combine(_workspaceDir, "readable.txt");
+        File.WriteAllText(filePath, "hello");
+
+        var content = await _tools.Read(filePath);
+
+        Assert.Equal("hello", content);
+    }
+
+    [Fact]
+    public async Task Read_临时目录内_成功()
+    {
+        var filePath = Path.Combine(_tempDir, "tmp.txt");
+        File.WriteAllText(filePath, "tmpdata");
+
+        var content = await _tools.Read(filePath);
+
+        Assert.Equal("tmpdata", content);
+    }
+
+    [Fact]
+    public async Task Read_允许列表外_拒绝()
+    {
+        var outside = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "outside.txt");
+        File.WriteAllText(outside, "secret");
+        try
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _tools.Read(outside));
+        }
+        finally
+        {
+            if (File.Exists(outside)) File.Delete(outside);
+        }
+    }
+
+    [Fact]
+    public void Glob_允许列表外的根_拒绝()
+    {
+        var outsideDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "glob_outside_dir");
+        Directory.CreateDirectory(outsideDir);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => _tools.Glob("*.txt", outsideDir));
+        }
+        finally
+        {
+            if (Directory.Exists(outsideDir)) Directory.Delete(outsideDir, true);
+        }
+    }
+
+    [Fact]
+    public void Glob_workspace内_返回结果()
+    {
+        var inside = Path.Combine(_workspaceDir, "a.txt");
+        File.WriteAllText(inside, "x");
+
+        var result = _tools.Glob("*.txt", _workspaceDir);
+
+        Assert.Contains(inside, result);
     }
 
     #endregion
