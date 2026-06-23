@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Storage;
@@ -18,12 +19,14 @@ public class FakeShellExecutor : IShellExecutor
 {
     public string? LastCommand { get; private set; }
     public string? LastWorkingDirectory { get; private set; }
+    public string? LastStdin { get; private set; }
     public ShellResult Result { get; set; } = new();
 
-    public ShellResult Execute(string command, string workingDirectory, int timeoutMs)
+    public ShellResult Execute(string command, string workingDirectory, int timeoutMs, string? stdin = null)
     {
         LastCommand = command;
         LastWorkingDirectory = workingDirectory;
+        LastStdin = stdin;
         return Result;
     }
 }
@@ -36,17 +39,18 @@ public class HookExecutorTests
     };
 
     [Fact]
-    public async Task 上下文临时文件落在workingDir而非系统tmp_且执行后清理()
+    public async Task 上下文经stdin传入_且command不含文件路径()
     {
-        // {RootPath}/hooks 必须存在:全局钩子的 workingDir 与上下文临时文件都落在这里
+        // {RootPath}/hooks 必须存在:全局钩子的 workingDir 落在这里
         var rootDir = Path.Combine(Path.GetTempPath(), $"mib_hookroot_{Guid.NewGuid():N}");
         var hooksDir = Path.Combine(rootDir, "hooks");
         Directory.CreateDirectory(hooksDir);
         try
         {
+            const string script = "python check.py";
             var shell = new FakeShellExecutor();
             var executor = new HookExecutor(
-                Options.Create(SettingsWithGlobalHook("python check.py")),
+                Options.Create(SettingsWithGlobalHook(script)),
                 Options.Create(new AgentStorageOptions { RootPath = rootDir }),
                 shell,
                 new FakeUserWorkspace("u", Path.Combine(Path.GetTempPath(), $"mib_ws_{Guid.NewGuid():N}")),
@@ -58,13 +62,21 @@ public class HookExecutorTests
                 default);
 
             // 全局钩子工作目录 = {RootPath}/hooks
-            Assert.NotNull(shell.LastCommand);
             Assert.Equal(hooksDir, shell.LastWorkingDirectory);
 
-            // 临时文件路径应在 workingDir(hooksDir)之下,而非系统 /tmp 根
-            Assert.Contains(hooksDir, shell.LastCommand!);
+            // context 经 stdin 传入(可反序列化回 HookContext,含 ToolName=Read)
+            Assert.NotNull(shell.LastStdin);
+            var ctx = JsonSerializer.Deserialize<HookContext>(
+                shell.LastStdin!, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.NotNull(ctx);
+            Assert.Equal("Read", ctx!.ToolName);
 
-            // 执行后临时文件应被清理(hooksDir 回到空)
+            // command 是裸脚本命令,不再拼接临时文件路径
+            Assert.Equal(script, shell.LastCommand);
+            Assert.DoesNotContain("mib-hook-ctx", shell.LastCommand!);
+            Assert.DoesNotContain(hooksDir, shell.LastCommand!);
+
+            // 不再写任何临时文件
             Assert.Empty(Directory.EnumerateFileSystemEntries(hooksDir));
         }
         finally

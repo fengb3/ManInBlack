@@ -8,6 +8,11 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
+  <!-- 非 Windows 定义 LINUX:启用 bubblewrap 集成测试(Windows 无 bwrap,测试经 LinuxOnlySkip 跳过) -->
+  <PropertyGroup Condition="'$(OS)' == 'Unix'">
+    <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
     <PackageReference Include="xunit" Version="*" />

@@ -72,4 +72,21 @@ public class BwarpShellExecutorMountTests
         Assert.Equal("cli_x", options.SetEnvVars["FEISHU_APP_ID"]);
         Assert.Equal("sk-y", options.SetEnvVars["OPENAI_API_KEY"]);
     }
+
+    [Fact]
+    public void WithStandardInput透传到Options()
+    {
+        const string payload = "{\"ToolName\":\"Read\"}";
+        var options = Sandbox.Confine("/data/ws/42", "ls", [])
+            .WithStandardInput(payload)
+            .Build();
+        Assert.Equal(payload, options.StandardInput);
+    }
+
+    [Fact]
+    public void 未设置StandardInput时为null()
+    {
+        var options = Sandbox.Confine("/data/ws/42", "ls", []).Build();
+        Assert.Null(options.StandardInput);
+    }
 }

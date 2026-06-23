@@ -242,14 +242,27 @@ public class BwarpSandboxTests
     }
 
     [Fact(Skip = LinuxOnlySkip)]
-    public async Task Confine_CannotWriteOutsideWorkingDirectory()
+    public async Task Confine_WorkingDirectory外的宿主文件不可见()
     {
         using var tmpDir = new TempDirectory();
+        // 在宿主 /tmp(workingDir 之外)放一个标记文件
+        var outsideMarker = Path.Combine(Path.GetTempPath(), $"bwarp-outside-{Guid.NewGuid():N}");
+        File.WriteAllText(outsideMarker, "secret");
 
-        var result = await Sandbox.Confine(tmpDir.Path, "touch /outside_sandbox_test 2>&1; echo exit=$?")
-            .ExecuteAsync();
+        try
+        {
+            // Confine default-deny:沙盒的 /tmp 是私有 tmpfs,宿主该文件在沙盒内不可见 → HIDDEN
+            var result = await Sandbox.Confine(tmpDir.Path, $"test -f {outsideMarker} && echo VISIBLE || echo HIDDEN")
+                .ExecuteAsync();
 
-        Assert.Contains("exit=1", result.StandardOutput);
+            Assert.True(result.IsSuccess, $"ExitCode={result.ExitCode}, Stderr={result.StandardError}");
+            Assert.Contains("HIDDEN", result.StandardOutput);
+            Assert.DoesNotContain("VISIBLE", result.StandardOutput);
+        }
+        finally
+        {
+            if (File.Exists(outsideMarker)) File.Delete(outsideMarker);
+        }
     }
 
     [Fact(Skip = LinuxOnlySkip)]
@@ -261,6 +274,20 @@ public class BwarpSandboxTests
             .ExecuteAsync();
 
         Assert.True(result.IsSuccess, $"ExitCode={result.ExitCode}\nStdout={result.StandardOutput}\nStderr={result.StandardError}");
+    }
+
+    [Fact(Skip = LinuxOnlySkip)]
+    public async Task Confine_StandardInput传给子进程()
+    {
+        using var tmpDir = new TempDirectory();
+
+        // cat 回显 stdin:验证 Confine 下 stdin 经 bwrap 透传到沙盒内进程,且写完 Close 发 EOF(cat 不会阻塞等待)
+        var result = await Sandbox.Confine(tmpDir.Path, "cat")
+            .WithStandardInput("hello-stdin")
+            .ExecuteAsync();
+
+        Assert.True(result.IsSuccess, $"stdin 透传失败: ExitCode={result.ExitCode}, Stderr={result.StandardError}");
+        Assert.Contains("hello-stdin", result.StandardOutput);
     }
 
     private sealed class TempDirectory : IDisposable
