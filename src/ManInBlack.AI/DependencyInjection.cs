@@ -83,14 +83,19 @@ public static class DependencyInjection
                 };
             });
 
+            services.AddScoped<FileAccessPolicyResolver>();
+
             services.AddAutoRegisteredServices();
 
-            // 沙盒：UseSandbox 在 IOptions resolve 时才确定，故做成 resolve 期工厂
+            // 沙盒:UseSandbox 在 IOptions resolve 时才确定,故做成 resolve 期工厂
             services.AddScoped<IShellExecutor>(sp =>
             {
                 var useSandbox = sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value.UseSandbox;
                 if (OperatingSystem.IsLinux() && useSandbox)
-                    return new BwarpShellExecutor();
+                {
+                    var policy = sp.GetRequiredService<FileAccessPolicyResolver>().Resolve();
+                    return new BwarpShellExecutor(policy);
+                }
                 return new ProcessShellExecutor();
             });
             services.AddToolHandlers();

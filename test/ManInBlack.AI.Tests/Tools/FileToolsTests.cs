@@ -1,7 +1,10 @@
 using System;
 using System.IO;
+using ManInBlack.AI.Abstraction.Storage;
+using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Tests.Helpers;
 using ManInBlack.AI.Tools;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace ManInBlack.AI.Tests.Tools;
@@ -21,7 +24,8 @@ public class FileToolsTests : IDisposable
         Directory.CreateDirectory(_tempDir);
 
         var workspace = new FakeUserWorkspace("test-user", _workspaceDir);
-        _tools = new FileTools(workspace);
+        var resolver = new FileAccessPolicyResolver(workspace, Options.Create(new ManInBlackSettings()), Options.Create(new AgentStorageOptions()));
+        _tools = new FileTools(resolver);
     }
 
     public void Dispose()
@@ -32,12 +36,12 @@ public class FileToolsTests : IDisposable
             Directory.Delete(_tempDir, true);
     }
 
-    #region WriteFile 临时目录测试
+    #region WriteFile 测试
 
     [Fact]
-    public void WriteFile_Temp目录内_写入成功()
+    public void WriteFile_workspace内_写入成功()
     {
-        var filePath = Path.Combine(_tempDir, "new-file.txt");
+        var filePath = Path.Combine(_workspaceDir, "new-file.txt");
 
         var result = _tools.Write(filePath, "temp content");
 
@@ -46,14 +50,24 @@ public class FileToolsTests : IDisposable
     }
 
     [Fact]
-    public void WriteFile_Temp目录内_自动创建父目录()
+    public void WriteFile_workspace内_自动创建父目录()
     {
-        var filePath = Path.Combine(_tempDir, "a", "b", "deep-file.txt");
+        var filePath = Path.Combine(_workspaceDir, "a", "b", "deep-file.txt");
 
         var result = _tools.Write(filePath, "deep content");
 
         Assert.Equal($"File written: {filePath}", result);
         Assert.Equal("deep content", File.ReadAllText(filePath));
+    }
+
+    [Fact]
+    public void WriteFile_Temp目录内_拒绝()
+    {
+        // 系统临时目录已从允许列表移除,写入应被拒
+        var filePath = Path.Combine(_tempDir, "rejected.txt");
+
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Write(filePath, "x"));
+        Assert.Contains("不允许", ex.Message);
     }
 
     [Fact]
@@ -69,12 +83,12 @@ public class FileToolsTests : IDisposable
 
     #endregion
 
-    #region UpdateFile 临时目录测试
+    #region UpdateFile 测试
 
     [Fact]
-    public void UpdateFile_Temp目录内_替换成功()
+    public void UpdateFile_workspace内_替换成功()
     {
-        var filePath = Path.Combine(_tempDir, "update-target.txt");
+        var filePath = Path.Combine(_workspaceDir, "update-target.txt");
         File.WriteAllText(filePath, "hello world");
 
         var result = _tools.Edit(filePath, "hello", "goodbye");
@@ -84,12 +98,121 @@ public class FileToolsTests : IDisposable
     }
 
     [Fact]
+    public void UpdateFile_Temp目录内_拒绝()
+    {
+        // 系统临时目录已从允许列表移除,编辑应被拒
+        var filePath = Path.Combine(_tempDir, "update-target.txt");
+        File.WriteAllText(filePath, "hello world");
+
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Edit(filePath, "hello", "goodbye"));
+        Assert.Contains("不允许", ex.Message);
+    }
+
+    [Fact]
     public void UpdateFile_不允许的目录_拒绝()
     {
         var filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "should-not-update.txt");
 
         var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Edit(filePath, "old", "new"));
         Assert.Contains("不允许", ex.Message);
+    }
+
+    #endregion
+
+    #region Read 隔离测试
+
+    [Fact]
+    public async Task Read_workspace内_成功()
+    {
+        var filePath = Path.Combine(_workspaceDir, "readable.txt");
+        File.WriteAllText(filePath, "hello");
+
+        var content = await _tools.Read(filePath);
+
+        Assert.Equal("hello", content);
+    }
+
+    [Fact]
+    public async Task Read_临时目录内_拒绝()
+    {
+        // 系统临时目录已从允许列表移除,读取应被拒
+        var filePath = Path.Combine(_tempDir, "tmp.txt");
+        File.WriteAllText(filePath, "tmpdata");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _tools.Read(filePath));
+    }
+
+    [Fact]
+    public async Task Read_允许列表外_拒绝()
+    {
+        var outside = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "outside.txt");
+        File.WriteAllText(outside, "secret");
+        try
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _tools.Read(outside));
+        }
+        finally
+        {
+            if (File.Exists(outside)) File.Delete(outside);
+        }
+    }
+
+    [Fact]
+    public void Glob_允许列表外的根_拒绝()
+    {
+        var outsideDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "glob_outside_dir");
+        Directory.CreateDirectory(outsideDir);
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => _tools.Glob("*.txt", outsideDir));
+        }
+        finally
+        {
+            if (Directory.Exists(outsideDir)) Directory.Delete(outsideDir, true);
+        }
+    }
+
+    [Fact]
+    public void Glob_workspace内_返回结果()
+    {
+        var inside = Path.Combine(_workspaceDir, "a.txt");
+        File.WriteAllText(inside, "x");
+
+        var result = _tools.Glob("*.txt", _workspaceDir);
+
+        Assert.Contains(inside, result);
+    }
+
+    [Fact]
+    public async Task Read_配置只读根内_成功_但不可写()
+    {
+        // 只读根必须在工作空间与临时目录之外,否则会被当作可写
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $"mib_test_root_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "shared.txt");
+        File.WriteAllText(file, "shared");
+        try
+        {
+            var settings = new ManInBlackSettings
+            {
+                Storage = new StorageSettings
+                {
+                    FileIsolation = new FileIsolationSettings { ReadableRoots = [root] }
+                }
+            };
+            var ws = new FakeUserWorkspace("test-user", _workspaceDir);
+            var tools = new FileTools(new FileAccessPolicyResolver(ws, Options.Create(settings), Options.Create(new AgentStorageOptions())));
+
+            var content = await tools.Read(file);
+            Assert.Equal("shared", content);
+
+            // 只读根可读但不可写
+            Assert.Throws<UnauthorizedAccessException>(() => tools.Write(file, "x"));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 
     #endregion

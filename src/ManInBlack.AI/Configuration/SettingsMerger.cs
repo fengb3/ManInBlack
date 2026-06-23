@@ -23,7 +23,11 @@ internal static class SettingsMerger
         target.Hooks.AddRange(source.Hooks);
 
         // Storage：仅当 source 有实质内容（非全默认）时覆盖
-        if (source.Storage is { } storage && (storage.RootPath is not null || storage.Workspace is not null))
+        if (source.Storage is { } storage
+            && (storage.RootPath is not null
+                || storage.Workspace is not null
+                || (storage.FileIsolation?.ReadableRoots.Count > 0)
+                || (storage.FileIsolation?.InjectedEnv.Count > 0)))
             target.Storage = storage;
 
         target.UseSandbox = source.UseSandbox;

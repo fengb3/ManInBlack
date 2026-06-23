@@ -194,9 +194,11 @@ public class HookExecutor(
         string? tempFile = null;
         try
         {
-            // 序列化上下文到临时文件
+            // 序列化上下文到临时文件。落在 workingDir(而非系统 /tmp):workingDir 在沙盒里是可写绑定区,
+            // 脚本能读到;系统 /tmp 在沙盒里是私有 tmpfs,宿主写的临时文件对脚本不可见(全局钩子 +
+            // UseSandbox 组合下上下文对脚本不可见即源于此)。
             var contextJson = JsonSerializer.Serialize(context, JsonWriteOptions);
-            tempFile = Path.GetTempFileName();
+            tempFile = Path.Combine(workingDir, $"mib-hook-ctx-{Path.GetRandomFileName()}.json");
             File.WriteAllText(tempFile, contextJson);
 
             // 构造命令：脚本命令 + 临时文件路径作为参数

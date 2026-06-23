@@ -200,6 +200,22 @@ public class ManInBlackBuilderTests
     }
 
     [Fact]
+    public void UseStorage_AddReadableRoot_合并保留()
+    {
+        var services = new ServiceCollection();
+        var builder = new ManInBlackBuilder(services);
+
+        builder.UseStorage(s => s.RootPath("/data/mib")
+            .AddReadableRoot("/opt/data")
+            .AddReadableRoot("/srv/shared"));
+
+        var settings = Merge(services);
+
+        Assert.Equal(["/opt/data", "/srv/shared"],
+            settings.Storage!.FileIsolation!.ReadableRoots);
+    }
+
+    [Fact]
     public void UseSandbox_SetsFlag()
     {
         var services = new ServiceCollection();
