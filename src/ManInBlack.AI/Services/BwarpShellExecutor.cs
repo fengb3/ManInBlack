@@ -12,7 +12,7 @@ namespace ManInBlack.AI.Services;
 /// </summary>
 public class BwarpShellExecutor(FileAccessPolicy policy) : IShellExecutor
 {
-    public ShellResult Execute(string command, string workingDirectory, int timeoutMs)
+    public ShellResult Execute(string command, string workingDirectory, int timeoutMs, string? stdin = null)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
 
@@ -21,6 +21,7 @@ public class BwarpShellExecutor(FileAccessPolicy policy) : IShellExecutor
             // 可写目录 = 调用方 workingDirectory(IShellExecutor 契约);不用 policy.Workspace,
             // 否则全局钩子({RootPath}/hooks/)会丢失脚本目录与 CWD。
             var result = Sandbox.Confine(workingDirectory, command, policy.ReadableRoots, policy.InjectedEnv)
+                .WithStandardInput(stdin)
                 .ExecuteAsync(cts.Token)
                 .GetAwaiter()
                 .GetResult();

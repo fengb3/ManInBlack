@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Channels;
@@ -23,6 +24,7 @@ internal sealed class SandboxProcess(SandboxOptions options)
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+        WriteStandardInput(process);
         process.WaitForExit();
         var exitTime = DateTimeOffset.UtcNow;
 
@@ -53,6 +55,7 @@ internal sealed class SandboxProcess(SandboxOptions options)
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+        WriteStandardInput(process);
 
         await process.WaitForExitAsync(cancellationToken);
         var exitTime = DateTimeOffset.UtcNow;
@@ -91,6 +94,7 @@ internal sealed class SandboxProcess(SandboxOptions options)
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+        WriteStandardInput(process);
 
         yield return new SandboxEvent.Started(process.Id);
 
@@ -119,6 +123,20 @@ internal sealed class SandboxProcess(SandboxOptions options)
         yield return new SandboxEvent.Exited(process.ExitCode);
     }
 
+    private void WriteStandardInput(Process process)
+    {
+        if (options.StandardInput is null) return;
+        try
+        {
+            process.StandardInput.Write(options.StandardInput);
+            process.StandardInput.Close(); // 发 EOF,使脚本侧 json.load(sys.stdin) 读完完整输入后返回
+        }
+        catch (IOException)
+        {
+            // 子进程已退出 / 管道断开(如超时 kill、脚本未读 stdin 即退出);忽略,结果由退出码体现。
+        }
+    }
+
     private ProcessStartInfo CreateStartInfo(List<string> args)
     {
         var psi = new ProcessStartInfo
@@ -129,6 +147,12 @@ internal sealed class SandboxProcess(SandboxOptions options)
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
+        if (options.StandardInput is not null)
+        {
+            psi.RedirectStandardInput = true;
+            // 无 BOM 的 UTF8:避免 StreamWriter 把 BOM 写进沙盒进程 stdin,致脚本 json.load 失败。
+            psi.StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        }
 
         foreach (var arg in args)
             psi.ArgumentList.Add(arg);
