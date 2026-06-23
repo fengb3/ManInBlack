@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Tests.Helpers;
 using ManInBlack.AI.Tools;
@@ -23,7 +24,7 @@ public class FileToolsTests : IDisposable
         Directory.CreateDirectory(_tempDir);
 
         var workspace = new FakeUserWorkspace("test-user", _workspaceDir);
-        var resolver = new FileAccessPolicyResolver(workspace, Options.Create(new ManInBlackSettings()));
+        var resolver = new FileAccessPolicyResolver(workspace, Options.Create(new ManInBlackSettings()), Options.Create(new AgentStorageOptions()));
         _tools = new FileTools(resolver);
     }
 
@@ -180,7 +181,7 @@ public class FileToolsTests : IDisposable
                 }
             };
             var ws = new FakeUserWorkspace("test-user", _workspaceDir);
-            var tools = new FileTools(new FileAccessPolicyResolver(ws, Options.Create(settings)));
+            var tools = new FileTools(new FileAccessPolicyResolver(ws, Options.Create(settings), Options.Create(new AgentStorageOptions())));
 
             var content = await tools.Read(file);
             Assert.Equal("shared", content);
