@@ -26,7 +26,8 @@ internal static class SettingsMerger
         if (source.Storage is { } storage
             && (storage.RootPath is not null
                 || storage.Workspace is not null
-                || (storage.FileIsolation?.ReadableRoots.Count > 0)))
+                || (storage.FileIsolation?.ReadableRoots.Count > 0)
+                || (storage.FileIsolation?.InjectedEnv.Count > 0)))
             target.Storage = storage;
 
         target.UseSandbox = source.UseSandbox;

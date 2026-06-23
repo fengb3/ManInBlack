@@ -88,4 +88,29 @@ public class FileAccessPolicyResolverTests
         Assert.True(policy.IsReadable("/data/root/skills/any-skill/SKILL.md"));
         Assert.False(policy.IsWritable("/data/root/skills/any-skill/SKILL.md")); // 只读
     }
+
+    [Fact]
+    public void Resolve_InjectedEnv_从配置流入()
+    {
+        var settings = new ManInBlackSettings
+        {
+            Storage = new StorageSettings
+            {
+                FileIsolation = new FileIsolationSettings
+                {
+                    InjectedEnv = new() { ["FEISHU_APP_ID"] = "cli_x", ["FEISHU_APP_SECRET"] = "sec" }
+                }
+            }
+        };
+        var resolver = new FileAccessPolicyResolver(
+            new FakeUserWorkspace("42", "/data/ws/42"),
+            Options.Create(settings),
+            Storage("/data/root"));
+
+        var policy = resolver.Resolve();
+
+        Assert.Equal(2, policy.InjectedEnv.Count);
+        Assert.Equal("cli_x", policy.InjectedEnv["FEISHU_APP_ID"]);
+        Assert.Equal("sec", policy.InjectedEnv["FEISHU_APP_SECRET"]);
+    }
 }

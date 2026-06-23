@@ -16,6 +16,12 @@ public sealed record FileAccessPolicy
     /// <summary>额外只读根(经配置添加)。默认空。</summary>
     public IReadOnlyList<string> ReadableRoots { get; init; } = [];
 
+    /// <summary>
+    /// 注入沙盒的环境变量(env 名 → 明文值),供 bwarp 命令读取。FileTools 忽略此项。
+    /// 默认空;值经配置(FileIsolation.InjectedEnv)提供。settings.json 文件本身不因此可见。
+    /// </summary>
+    public IReadOnlyDictionary<string, string> InjectedEnv { get; init; } = new Dictionary<string, string>();
+
     public bool IsReadable(string resolvedPath) =>
         IsUnderOrEqual(resolvedPath, Workspace)
         || IsUnderOrEqual(resolvedPath, Temp)

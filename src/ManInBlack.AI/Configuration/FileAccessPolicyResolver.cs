@@ -31,7 +31,9 @@ public sealed class FileAccessPolicyResolver(
         {
             Workspace = FileAccessPolicy.Canonicalize(workspace.WorkingDirectory),
             Temp = FileAccessPolicy.Canonicalize(Path.GetTempPath()),
-            ReadableRoots = roots
+            ReadableRoots = roots,
+            InjectedEnv = settings.Value.Storage?.FileIsolation?.InjectedEnv
+                ?? new Dictionary<string, string>()
         };
     }
 }

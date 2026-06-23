@@ -56,4 +56,20 @@ public class BwarpShellExecutorMountTests
             && b.Destination.StartsWith("/data/ws/", StringComparison.Ordinal)
             && b.Destination != "/data/ws/42");
     }
+
+    [Fact]
+    public void 注入的环境变量出现在SetEnvVars()
+    {
+        var env = new Dictionary<string, string>
+        {
+            ["FEISHU_APP_ID"] = "cli_x",
+            ["OPENAI_API_KEY"] = "sk-y",
+        };
+
+        var options = Sandbox.Confine("/data/ws/42", "ls", [], env).Build();
+
+        Assert.Equal(2, options.SetEnvVars.Count);
+        Assert.Equal("cli_x", options.SetEnvVars["FEISHU_APP_ID"]);
+        Assert.Equal("sk-y", options.SetEnvVars["OPENAI_API_KEY"]);
+    }
 }

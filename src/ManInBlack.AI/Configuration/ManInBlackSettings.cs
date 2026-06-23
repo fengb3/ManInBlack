@@ -52,6 +52,14 @@ public class FileIsolationSettings
 {
     /// <summary>额外只读根(系统运行时路径、MIB 指定路径等)。</summary>
     public List<string> ReadableRoots { get; set; } = [];
+
+    /// <summary>
+    /// 注入沙盒的环境变量(env 名 → 明文值)。值在沙盒内以环境变量形式可见,
+    /// 供 agent 经 RunBash 调用的 CLI 工具读取(如 FEISHU_APP_ID / OPENAI_API_KEY)。
+    /// 仅作用于 bwarp 执行路径(UseSandbox=true);settings.json 文件本身仍不可见。
+    /// 注意:沙盒内命令可读出这些值(如 echo),只注入你信任 agent 可见的密钥。
+    /// </summary>
+    public Dictionary<string, string> InjectedEnv { get; set; } = new();
 }
 
 /// <summary>
