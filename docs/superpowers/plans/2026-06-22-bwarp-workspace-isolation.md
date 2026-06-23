@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-22-bwarp-workspace-isolation-design.md`
 
+> ⚠️ **本 plan 是初版 7-task 的执行记录(已落地)。** 之后代码又有两项增量,**未反映在下方步骤的代码片段里**——以 spec 的「修订记录」为准:
+> 1. `FileAccessPolicyResolver` 增 `IOptions<AgentStorageOptions>` 参数,自动放行 `{RootPath}/skills` 系统只读根(commit `f23ebce`);
+> 2. `FileIsolationSettings` 增 `InjectedEnv`,`Sandbox.Confine` 增 `injectedEnv` 参数(bwarp `--setenv` 注入),`BwarpShellExecutor` 传 `policy.InjectedEnv`(本分支未提交)。
+> 所以下文出现的 `new FileAccessPolicyResolver(workspace, Options.Create(...))`(2 参)、`Sandbox.Confine(ws, cmd, roots)`(3 参)、`FileIsolationSettings { ReadableRoots }` 等片段均为初版形态,现行代码已演进。
+
 **已核实事实(实现时无需再查):**
 - mount 类型均为 public positional record:`BindMount(string Source, string Destination, MountAccess Access = ReadWrite, bool Try = false)`、`TmpfsMount(string Destination, ...)`、`DirCreate(string Destination, ...)`、`ProcMount`、`DevMount`;基类 `MountEntry`。
 - `SandboxOptions.Mounts` 为 `public IReadOnlyList<MountEntry>`;`SandboxBuilder.Build()` 返回 `SandboxOptions`;`SandboxBuilder` 构造为 `internal`,只能经 `Sandbox.Run/Confine` 公共工厂获得。
