@@ -12,7 +12,7 @@ public class FileAccessPolicyResolverTests
         Options.Create(new AgentStorageOptions { RootPath = rootPath });
 
     [Fact]
-    public void Resolve_无配置_仅workspace与temp与skills可读()
+    public void Resolve_无配置_仅workspace与skills可读()
     {
         var ws = "/data/ws/42";
         var resolver = new FileAccessPolicyResolver(

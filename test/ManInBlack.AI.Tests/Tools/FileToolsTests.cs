@@ -36,12 +36,12 @@ public class FileToolsTests : IDisposable
             Directory.Delete(_tempDir, true);
     }
 
-    #region WriteFile 临时目录测试
+    #region WriteFile 测试
 
     [Fact]
-    public void WriteFile_Temp目录内_写入成功()
+    public void WriteFile_workspace内_写入成功()
     {
-        var filePath = Path.Combine(_tempDir, "new-file.txt");
+        var filePath = Path.Combine(_workspaceDir, "new-file.txt");
 
         var result = _tools.Write(filePath, "temp content");
 
@@ -50,14 +50,24 @@ public class FileToolsTests : IDisposable
     }
 
     [Fact]
-    public void WriteFile_Temp目录内_自动创建父目录()
+    public void WriteFile_workspace内_自动创建父目录()
     {
-        var filePath = Path.Combine(_tempDir, "a", "b", "deep-file.txt");
+        var filePath = Path.Combine(_workspaceDir, "a", "b", "deep-file.txt");
 
         var result = _tools.Write(filePath, "deep content");
 
         Assert.Equal($"File written: {filePath}", result);
         Assert.Equal("deep content", File.ReadAllText(filePath));
+    }
+
+    [Fact]
+    public void WriteFile_Temp目录内_拒绝()
+    {
+        // 系统临时目录已从允许列表移除,写入应被拒
+        var filePath = Path.Combine(_tempDir, "rejected.txt");
+
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Write(filePath, "x"));
+        Assert.Contains("不允许", ex.Message);
     }
 
     [Fact]
@@ -73,18 +83,29 @@ public class FileToolsTests : IDisposable
 
     #endregion
 
-    #region UpdateFile 临时目录测试
+    #region UpdateFile 测试
 
     [Fact]
-    public void UpdateFile_Temp目录内_替换成功()
+    public void UpdateFile_workspace内_替换成功()
     {
-        var filePath = Path.Combine(_tempDir, "update-target.txt");
+        var filePath = Path.Combine(_workspaceDir, "update-target.txt");
         File.WriteAllText(filePath, "hello world");
 
         var result = _tools.Edit(filePath, "hello", "goodbye");
 
         Assert.Equal($"File updated: {filePath}", result);
         Assert.Equal("goodbye world", File.ReadAllText(filePath));
+    }
+
+    [Fact]
+    public void UpdateFile_Temp目录内_拒绝()
+    {
+        // 系统临时目录已从允许列表移除,编辑应被拒
+        var filePath = Path.Combine(_tempDir, "update-target.txt");
+        File.WriteAllText(filePath, "hello world");
+
+        var ex = Assert.Throws<UnauthorizedAccessException>(() => _tools.Edit(filePath, "hello", "goodbye"));
+        Assert.Contains("不允许", ex.Message);
     }
 
     [Fact]
@@ -112,14 +133,13 @@ public class FileToolsTests : IDisposable
     }
 
     [Fact]
-    public async Task Read_临时目录内_成功()
+    public async Task Read_临时目录内_拒绝()
     {
+        // 系统临时目录已从允许列表移除,读取应被拒
         var filePath = Path.Combine(_tempDir, "tmp.txt");
         File.WriteAllText(filePath, "tmpdata");
 
-        var content = await _tools.Read(filePath);
-
-        Assert.Equal("tmpdata", content);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _tools.Read(filePath));
     }
 
     [Fact]

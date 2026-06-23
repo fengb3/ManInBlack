@@ -5,14 +5,11 @@ namespace ManInBlack.AI.Tests.Configuration;
 
 public class FileAccessPolicyTests
 {
-    // workspace 与 temp 用不同根,避免互相包含造成误判
     private readonly string _ws = "/data/ws";
-    private readonly string _tmp = "/data/tmp";
 
     private FileAccessPolicy Policy(params string[] roots) => new()
     {
         Workspace = _ws,
-        Temp = _tmp,
         ReadableRoots = roots
     };
 
@@ -25,10 +22,6 @@ public class FileAccessPolicyTests
         => Assert.True(Policy().IsReadable("/data/ws"));
 
     [Fact]
-    public void IsReadable_temp内_true()
-        => Assert.True(Policy().IsReadable("/data/tmp/scratch"));
-
-    [Fact]
     public void IsReadable_配置只读根内_true()
         => Assert.True(Policy("/opt/data").IsReadable("/opt/data/x"));
 
@@ -39,6 +32,7 @@ public class FileAccessPolicyTests
         Assert.False(Policy().IsReadable("/root/.man-in-black/settings.json"));
         Assert.False(Policy().IsReadable("/root/.man-in-black/sessions/abc"));
         Assert.False(Policy().IsReadable("/etc/passwd"));
+        Assert.False(Policy().IsReadable("/tmp/scratch")); // 系统临时目录不在允许列表
     }
 
     [Fact]

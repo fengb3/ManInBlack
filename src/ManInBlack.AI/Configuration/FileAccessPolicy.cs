@@ -2,16 +2,14 @@ namespace ManInBlack.AI.Configuration;
 
 /// <summary>
 /// 文件访问「纯允许列表」策略:FileTools(.NET 校验)与 bwarp(挂载)的唯一共享真相。
-/// 默认拒绝:仅 Workspace、Temp(可读写)与配置的 ReadableRoots(只读)可读。其余一律不可读。
+/// 默认拒绝:仅 Workspace(可读写)与配置的 ReadableRoots(只读)可读。其余一律不可读。
+/// 系统临时目录(/tmp)故意不在此允许列表:FileTools 不放行;沙盒则以私有 tmpfs 提供命令级暂存(不与宿主 /tmp 共享)。
 /// 隔离强度 = 所配 ReadableRoots 的窄度;配 "/" 等于关闭隔离(操作者显式开关,见 spec §7)。
 /// </summary>
 public sealed record FileAccessPolicy
 {
     /// <summary>可读写:当前用户 workspace(= IUserWorkspace.WorkingDirectory)。</summary>
     public string Workspace { get; init; } = "";
-
-    /// <summary>可读写:系统临时目录。</summary>
-    public string Temp { get; init; } = "";
 
     /// <summary>额外只读根(经配置添加)。默认空。</summary>
     public IReadOnlyList<string> ReadableRoots { get; init; } = [];
@@ -24,11 +22,9 @@ public sealed record FileAccessPolicy
 
     public bool IsReadable(string resolvedPath) =>
         IsUnderOrEqual(resolvedPath, Workspace)
-        || IsUnderOrEqual(resolvedPath, Temp)
         || ReadableRoots.Any(r => IsUnderOrEqual(resolvedPath, r));
 
-    public bool IsWritable(string resolvedPath) =>
-        IsUnder(resolvedPath, Workspace) || IsUnder(resolvedPath, Temp);
+    public bool IsWritable(string resolvedPath) => IsUnder(resolvedPath, Workspace);
 
     /// <summary>规范化:取绝对路径并去掉尾部目录分隔符。</summary>
     internal static string Canonicalize(string path)
