@@ -32,6 +32,7 @@ public sealed class SandboxBuilder
     private bool _asPid1;
     private string? _workingDirectory;
     private string? _argv0;
+    private string? _standardInput;
 
     private string _command = "";
     private readonly List<string> _arguments = [];
@@ -264,6 +265,13 @@ public sealed class SandboxBuilder
         return this;
     }
 
+    /// <summary>写入沙盒进程标准输入的内容;null 时不重定向 stdin(默认行为)。</summary>
+    public SandboxBuilder WithStandardInput(string? standardInput)
+    {
+        _standardInput = standardInput;
+        return this;
+    }
+
     public SandboxBuilder WithWorkingDirectory(string dir)
     {
         _workingDirectory = dir;
@@ -309,6 +317,7 @@ public sealed class SandboxBuilder
         AsPid1 = _asPid1,
         WorkingDirectory = _workingDirectory,
         Argv0 = _argv0,
+        StandardInput = _standardInput,
         Command = _command,
         Arguments = _arguments.ToArray(),
         BwrapPath = _bwrapPath,

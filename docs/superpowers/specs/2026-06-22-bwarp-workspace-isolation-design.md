@@ -206,7 +206,7 @@ public StorageBuilder AddReadableRoot(string root) { ... }
 - **行为收紧(全模式)**:允许列表始终启用,`CurrentDirectory` / `CustomPath` 模式的 `Read`/`Glob`/`Grep` 也被限定在 workspace + 配置只读根内(今日为任意可读)。这是「默认只有 workspace」的必然结果;若某些场景需放宽,经配置加只读根。
 - **bwarp 精选路径风险**:`ConfineBaseline` 的系统路径列表若遗漏某命令所需路径,该命令失败;经配置加只读根或扩充默认列表解决。
 - **部分隔离态**:`UseSandbox=false` 时 `FileTools` 受限(经 .NET 校验),但 `CommandLineTools` 走 `ProcessShellExecutor` **不受限**(bwarp 是它唯一隔离手段)。要双工具全隔离须开 `UseSandbox`。
-- **全局钩子 + UseSandbox(范围外,既有问题)**:`IShellExecutor` 被 `CommandLineTools` 与 `HookExecutor` 共用;`BwarpShellExecutor` 故意以调用方 `workingDirectory`(而非 `policy.Workspace`)为可写目录,使全局钩子的 `{RootPath}/hooks/` 脚本目录与 CWD 可用。但 `HookExecutor` 另把上下文写入宿主 `/tmp` 临时文件再传给脚本,而沙盒挂载的是私有 `/tmp` tmpfs——故该组合下临时文件对脚本不可见。此问题在旧 `ro-bind /` 下同样存在,本期不修;如需支持,后续让钩子经 stdin/env 传上下文,或把宿主 `/tmp` 以可写 bind 挂入沙盒。
+- **全局钩子 + UseSandbox(范围外,既有问题)**:`IShellExecutor` 被 `CommandLineTools` 与 `HookExecutor` 共用;`BwarpShellExecutor` 故意以调用方 `workingDirectory`(而非 `policy.Workspace`)为可写目录,使全局钩子的 `{RootPath}/hooks/` 脚本目录与 CWD 可用。但 `HookExecutor` 另把上下文写入宿主 `/tmp` 临时文件再传给脚本,而沙盒挂载的是私有 `/tmp` tmpfs——故该组合下临时文件对脚本不可见。此问题在旧 `ro-bind /` 下同样存在,本期不修;如需支持,后续让钩子经 stdin/env 传上下文,或把宿主 `/tmp` 以可写 bind 挂入沙盒。**[后续已解决]** 该问题已消除:`HookContext` 改为经 **stdin** 传入脚本(`IShellExecutor.Execute` 增可选 `stdin` 参数,见 `docs/hooks-guide.md`),不再落临时文件——stdin 是进程 fd、不依赖文件系统挂载,沙盒隔离对它透明。上述两条路采用了前者。
 - **Windows / 非 Linux**:bwarp 不跑(`OperatingSystem.IsLinux()` 门);`FileTools` 路径校验照常生效。
 - **路径比较**:沿用现有 `OrdinalIgnoreCase`(Linux 实际路径全小写,无实际影响),记为既有约束。
 - **`Temp` 默认可写**:作为系统暂存区默认开启;若要更严(仅 workspace 可写),后续可经配置移出,本期不动。
@@ -259,5 +259,6 @@ mount/env 测试:直接构造 bwarp 的 `Sandbox.Confine(workingDirectory, comma
 1. **`{RootPath}/skills` 系统只读根**(commit `f23ebce`):沙盒下 skill 脚本(经 RunBash)与 skill 文件(经 Read)需可见,Resolver 自动把 skills 目录加为只读根。见 §1 / §2 / §7。
 2. **`FileIsolation.InjectedEnv` 环境变量注入**(本分支 `feat/workspace-isolation`,未提交):沙盒内 CLI(如 klzl 读飞书文档)需要 API key,但 `settings.json` 不可挂载(会泄露全量配置);改为把所需密钥以明文 env 经 bwarp `--setenv` 注入。见 §1 / §2 / §3 / §5 / §7。
 3. **DNS 操作注意**(运行时发现,WSL2):`resolv.conf` 符号链接到未挂载的 `/mnt/wsl` 会让沙盒 DNS 失败;临时把 `/mnt/wsl` 加入 `ReadableRoots`,根本修复待在 `Confine` 内 bind `resolv.conf` 真实目标。见 §7。
+4. **HookContext 改用 stdin 传递**(后续分支 `feat/hook-context-stdin`):§7 记的「全局钩子 + UseSandbox 下临时文件不可见」既有问题,改为经 stdin 传入解决——`HookExecutor` 不再写临时文件,`IShellExecutor.Execute` 增可选 `stdin` 参数,bwarp `SandboxBuilder.WithStandardInput` 透传 stdin 到沙盒内进程。顺带修了 `StandardInputEncoding` 仅在 stdin 重定向时才可设的坑(不传 stdin 时无条件设该属性会让所有 `RunBash` 在 `Process.Start()` 抛异常)。见 `docs/hooks-guide.md`。
 
 实测佐证(WSL2 + bwrap + .NET 10,用 `demo/AgentConsole` 端到端):`InjectedEnv` 的 `KLZL_APP_ID/SECRET` 在沙盒内可见(`env | grep` 命中),`LoadSkill("klzl")` 成功,klzl CLI **仅凭环境变量**(非 `settings.json`)认证并读取飞书文档成功(加 `/mnt/wsl` 修复 DNS 后,exit 0)。

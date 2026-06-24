@@ -186,25 +186,18 @@ public class HookExecutor(
     }
 
     /// <summary>
-    /// 执行单个钩子脚本：将 HookContext 序列化为临时 JSON 文件，作为参数传递给脚本，
+    /// 执行单个钩子脚本：将 HookContext 序列化为 JSON 经 stdin 传入脚本（写完即关闭 stdin 发 EOF），
     /// 从 stdout 解析 HookResult。异常会被捕获并记录，不会向上传播。
     /// </summary>
     private HookResult ExecuteSingleScript(string scriptCommand, string workingDir, HookSettings hook, HookContext context)
     {
-        string? tempFile = null;
         try
         {
-            // 序列化上下文到临时文件。落在 workingDir(而非系统 /tmp):workingDir 在沙盒里是可写绑定区,
-            // 脚本能读到;系统 /tmp 在沙盒里是私有 tmpfs,宿主写的临时文件对脚本不可见(全局钩子 +
-            // UseSandbox 组合下上下文对脚本不可见即源于此)。
+            // 序列化上下文为 JSON，经 stdin 传入脚本。stdin 是进程 fd，不依赖任何文件系统挂载，
+            // 沙盒隔离对它透明（取代旧方案「序列化到临时文件落在 workingDir」的 /tmp 可见性 workaround）。
             var contextJson = JsonSerializer.Serialize(context, JsonWriteOptions);
-            tempFile = Path.Combine(workingDir, $"mib-hook-ctx-{Path.GetRandomFileName()}.json");
-            File.WriteAllText(tempFile, contextJson);
 
-            // 构造命令：脚本命令 + 临时文件路径作为参数
-            var command = $"{scriptCommand} \"{tempFile}\"";
-
-            var shellResult = shellExecutor.Execute(command, workingDir, hook.TimeoutMs);
+            var shellResult = shellExecutor.Execute(scriptCommand, workingDir, hook.TimeoutMs, stdin: contextJson);
 
             // 空 stdout 视为无操作
             if (string.IsNullOrWhiteSpace(shellResult.StandardOutput))
@@ -220,20 +213,6 @@ public class HookExecutor(
         {
             logger.LogWarning(ex, "钩子脚本执行异常：{Name} ({Script})", hook.Name, hook.Script);
             return new HookResult { Succeeded = false, ErrorMessage = ex.Message };
-        }
-        finally
-        {
-            if (tempFile is not null)
-            {
-                try
-                {
-                    File.Delete(tempFile);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "临时文件清理失败：{Path}", tempFile);
-                }
-            }
         }
     }
 }

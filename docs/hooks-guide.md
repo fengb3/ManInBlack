@@ -13,7 +13,7 @@ Hook 系统允许用户通过外部脚本在 Agent 执行生命周期的关键�
 Hook 系统基于 **挂载点（HookPoint）** 和 **脚本合约（HookContext / HookResult）** 两个核心抽象：
 
 - **挂载点**：定义在 `HookPoint` 枚举中，对应 Agent 执行生命周期的 6 个具体节点
-- **脚本合约**：`HookContext` 作为输入（JSON 临时文件），`HookResult` 作为输出（stdout JSON）
+- **脚本合约**：`HookContext` 作为输入（stdin JSON），`HookResult` 作为输出（stdout JSON）
 
 Hook 通过两个集成层接入框架：
 
@@ -139,7 +139,7 @@ Hook 配置分为全局配置和用户级配置两个层级。
 
 ### HookContext 输入
 
-框架将 `HookContext` 序列化为 JSON 写入临时文件，脚本通过命令行参数接收该文件路径。
+框架将 `HookContext` 序列化为 JSON 写入脚本的标准输入（stdin），写完即关闭 stdin 发送 EOF；脚本从 stdin 读取完整 JSON（读到 EOF 即为完整输入）。
 
 **通用字段**：
 
@@ -204,7 +204,7 @@ Hook 配置分为全局配置和用户级配置两个层级。
 | **超时**     | 每个脚本有独立的 `TimeoutMs`（默认 10 秒），超时后强制终止                 |
 | **容错**     | 脚本异常不会向上传播，只会记录警告日志并返回 `Succeeded=false`              |
 | **零开销**    | 没有配置任何钩子时，`HookExecutor.ExecuteAsync` 直接返回空结果，不执行任何脚本 |
-| **临时文件清理** | HookContext JSON 临时文件在执行完毕后自动删除，清理失败仅记录调试日志           |
+| **stdin 传参** | HookContext JSON 经 stdin 一次性传入脚本，写入后关闭 stdin（发 EOF）；不落临时文件，无磁盘残留           |
 
 ---
 
@@ -221,9 +221,7 @@ import sys
 
 
 def main():
-    context_path = sys.argv[1]
-    with open(context_path, "r", encoding="utf-8") as f:
-        ctx = json.load(f)
+    ctx = json.load(sys.stdin)
 
     tool_name = ctx.get("ToolName", "")
     arguments = ctx.get("ArgumentsJson", "")
@@ -257,9 +255,7 @@ import sys
 
 
 def main():
-    context_path = sys.argv[1]
-    with open(context_path, "r", encoding="utf-8") as f:
-        ctx = json.load(f)
+    ctx = json.load(sys.stdin)
 
     # 追加项目规范到 SystemPrompt
     extra = "当前项目使用 file-scoped namespace 和 nullable enabled，注释使用中文。"
@@ -285,9 +281,7 @@ from datetime import datetime
 
 
 def main():
-    context_path = sys.argv[1]
-    with open(context_path, "r", encoding="utf-8") as f:
-        ctx = json.load(f)
+    ctx = json.load(sys.stdin)
 
     log_entry = {
         "timestamp": datetime.now().isoformat(),
@@ -370,6 +364,9 @@ AgentLifecycleFilter           ← BeforeToolExecute → AfterToolExecute
 
 - **Script 必须包含解释器前缀**：`Script` 字段是原始 shell 命令，不是文件路径。必须写 `"python script.py"` 而不是
   `"script.py"`
+- **Script 不要重定向 stdin**：`HookContext` 经 stdin 传入脚本，框架写完即关闭 stdin（发 EOF）。因此 `Script` 命令
+  不要用 `< /dev/null`、`| tee`、`> file` 等重定向 stdin 的写法（会断开或抢占 stdin，导致脚本读不到上下文）；
+  多命令链 `a.py && b.py` 会让 `a.py` 独占 stdin、`b.py` 拿到空输入——若多个命令都需要上下文，应在单个脚本内部处理
 - **IAsyncEnumerable 不阻塞流**：`HookMiddleware` 和 `AgentLoopMiddleware` 通过 `yield return` 流式转发 LLM
   响应，钩子执行不会阻塞流式输出
 - **Hooks 配置每个 Scope 缓存一次**：`HookExecutor` 使用懒加载缓存 `_cachedHooks`，在首次调用 `ExecuteAsync`

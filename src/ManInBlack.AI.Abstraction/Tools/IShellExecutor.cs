@@ -23,6 +23,7 @@ public interface IShellExecutor
     /// <param name="command">要执行的命令</param>
     /// <param name="workingDirectory">工作目录</param>
     /// <param name="timeoutMs">超时时间（毫秒）</param>
+    /// <param name="stdin">写入进程标准输入的内容;为 null 时不重定向 stdin(继承父进程 fd)。</param>
     /// <returns>执行结果</returns>
-    ShellResult Execute(string command, string workingDirectory, int timeoutMs);
+    ShellResult Execute(string command, string workingDirectory, int timeoutMs, string? stdin = null);
 }

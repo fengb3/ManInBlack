@@ -30,6 +30,9 @@ public sealed record SandboxOptions
     public string? WorkingDirectory { get; init; }
     public string? Argv0 { get; init; }
 
+    /// <summary>写入沙盒进程标准输入的内容;为 null 时不重定向 stdin(继承父进程 fd)。</summary>
+    public string? StandardInput { get; init; }
+
     public string Command { get; init; } = "";
     public IReadOnlyList<string> Arguments { get; init; } = [];
 
