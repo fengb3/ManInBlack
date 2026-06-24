@@ -30,6 +30,14 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         var bus = context.ServiceProvider.GetRequiredService<EventBus>();
         var subs = new List<IDisposable>();
 
+        // ── 构建通用属性字典，所有 HookContext 共享 ──
+        var props = new Dictionary<string, string>();
+        if (!string.IsNullOrEmpty(context.RootUserId)) props["RootUserId"] = context.RootUserId;
+        if (!string.IsNullOrEmpty(context.SessionId))  props["SessionId"]  = context.SessionId;
+        if (!string.IsNullOrEmpty(context.ParentId))   props["ParentId"]   = context.ParentId;
+        if (!string.IsNullOrEmpty(context.ParentType)) props["ParentType"] = context.ParentType;
+        if (!string.IsNullOrEmpty(context.AgentName))  props["AgentName"]  = context.AgentName;
+
         // ── 订阅全部生命周期事件 ──
         subs.Add(bus.Subscribe<BeforeLlmCallEvent>(key, async (evt, ct) =>
         {
@@ -39,6 +47,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
                 AgentId = evt.AgentId,
                 SystemPrompt = evt.SystemPrompt,
                 UserInput = evt.UserInput,
+                Properties = props,
             };
             var result = await hookExecutor.ExecuteAsync(HookPoint.BeforeLlmCall, hookCtx, ct);
             if (result.Succeeded && !string.IsNullOrEmpty(result.InjectedText))
@@ -57,6 +66,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
                 AgentId = evt.AgentId,
                 SystemPrompt = evt.SystemPrompt,
                 UserInput = evt.UserInput,
+                Properties = props,
             };
             await hookExecutor.ExecuteAsync(HookPoint.AfterLlmCall, hookCtx, ct);
         }));
@@ -70,6 +80,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
                 ToolName = evt.ToolName,
                 CallId = evt.CallId,
                 ArgumentsJson = evt.ArgumentsJson,
+                Properties = props,
             };
             var result = await hookExecutor.ExecuteAsync(HookPoint.BeforeToolExecute, hookCtx, ct);
             if (result.IsBlocked)
@@ -90,6 +101,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
                 ArgumentsJson = evt.ArgumentsJson,
                 ResultJson = evt.ResultJson,
                 Error = evt.Error,
+                Properties = props,
             };
             await hookExecutor.ExecuteAsync(HookPoint.AfterToolExecute, hookCtx, ct);
         }));
@@ -100,6 +112,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             {
                 HookPoint = HookPoint.AllToolsCompleted.ToString(),
                 AgentId = evt.AgentId,
+                Properties = props,
             };
             await hookExecutor.ExecuteAsync(HookPoint.AllToolsCompleted, hookCtx, ct);
         }));
@@ -112,6 +125,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
                 AgentId = evt.AgentId,
                 SystemPrompt = evt.SystemPrompt,
                 UserInput = evt.UserInput,
+                Properties = props,
             };
             await hookExecutor.ExecuteAsync(HookPoint.AgentCompleted, hookCtx, ct);
         }));
