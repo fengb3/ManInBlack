@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ namespace ManInBlack.AI.Persistence;
 /// <summary>
 /// SQLite 实现的会话消息 + 状态快照存储。
 /// </summary>
+[ServiceRegister.Singleton.As<ISessionStorage>]
 public class SqliteAgentStateStorage(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
     ILogger<SqliteAgentStateStorage> logger) : IAgentStateStorage

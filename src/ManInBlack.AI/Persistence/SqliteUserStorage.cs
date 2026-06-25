@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ namespace ManInBlack.AI.Persistence;
 /// <summary>
 /// SQLite 实现的用户存储。SelfHostUserId = 自增 Id 的字符串形式。
 /// </summary>
+[ServiceRegister.Singleton.As<IUserStorage>]
 public class SqliteUserStorage(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
     ILogger<SqliteUserStorage> logger) : IUserStorage
