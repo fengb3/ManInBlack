@@ -16,7 +16,8 @@ public static class SqliteTestHelpers
         Directory.CreateDirectory(root);
         var services = new ServiceCollection();
         services.AddDbContextFactory<ManInBlackDbContext>(o =>
-            o.UseSqlite($"Data Source={Path.Combine(root, "maninblack.db")}"));
+            o.UseSqlite($"Data Source={Path.Combine(root, "maninblack.db")}")
+             .AddInterceptors(new ManInBlack.AI.Persistence.SqliteInitInterceptor()));
         var sp = services.BuildServiceProvider();
         var factory = sp.GetRequiredService<IDbContextFactory<ManInBlackDbContext>>();
         await using var db = factory.CreateDbContext();

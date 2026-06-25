@@ -145,6 +145,7 @@ public class JsonToSqliteMigrator(
                     if (!int.TryParse(internalId, out var internalIdNum))
                     {
                         logger.LogWarning("迁移:用户 {OriId} 的内部 id '{InternalId}' 非数字,跳过", oriId, internalId);
+                        skip++;
                         continue;
                     }
 

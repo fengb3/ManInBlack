@@ -87,6 +87,7 @@ public class SqliteAgentStateStorageTests
 
             Assert.NotNull(loaded);
             Assert.Equal("TestAgent", loaded.AgentName);
+            Assert.Equal("p", loaded.SystemPrompt);
             Assert.Equal("v", loaded.Items["k"].ToString());
             Assert.Equal("ToolCallCompleted", loaded.CheckpointReason);
         }
@@ -144,6 +145,52 @@ public class SqliteAgentStateStorageTests
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p" });
             await storage.DeleteSnapshotAsync("s1");
             Assert.Null(await storage.LoadSnapshotAsync("s1"));
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>
+    /// 规约 §8.1: 多线程并发 SaveMessage 不损坏。
+    /// 5 个任务各写入 20 条消息(共 100 条)，全部完成后验证总数与反序列化正确性。
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentSaveMessage_WritesAllMessages_WithoutCorruption()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            const int taskCount = 5;
+            const int messagesPerTask = 20;
+            var sessionId = "concurrent-s1";
+
+            var tasks = Enumerable.Range(0, taskCount).Select(taskIndex =>
+            {
+                return Task.Run(async () =>
+                {
+                    for (int i = 0; i < messagesPerTask; i++)
+                    {
+                        var msg = new ChatMessage(ChatRole.User, $"task{taskIndex}-msg{i}");
+                        await storage.SaveMessage(sessionId, msg);
+                    }
+                });
+            });
+
+            await Task.WhenAll(tasks);
+
+            var loaded = await storage.LoadMessages(sessionId);
+            Assert.Equal(taskCount * messagesPerTask, loaded.Count);
+
+            // 验证每条消息均可正常反序列化（无损坏）
+            foreach (var m in loaded)
+            {
+                Assert.NotNull(m);
+                Assert.False(string.IsNullOrEmpty(m.Text));
+            }
         }
         finally
         {
