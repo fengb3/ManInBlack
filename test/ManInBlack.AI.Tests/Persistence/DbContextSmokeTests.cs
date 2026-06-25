@@ -25,7 +25,7 @@ public class DbContextSmokeTests
         finally
         {
             sp.Dispose();
-            try { Directory.Delete(root, recursive: true); } catch { }
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
         }
     }
 }
