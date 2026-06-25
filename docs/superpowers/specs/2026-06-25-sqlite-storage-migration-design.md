@@ -229,3 +229,19 @@ ssh aliyun 'systemctl start mib-feishu'
 - **bubblewrap 沙盒**：实现后跑 demo 验证主进程对 `{RootPath}/maninblack.db` 的写入不受沙盒影响（预期不受影响，存储不在沙盒内）。
 - **FeishuAdaptor 生产环境**：阿里云迁移前先在本地或服务器副本上用生产 JSON 副本试跑一次，确认计数与数据完整后再正式操作。
 - **`ChatMessage` 序列化兼容性**：`Microsoft.Extensions.AI` 的 `ChatMessage` 含多态 `AIContent`，确认 `System.Text.Json` 默认序列化能正确往返（现有 JSONL 已在用，应无问题，测试覆盖 function/tool 消息确认）。
+
+### 10.1 端到端验证（AgentConsole 对话 + 查库）
+
+实现完成后用 `demo/AgentConsole` 做真实验证（复用项目 `test-agent-console` skill 覆盖的完整流程）：
+
+1. 跑几轮 AgentConsole 对话（含普通对话 + 触发工具调用，让 `SessionMessages` 覆盖 text 与 function/tool 两类 `AIContent`）。
+2. 重启后再开同一 session，确认历史能从 SQLite 正确加载（`LoadMessages` 往返无损）。
+3. 用 `sqlite3` CLI 直接查库核对落盘（只读，无需 GUI）：
+   ```bash
+   sqlite3 ~/.man-in-black/maninblack.db "SELECT SessionId, COUNT(*) FROM SessionMessages GROUP BY SessionId;"
+   sqlite3 ~/.man-in-black/maninblack.db "SELECT SessionId, SavedAt FROM AgentStateSnapshots;"
+   sqlite3 ~/.man-in-black/maninblack.db "SELECT Id, UserId FROM Users;"
+   ```
+4. 确认 `~/.man-in-black/sessions/`、`users/` 旧 JSON 目录**不再产生新文件**（新数据只进 DB）。
+
+可用工具（已确认本机就位）：`sqlite3` 3.53.1（查库）、`dotnet-ef` 10.0.1（Migrations）。
