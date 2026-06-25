@@ -39,103 +39,147 @@ public class JsonToSqliteMigrator(
 
         await using var db = dbFactory.CreateDbContext();
 
-        // 1) 会话历史 JSONL
+        // 1) 会话历史 JSONL（整段一个事务）
         if (Directory.Exists(sessionsDir))
         {
-            foreach (var file in Directory.EnumerateFiles(sessionsDir, "*.jsonl"))
+            await using var msgTx = await db.Database.BeginTransactionAsync(ct);
+            try
             {
-                var sessionId = Path.GetFileNameWithoutExtension(file);
-                if (await db.SessionMessages.AnyAsync(x => x.SessionId == sessionId, ct)) { skip++; continue; }
-
-                var now = DateTimeOffset.UtcNow.ToString("O");
-                await using var tx = await db.Database.BeginTransactionAsync(ct);
-                foreach (var line in await File.ReadAllLinesAsync(file, ct))
+                foreach (var file in Directory.EnumerateFiles(sessionsDir, "*.jsonl"))
                 {
-                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var sessionId = Path.GetFileNameWithoutExtension(file);
+                    if (await db.SessionMessages.AnyAsync(x => x.SessionId == sessionId, ct)) { skip++; continue; }
+
+                    var now = DateTimeOffset.UtcNow.ToString("O");
+                    foreach (var line in await File.ReadAllLinesAsync(file, ct))
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        try
+                        {
+                            var m = JsonSerializer.Deserialize<ChatMessage>(line, JsonOptions);
+                            if (m is null) continue;
+                            db.SessionMessages.Add(new SessionMessageEntity
+                            {
+                                SessionId = sessionId,
+                                CreatedAt = now,
+                                PayloadJson = JsonSerializer.Serialize(m, JsonOptions),
+                            });
+                            msg++;
+                        }
+                        catch (JsonException ex)
+                        {
+                            logger.LogWarning(ex, "迁移:会话 {SessionId} 跳过坏行", sessionId);
+                        }
+                    }
+                }
+                await db.SaveChangesAsync(ct);
+                await msgTx.CommitAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await msgTx.RollbackAsync(ct);
+                logger.LogError(ex, "迁移:会话历史事务失败,已回滚");
+            }
+        }
+
+        // 2) 状态快照（整段一个事务）
+        if (Directory.Exists(sessionsDir))
+        {
+            await using var snapTx = await db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(sessionsDir, "*.state.json"))
+                {
+                    var sessionId = Path.GetFileName(file).Replace(".state.json", "");
+                    if (await db.AgentStateSnapshots.AnyAsync(x => x.SessionId == sessionId, ct)) { skip++; continue; }
+
                     try
                     {
-                        var m = JsonSerializer.Deserialize<ChatMessage>(line, JsonOptions);
-                        if (m is null) continue;
-                        db.SessionMessages.Add(new SessionMessageEntity
+                        var s = JsonSerializer.Deserialize<AgentStateSnapshot>(await File.ReadAllTextAsync(file, ct), JsonOptions);
+                        if (s is null) continue;
+                        db.AgentStateSnapshots.Add(new AgentStateSnapshotEntity
                         {
                             SessionId = sessionId,
-                            CreatedAt = now,
-                            PayloadJson = JsonSerializer.Serialize(m, JsonOptions),
+                            SavedAt = (s.SavedAt == default ? DateTimeOffset.UtcNow : s.SavedAt).ToString("O"),
+                            PayloadJson = JsonSerializer.Serialize(s, JsonOptions),
                         });
-                        msg++;
+                        snap++;
                     }
                     catch (JsonException ex)
                     {
-                        logger.LogWarning(ex, "迁移:会话 {SessionId} 跳过坏行", sessionId);
+                        logger.LogWarning(ex, "迁移:快照 {SessionId} 跳过(损坏)", sessionId);
                     }
                 }
                 await db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
+                await snapTx.CommitAsync(ct);
             }
-        }
-
-        // 2) 状态快照
-        if (Directory.Exists(sessionsDir))
-        {
-            foreach (var file in Directory.EnumerateFiles(sessionsDir, "*.state.json"))
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                var sessionId = Path.GetFileName(file).Replace(".state.json", "");
-                if (await db.AgentStateSnapshots.AnyAsync(x => x.SessionId == sessionId, ct)) { skip++; continue; }
-
-                try
-                {
-                    var s = JsonSerializer.Deserialize<AgentStateSnapshot>(await File.ReadAllTextAsync(file, ct), JsonOptions);
-                    if (s is null) continue;
-                    db.AgentStateSnapshots.Add(new AgentStateSnapshotEntity
-                    {
-                        SessionId = sessionId,
-                        SavedAt = (s.SavedAt == default ? DateTimeOffset.UtcNow : s.SavedAt).ToString("O"),
-                        PayloadJson = JsonSerializer.Serialize(s, JsonOptions),
-                    });
-                    await db.SaveChangesAsync(ct);
-                    snap++;
-                }
-                catch (JsonException ex)
-                {
-                    logger.LogWarning(ex, "迁移:快照 {SessionId} 跳过(损坏)", sessionId);
-                }
+                await snapTx.RollbackAsync(ct);
+                logger.LogError(ex, "迁移:状态快照事务失败,已回滚");
             }
         }
 
-        // 3) 用户(userIdMap + 条目)
+        // 3) 用户(userIdMap + 条目)（整段一个事务）
         var mapFile = Path.Combine(usersDir, "userIdMap.json");
         if (File.Exists(mapFile))
         {
-            var map = JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(mapFile, ct), JsonOptions) ?? new();
-            foreach (var (oriId, internalId) in map)
+            Dictionary<string, string> map;
+            try
             {
-                if (await db.Users.AnyAsync(x => x.UserId == oriId, ct)) { skip++; continue; }
+                map = JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(mapFile, ct), JsonOptions) ?? new();
+            }
+            catch (JsonException ex)
+            {
+                logger.LogWarning(ex, "迁移:userIdMap.json 损坏,跳过用户迁移");
+                return new MigrationSummary(msg, snap, usr, skip);
+            }
 
-                string meta = "{}", sids = "[]";
-                var entryFile = Path.Combine(usersDir, $"{internalId}.json");
-                if (File.Exists(entryFile))
+            await using var usrTx = await db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                foreach (var (oriId, internalId) in map)
                 {
-                    try
+                    if (await db.Users.AnyAsync(x => x.UserId == oriId, ct)) { skip++; continue; }
+
+                    if (!int.TryParse(internalId, out var internalIdNum))
                     {
-                        var entry = JsonSerializer.Deserialize<UserEntry>(await File.ReadAllTextAsync(entryFile, ct), JsonOptions);
-                        if (entry is not null)
-                        {
-                            meta = JsonSerializer.Serialize(entry.Metadata ?? new(), JsonOptions);
-                            sids = JsonSerializer.Serialize(entry.SessionIds ?? new List<string>(), JsonOptions);
-                        }
+                        logger.LogWarning("迁移:用户 {OriId} 的内部 id '{InternalId}' 非数字,跳过", oriId, internalId);
+                        continue;
                     }
-                    catch (JsonException ex) { logger.LogWarning(ex, "迁移:用户 {Id} 条目损坏,用空值", oriId); }
-                }
 
-                db.Users.Add(new UserEntity
-                {
-                    Id = int.Parse(internalId), // 保留原数字内部 id
-                    UserId = oriId,
-                    MetadataJson = meta,
-                    SessionIdsJson = sids,
-                });
+                    string meta = "{}", sids = "[]";
+                    var entryFile = Path.Combine(usersDir, $"{internalId}.json");
+                    if (File.Exists(entryFile))
+                    {
+                        try
+                        {
+                            var entry = JsonSerializer.Deserialize<UserEntry>(await File.ReadAllTextAsync(entryFile, ct), JsonOptions);
+                            if (entry is not null)
+                            {
+                                meta = JsonSerializer.Serialize(entry.Metadata ?? new(), JsonOptions);
+                                sids = JsonSerializer.Serialize(entry.SessionIds ?? new List<string>(), JsonOptions);
+                            }
+                        }
+                        catch (JsonException ex) { logger.LogWarning(ex, "迁移:用户 {Id} 条目损坏,用空值", oriId); }
+                    }
+
+                    db.Users.Add(new UserEntity
+                    {
+                        Id = internalIdNum,
+                        UserId = oriId,
+                        MetadataJson = meta,
+                        SessionIdsJson = sids,
+                    });
+                    usr++;
+                }
                 await db.SaveChangesAsync(ct);
-                usr++;
+                await usrTx.CommitAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await usrTx.RollbackAsync(ct);
+                logger.LogError(ex, "迁移:用户事务失败,已回滚");
             }
         }
 
