@@ -7,14 +7,12 @@ using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Persistence;
 
-#pragma warning disable CS9113 // 参数是未读的
 /// <summary>
 /// SQLite 实现的用户存储。SelfHostUserId = 自增 Id 的字符串形式。
 /// </summary>
 public class SqliteUserStorage(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
-    ILogger<SqliteUserStorage> _logger) : IUserStorage
-#pragma warning restore CS9113
+    ILogger<SqliteUserStorage> logger) : IUserStorage
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,6 +28,7 @@ public class SqliteUserStorage(
         entity = new UserEntity { UserId = userId };
         db.Users.Add(entity);
         await db.SaveChangesAsync();
+        logger.LogInformation("创建用户 {UserId} (SelfHostUserId={SelfHostUserId})", userId, entity.Id);
         return ToEntry(entity);
     }
 
