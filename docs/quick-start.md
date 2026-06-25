@@ -234,7 +234,7 @@ services.AddManInBlack()
 
 `AgentFactory` 内部自动管理会话生命周期。`SessionId` 由 `IUserStorage` 自动解析，无需手动设置。`default` 管道中的 `ReadPersistenceMiddleware` 会自动从 `ISessionStorage` 恢复历史消息。
 
-持久化基于实现了 `IUserStorage` 的服务。默认实现 `FileUserStorage` 将数据保存在 `~/.man-in-black/`。
+持久化基于实现了 `IUserStorage` 的服务。默认实现 `SqliteUserStorage` 将数据保存在 `~/.man-in-black/maninblack.db`（SQLite）。详见 [存储指南](./storage-guide.md)。
 
 ---
 

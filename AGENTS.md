@@ -49,3 +49,4 @@ dotnet run --project demo/FeishuAdaptor                         # 飞书 bot dem
 - [Provider 配置指南](docs/provider-guide.md)
 - [飞书适配器指南](docs/feishu-guide.md)
 - [快速开始](docs/quick-start.md)
+- [存储指南](docs/storage-guide.md)

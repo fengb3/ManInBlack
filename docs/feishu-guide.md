@@ -107,3 +107,24 @@ factory.RegisterPipeline("sub-agent", builder => builder
 - 工具调用后会重置 `_lastLlmType`，确保后续文本创建新卡片而非追加到旧卡片
 - 工具结果超过 500 字符时截断显示
 - 子 Agent 与父 Agent 共享同一工作空间（通过 `RootUserId` 向上追溯到根用户）
+
+---
+
+## 阿里云迁移 runbook（JSON → SQLite）
+
+以下步骤将阿里云服务器上旧的 JSON 文件数据迁移到 SQLite。
+
+```bash
+# 1. 发新二进制(含 SQLite 存储 + migrator + migrate-storage 参数)到服务器
+scp mib-feishu.tar.gz aliyun:~ && ssh aliyun 'tar xzf mib-feishu.tar.gz -C /opt/mib-feishu && chmod -R 755 /opt/mib-feishu'
+# 2. 停服
+ssh aliyun 'systemctl stop mib-feishu'
+# 3. 迁移:读 /root/.man-in-black/sessions + users → 生成 maninblack.db
+ssh aliyun '/opt/mib-feishu/FeishuAdaptor migrate-storage'
+# 4. 核对(journalctl -u mib-feishu 看汇总计数 / ls /root/.man-in-black/maninblack.db)
+# 5. 起服
+ssh aliyun 'systemctl start mib-feishu'
+```
+
+迁移工具为幂等操作，可安全重复运行。旧的 `sessions/` 和 `users/` 目录原地保留不删除，确认无误后手动清理即可。详见 [存储指南](./storage-guide.md)。
+
