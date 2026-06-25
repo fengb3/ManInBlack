@@ -1,3 +1,4 @@
+using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +57,93 @@ public class SqliteAgentStateStorageTests
             var storage = CreateStorage(factory);
             var loaded = await storage.LoadMessages("nope");
             Assert.Empty(loaded);
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task SaveSnapshot_Then_LoadSnapshot_RestoresState()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            var snap = new AgentStateSnapshot
+            {
+                SessionId = "s1",
+                AgentName = "TestAgent",
+                SystemPrompt = "p",
+                Items = new Dictionary<string, object> { ["k"] = "v" },
+                SavedAt = DateTimeOffset.UtcNow,
+                CheckpointReason = "ToolCallCompleted",
+            };
+
+            await storage.SaveSnapshotAsync("s1", snap);
+            var loaded = await storage.LoadSnapshotAsync("s1");
+
+            Assert.NotNull(loaded);
+            Assert.Equal("TestAgent", loaded.AgentName);
+            Assert.Equal("v", loaded.Items["k"].ToString());
+            Assert.Equal("ToolCallCompleted", loaded.CheckpointReason);
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task SaveSnapshot_OverwritesExisting()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "first" });
+            await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "second" });
+
+            var loaded = await storage.LoadSnapshotAsync("s1");
+            Assert.NotNull(loaded);
+            Assert.Equal("second", loaded.SystemPrompt);
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task LoadSnapshot_None_ReturnsNull()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            Assert.Null(await storage.LoadSnapshotAsync("missing"));
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task DeleteSnapshot_RemovesIt()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p" });
+            await storage.DeleteSnapshotAsync("s1");
+            Assert.Null(await storage.LoadSnapshotAsync("s1"));
         }
         finally
         {

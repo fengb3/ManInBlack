@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -8,11 +9,11 @@ using Microsoft.Extensions.Logging;
 namespace ManInBlack.AI.Persistence;
 
 /// <summary>
-/// SQLite 实现的会话消息 + 状态快照存储。本任务先实现消息部分;快照部分见 Task 3。
+/// SQLite 实现的会话消息 + 状态快照存储。
 /// </summary>
 public class SqliteAgentStateStorage(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
-    ILogger<SqliteAgentStateStorage> logger)
+    ILogger<SqliteAgentStateStorage> logger) : IAgentStateStorage
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -55,5 +56,59 @@ public class SqliteAgentStateStorage(
             }
         }
         return messages;
+    }
+
+    public async Task<AgentStateSnapshot?> LoadSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        await using var db = dbFactory.CreateDbContext();
+        var row = await db.AgentStateSnapshots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.SessionId == sessionId, ct);
+
+        if (row is null) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<AgentStateSnapshot>(row.PayloadJson, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "快照 {SessionId} 反序列化失败,返回 null", sessionId);
+            return null;
+        }
+    }
+
+    public async Task SaveSnapshotAsync(string sessionId, AgentStateSnapshot snapshot, CancellationToken ct = default)
+    {
+        await using var db = dbFactory.CreateDbContext();
+        var existing = await db.AgentStateSnapshots.FirstOrDefaultAsync(x => x.SessionId == sessionId, ct);
+        var savedAt = (snapshot.SavedAt == default ? DateTimeOffset.UtcNow : snapshot.SavedAt).ToString("O");
+        var payload = JsonSerializer.Serialize(snapshot, JsonOptions);
+
+        if (existing is null)
+        {
+            db.AgentStateSnapshots.Add(new AgentStateSnapshotEntity
+            {
+                SessionId = sessionId,
+                SavedAt = savedAt,
+                PayloadJson = payload,
+            });
+        }
+        else
+        {
+            existing.SavedAt = savedAt;
+            existing.PayloadJson = payload;
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeleteSnapshotAsync(string sessionId, CancellationToken ct = default)
+    {
+        await using var db = dbFactory.CreateDbContext();
+        var row = await db.AgentStateSnapshots.FirstOrDefaultAsync(x => x.SessionId == sessionId, ct);
+        if (row is not null)
+        {
+            db.AgentStateSnapshots.Remove(row);
+            await db.SaveChangesAsync(ct);
+        }
     }
 }
