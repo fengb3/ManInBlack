@@ -314,13 +314,20 @@ public static class ChatMessageRenderer
                     {
                         null => "null",
                         string s => s,
-                        _ => JsonSerializer.Serialize(fr.Result, JsonOptions),
+                        _ => SafeSerialize(fr.Result),
                     },
                 },
-                _ => new MessageBlock { Kind = MessageBlockKind.Unknown, RawJson = JsonSerializer.Serialize(content, JsonOptions) },
+                _ => new MessageBlock { Kind = MessageBlockKind.Unknown, RawJson = SafeSerialize(content) },
             });
         }
         return new MessageView { Role = message.Role.Value, Blocks = blocks };
+    }
+
+    /// <summary>序列化任意对象;若类型不受 JSON 多态契约支持(如未注册的 AIContent 子类),回退为类型名 JSON,保证不抛。</summary>
+    private static string SafeSerialize(object obj)
+    {
+        try { return JsonSerializer.Serialize(obj, JsonOptions); }
+        catch (NotSupportedException) { return $"{{\"$type\":\"{obj.GetType().Name}\"}}"; }
     }
 }
 ```
