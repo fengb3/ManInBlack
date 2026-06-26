@@ -25,12 +25,12 @@ public sealed class ChatHistoryQueries(
             {
                 SessionId = g.Key,
                 Count = g.Count(),
-                First = g.Min(x => x.CreatedAt),
-                Last = g.Max(x => x.CreatedAt),
+                First = g.Min(x => x.CreatedAt) ?? "",
+                Last = g.Max(x => x.CreatedAt) ?? "",
             })
             .ToListAsync(ct);
 
-        var userBySession = await BuildSessionToUserMapAsync(db, ct);
+        var userBySession = await BuildSessionToUserMapAsync(db, logger, ct);
 
         return groups
             .OrderByDescending(g => g.Last)
@@ -111,7 +111,7 @@ public sealed class ChatHistoryQueries(
         }).ToList();
     }
 
-    private static async Task<Dictionary<string, string>> BuildSessionToUserMapAsync(ManInBlackDbContext db, CancellationToken ct)
+    private static async Task<Dictionary<string, string>> BuildSessionToUserMapAsync(ManInBlackDbContext db, ILogger logger, CancellationToken ct)
     {
         var users = await db.Users.AsNoTracking().ToListAsync(ct);
         var map = new Dictionary<string, string>();
@@ -123,7 +123,10 @@ public sealed class ChatHistoryQueries(
                 if (ids is null) continue;
                 foreach (var sid in ids) map.TryAdd(sid, u.UserId);
             }
-            catch (JsonException) { /* 忽略单用户解析失败 */ }
+            catch (JsonException ex)
+            {
+                logger.LogWarning(ex, "用户 {UserId} 的 SessionIdsJson 反序列化失败,跳过会话映射", u.UserId);
+            }
         }
         return map;
     }
