@@ -5,6 +5,7 @@ using FeishuAdaptor;
 using ManInBlack.AI;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Persistence;
 using Microsoft.Extensions.Http;
 using Serilog;
 using Serilog.Events;
@@ -73,6 +74,19 @@ builder.Services.AddManInBlack()
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
+
+// 一次性 JSON→SQLite 迁移子命令(执行后退出,不启动 Web 服务/不连飞书)
+if (args.Contains("migrate-storage"))
+{
+    await app.Services.MigrateManInBlackStorageAsync();
+    var migrator = app.Services.GetRequiredService<JsonToSqliteMigrator>();
+    var summary = await migrator.MigrateAsync();
+    Console.WriteLine($"迁移完成:消息 {summary.Messages},快照 {summary.Snapshots},用户 {summary.Users},跳过 {summary.Skipped}");
+    return;
+}
+
+// 启动期应用 EF Core 迁移(已最新则空操作)
+await app.Services.MigrateManInBlackStorageAsync();
 
 // 愿你健康, 开心, 美满, 幸福
 app.MapGet(

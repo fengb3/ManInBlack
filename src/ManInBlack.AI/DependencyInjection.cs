@@ -10,6 +10,8 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ManInBlack.AI.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -48,6 +50,15 @@ public static class DependencyInjection
             // 默认 ModelChoice 单例：从合并后的 settings 解析
             services.AddSingleton<ModelChoice>(sp =>
                 sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value.GetDefaultModelChoice());
+
+            // SQLite 持久化:连接串从 RootPath 取
+            services.AddDbContextFactory<ManInBlackDbContext>((sp, o) =>
+            {
+                var root = sp.GetRequiredService<IOptions<AgentStorageOptions>>().Value.RootPath;
+                Directory.CreateDirectory(root);
+                o.UseSqlite($"Data Source={Path.Combine(root, "maninblack.db")}");
+                o.AddInterceptors(new SqliteInitInterceptor());
+            });
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();

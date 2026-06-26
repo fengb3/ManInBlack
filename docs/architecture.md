@@ -49,7 +49,8 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Middlewares/`     | 15 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools、DelegationTools  |
 | `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter（LargeResultFilter 已注释） |
-| `Services/`        | SkillService、EventBus、FileUserWorkspace、FileAgentStateStorage、AfterToolCallPolicy 等 |
+| `Services/`        | SkillService、EventBus、FileUserWorkspace、AfterToolCallPolicy 等 |
+| `Persistence/`     | SqliteAgentStateStorage、SqliteUserStorage、ManInBlackDbContext（EF Core + SQLite） |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
 
 此外还包含 `ModelChoice`（纯数据结构：Schema/ApiKey/BaseUrl/ModelId）、`ChatClientProviderExtensions`，以及 DI 注册入口。
@@ -237,13 +238,15 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 
 ### 概述
 
-框架在消息持久化（`.jsonl`）基础上增加了**状态快照**机制，用于崩溃恢复和断点续传。快照保存 Agent 的 `SystemPrompt`、`Items` 字典等运行时状态，与消息文件并行存储。
+框架使用 **SQLite**（EF Core 10）持久化会话消息和状态快照，用于崩溃恢复和断点续传。所有运行期数据存储在 `{AgentStorageOptions.RootPath}/maninblack.db`（默认 `~/.man-in-black/maninblack.db`）。
+
+详见 [存储指南](./storage-guide.md)。
 
 ### 存储接口
 
 - **`ISessionStorage`** — 消息持久化接口（`SaveMessage` / `LoadMessages`）
 - **`IAgentStateStorage`** — 扩展 `ISessionStorage`，增加 `LoadSnapshotAsync`、`SaveSnapshotAsync`、`DeleteSnapshotAsync`
-- **`FileAgentStateStorage`** — 默认实现，同时满足两个接口。快照存储为 `{sessionId}.state.json`，消息存储为 `{sessionId}.jsonl`，位于同一 `sessions/` 目录
+- **`SqliteAgentStateStorage`** — 默认实现（`Persistence/` 模块），基于 EF Core + SQLite，同时满足两个接口
 
 ### 检查点机制
 
@@ -259,10 +262,10 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 
 ```
 ReadPersistenceMiddleware
-    ├── 加载 {sessionId}.state.json
+    ├── 从 SQLite 加载会话快照
     ├── 恢复 SystemPrompt、Items 到 AgentContext
     ├── 注入 SaveCheckpoint 回调
-    └── 继续正常管道流程（加载 .jsonl 消息 → 执行）
+    └── 继续正常管道流程（从 SQLite 加载消息 → 执行）
 ```
 
 ---
