@@ -29,12 +29,15 @@
   </Folder>
   <Folder Name="/Demo/">
     <Project Path="demo/AgentConsole/AgentConsole.csproj" />
+    <Project Path="demo/Dashboard/Dashboard.csproj" />
     <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
     <Project Path="demo/GitHubAdaptor/GitHubAdaptor.csproj" />
     <Project Path="demo/Playground/Playground.csproj" />
   </Folder>
   <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
+  <Folder Name="/src/" />
   <Folder Name="/Test/">
+    <Project Path="test/Dashboard.Tests/Dashboard.Tests.csproj" />
     <Project Path="test/FeishuAdaptor.Tests/FeishuAdaptor.Tests.csproj" />
   </Folder>
 </Solution>
