@@ -6,9 +6,14 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [error, setError] = useState('')
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const res = await api.login(password)
-    if (res.ok) onLoggedIn()
-    else setError('密码错误')
+    try {
+      const res = await api.login(password)
+      if (res.ok) onLoggedIn()
+      else setError('密码错误')
+    }
+    catch {
+      setError('网络错误,请重试')
+    }
   }
   return (
     <form className="login" onSubmit={submit}>
