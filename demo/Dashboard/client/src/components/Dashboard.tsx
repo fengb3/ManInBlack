@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react'
 import SessionsPanel from './SessionsPanel'
-import UsersPanel from './UsersPanel'
 import SearchPanel from './SearchPanel'
 import MessageList from './MessageList'
 
-type Tab = 'sessions' | 'users' | 'search'
+type Tab = 'sessions' | 'search'
 
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('sessions')
@@ -23,11 +22,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         <aside className="sidebar">
           <nav className="tabs">
             <button className={tab === 'sessions' ? 'active' : ''} onClick={() => setTab('sessions')}>会话</button>
-            <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>用户</button>
             <button className={tab === 'search' ? 'active' : ''} onClick={() => setTab('search')}>搜索</button>
           </nav>
           {tab === 'sessions' && <SessionsPanel activeSession={activeSession} onSelect={setActiveSession} onDbError={handleDbError} />}
-          {tab === 'users' && <UsersPanel onSelect={s => { setActiveSession(s); setTab('sessions') }} onDbError={handleDbError} />}
           {tab === 'search' && <SearchPanel onSelect={setActiveSession} onDbError={handleDbError} />}
         </aside>
         <main className="main">

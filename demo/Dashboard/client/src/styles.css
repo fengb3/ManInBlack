@@ -22,3 +22,9 @@ pre { background: #f6f8fa; padding: 8px; overflow: auto; border-radius: 4px; }
 .snippet { font-size: 12px; }
 /* spec §10: 数据库不可用时顶部横幅 */
 .db-error-banner { background: #dc2626; color: #fff; padding: 8px 16px; text-align: center; font-weight: 600; cursor: pointer; }
+/* 会话按用户分组(合并原 会话/用户 tab) */
+.sessions-by-user .user-group { border-bottom: 1px solid #eee; }
+.sessions-by-user .user-group > summary { padding: 8px 12px; cursor: pointer; font-weight: 600; background: #fafafa; }
+.sessions-by-user .user-group > summary:hover { background: #f0f0f5; }
+.sessions-by-user .session-list { padding: 0; }
+.sid { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; word-break: break-all; }
