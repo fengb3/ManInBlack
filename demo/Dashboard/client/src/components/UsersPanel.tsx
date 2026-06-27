@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, ApiError } from '../api'
 import type { UserSummary } from '../types'
 
-export default function UsersPanel({ onSelect }: { onSelect: (s: string) => void }) {
+export default function UsersPanel({ onSelect, onDbError }: { onSelect: (s: string) => void; onDbError: () => void }) {
   const [users, setUsers] = useState<UserSummary[]>([])
   const [error, setError] = useState('')
-  useEffect(() => { api.users().then(setUsers).catch(e => setError(String(e))) }, [])
+  useEffect(() => {
+    api.users().then(setUsers).catch(e => {
+      if (e instanceof ApiError && e.status === 503) onDbError()
+      else setError(String(e))
+    })
+  }, [onDbError])
   if (error) return <div className="error">{error}</div>
   return (
     <ul className="user-list">

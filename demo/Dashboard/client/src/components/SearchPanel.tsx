@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { api } from '../api'
+import { api, ApiError } from '../api'
 import type { SearchResult } from '../types'
 
-export default function SearchPanel({ onSelect }: { onSelect: (s: string) => void }) {
+export default function SearchPanel({ onSelect, onDbError }: { onSelect: (s: string) => void; onDbError: () => void }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [error, setError] = useState('')
@@ -10,7 +10,12 @@ export default function SearchPanel({ onSelect }: { onSelect: (s: string) => voi
     e.preventDefault()
     if (!q.trim()) return
     setError('')
-    try { setResults(await api.search(q)) } catch (ex) { setError(String(ex)) }
+    try {
+      setResults(await api.search(q))
+    } catch (ex) {
+      if (ex instanceof ApiError && ex.status === 503) onDbError()
+      else setError(String(ex))
+    }
   }
   return (
     <div>

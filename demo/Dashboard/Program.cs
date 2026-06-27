@@ -84,18 +84,25 @@ app.MapPost("/api/logout", async (HttpContext ctx) =>
     return Results.Ok();
 }).RequireAuthorization();
 
+// spec §10: 数据端点 DB 异常统一返回 503
+static async Task<IResult> Db<T>(Func<Task<T>> query)
+{
+    try { return Results.Ok(await query()); }
+    catch { return Results.Json(new { error = "database-unavailable" }, statusCode: 503); }
+}
+
 // 数据端点(均需登录)
-app.MapGet("/api/sessions", async (ChatHistoryQueries q, CancellationToken ct) =>
-    Results.Ok(await q.ListSessionsAsync(ct))).RequireAuthorization();
+app.MapGet("/api/sessions", (ChatHistoryQueries q, CancellationToken ct) =>
+    Db(() => q.ListSessionsAsync(ct))).RequireAuthorization();
 
-app.MapGet("/api/sessions/{sessionId}/messages", async (string sessionId, ChatHistoryQueries q, CancellationToken ct) =>
-    Results.Ok(await q.GetSessionMessagesAsync(sessionId, ct))).RequireAuthorization();
+app.MapGet("/api/sessions/{sessionId}/messages", (string sessionId, ChatHistoryQueries q, CancellationToken ct) =>
+    Db(() => q.GetSessionMessagesAsync(sessionId, ct))).RequireAuthorization();
 
-app.MapGet("/api/users", async (ChatHistoryQueries q, CancellationToken ct) =>
-    Results.Ok(await q.ListUsersAsync(ct))).RequireAuthorization();
+app.MapGet("/api/users", (ChatHistoryQueries q, CancellationToken ct) =>
+    Db(() => q.ListUsersAsync(ct))).RequireAuthorization();
 
-app.MapGet("/api/search", async (string? q, ChatHistoryQueries queries, CancellationToken ct) =>
-    Results.Ok(await queries.SearchAsync(q ?? "", ct))).RequireAuthorization();
+app.MapGet("/api/search", (string? q, ChatHistoryQueries queries, CancellationToken ct) =>
+    Db(() => queries.SearchAsync(q ?? "", ct))).RequireAuthorization();
 
 app.MapFallbackToFile("index.html");
 
