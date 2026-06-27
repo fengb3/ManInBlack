@@ -21,4 +21,4 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 pre { background: #f6f8fa; padding: 8px; overflow: auto; border-radius: 4px; }
 .snippet { font-size: 12px; }
 /* spec §10: 数据库不可用时顶部横幅 */
-.db-error-banner { background: #dc2626; color: #fff; padding: 8px 16px; text-align: center; font-weight: 600; }
+.db-error-banner { background: #dc2626; color: #fff; padding: 8px 16px; text-align: center; font-weight: 600; cursor: pointer; }

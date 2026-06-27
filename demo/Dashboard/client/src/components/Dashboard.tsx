@@ -14,7 +14,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const handleDbError = useCallback(() => setDbError(true), [])
   return (
     <div>
-      {dbError && <div className="db-error-banner">无法读取数据库</div>}
+      {dbError && <div className="db-error-banner" onClick={() => setDbError(false)}>无法读取数据库</div>}
       <header className="topbar">
         <span>ManInBlack Dashboard</span>
         <button onClick={onLogout}>退出</button>
