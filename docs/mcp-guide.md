@@ -25,6 +25,18 @@ ManInBlack 作为 MCP（Model Context Protocol）client，连接外部 MCP serve
     "Arguments": ["-y", "@modelcontextprotocol/server-brave-search"],
     "Environment": { "BRAVE_API_KEY": "BSAxxx" },
     "ConnectionTimeoutSeconds": 60
+  },
+  // 智谱 GLM-4.6V 视觉理解 MCP（stdio，npx 拉起官方 @z_ai/mcp-server）。
+  // 复用智谱 key；工具暴露为 glm-vision__image_analysis / ui_to_artifact 等。
+  "glm-vision": {
+    "Transport": "stdio",
+    "Command": "npx",
+    "Arguments": ["-y", "@z_ai/mcp-server@latest"],
+    "Environment": {
+      "Z_AI_API_KEY": "<智谱 API Key>",
+      "Z_AI_MODE": "ZHIPU"
+    },
+    "ConnectionTimeoutSeconds": 60
   }
 }
 ```
@@ -53,6 +65,8 @@ MCP 工具在框架内全局名为 `"{serverName}__{toolName}"`（如 `tavily__t
 ## 限制与注意
 
 - **stdio 子进程**：Windows 需 `npx`/`node` 在 PATH；Linux 首次 `npx -y` 下载慢，建议镜像预装或加大 `ConnectionTimeoutSeconds`。stderr 已接 `StandardErrorLines` 防管道阻塞。
+- **Windows 命令包裹**：`Command` 写 `npx`/`node` 等即可，**无需**手动加 `cmd /c`——MCP SDK 的 `StdioClientTransport` 在 Windows 上会自动用 `cmd.exe /c` 包裹非 shell 命令（`StdioClientTransport.cs`，注释原文 "usually npx or uvicorn"）。故 `Command: "npx"` 在 Windows/Linux 通用。
+- **stdio 文件路径**：stdio MCP 子进程在宿主文件系统运行，**不受** Agent 工作空间隔离约束。如 GLM 视觉 MCP 的 `image_source` 传宿主绝对路径（如 `C:/Users/.../x.png`）即可，正斜杠在 Windows 下 Node 亦兼容。
 - **http 境外**：官方搜索 MCP server（Brave/Tavily）在境外，国内部署（如阿里云）访问可能需代理。
 - **重试交互**：MCP 工具异常被 `ToolExecutor` 写入 `ctx.Error`；`RetryMiddleware` 若作用于工具层可能对付费 API 重复计费，注意配置。
 - **filter 复用**：MCP 工具不走源生成器，首版仅内联挂 `AgentLifecycleFilter`；本地 `[AiTool.HasFilter<T>]` 的其他 filter（如 `LoggingFilter`）不自动挂。
