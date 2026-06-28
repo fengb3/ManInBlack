@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import type { SessionSummary } from '../types'
 import SessionsPanel from './SessionsPanel'
@@ -46,6 +46,8 @@ export default function Dashboard({ theme, onToggleTheme, onLogout }: {
 
   const activeSummary = sessions?.find(s => s.sessionId === activeId) ?? null
   const selectSession = (id: string) => { setActiveId(id); setSidebarOpen(false) }
+  // 稳定引用:供 MessageList/SearchPanel 的 effect 依赖,避免无关重渲染触发重复拉取
+  const handleDbError = useCallback(() => setDbError(true), [])
 
   return (
     <div className="app">
@@ -84,13 +86,13 @@ export default function Dashboard({ theme, onToggleTheme, onLogout }: {
               activeSession={activeId} onSelect={selectSession} />
           </div>
           <div className={'panel search-panel' + (tab === 'search' ? ' active' : '')}>
-            <SearchPanel activeSession={activeId} onSelect={selectSession} onDbError={() => setDbError(true)} />
+            <SearchPanel activeSession={activeId} onSelect={selectSession} onDbError={handleDbError} />
           </div>
         </aside>
 
         <main className="main">
           {activeId
-            ? <MessageList sessionId={activeId} summary={activeSummary} onDbError={() => setDbError(true)} />
+            ? <MessageList sessionId={activeId} summary={activeSummary} onDbError={handleDbError} />
             : (
               <div className="m-state">
                 <div className="ph">{CHAT}</div>
