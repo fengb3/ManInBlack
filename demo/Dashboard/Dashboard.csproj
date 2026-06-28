@@ -11,6 +11,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AppHost.ServiceDefaults\ManInBlack.AppHost.ServiceDefaults.csproj" />
+  </ItemGroup>
   <Target Name="BuildClient" BeforeTargets="Publish">
     <Exec Command="npm ci" WorkingDirectory="client" Condition="Exists('client/package-lock.json')" />
     <Exec Command="npm install" WorkingDirectory="client" Condition="!Exists('client/package-lock.json')" />

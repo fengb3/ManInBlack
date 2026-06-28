@@ -13,6 +13,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 
 // 1) 配置源:复用 ~/.man-in-black/settings.json
 builder.Configuration.AddManInBlackSettings();
@@ -59,6 +60,7 @@ AuthService.EnsureConfigured(app.Services.GetRequiredService<IOptions<DashboardO
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapDefaultEndpoints();
 
 // 静态文件 + SPA 回退(wwwroot 由 Vite 构建产物填充)
 app.UseDefaultFiles();
