@@ -17,31 +17,42 @@ public static class ChatMessageRenderer
         var blocks = new List<MessageBlock>(message.Contents.Count);
         foreach (var content in message.Contents)
         {
-            blocks.Add(content switch
+            // 单块映射失败不丢整条消息:降级为 Unknown 块,其余块照常渲染。
+            try { blocks.Add(MapBlock(content)); }
+            catch (Exception ex)
             {
-                TextContent t => new MessageBlock { Kind = MessageBlockKind.Text, Text = t.Text },
-                FunctionCallContent fc => new MessageBlock
+                blocks.Add(new MessageBlock
                 {
-                    Kind = MessageBlockKind.ToolCall,
-                    ToolName = fc.Name,
-                    ArgumentsJson = JsonSerializer.Serialize(fc.Arguments, JsonOptions),
-                },
-                FunctionResultContent fr => new MessageBlock
-                {
-                    Kind = MessageBlockKind.ToolResult,
-                    ResultJson = fr.Result switch
-                    {
-                        null => "null",
-                        string s => s,
-                        _ => SafeSerialize(fr.Result),
-                    },
-                },
-                TextReasoningContent r => new MessageBlock { Kind = MessageBlockKind.Reasoning, Text = r.Text },
-                _ => new MessageBlock { Kind = MessageBlockKind.Unknown, RawJson = SafeSerialize(content) },
-            });
+                    Kind = MessageBlockKind.Unknown,
+                    RawJson = JsonSerializer.Serialize(new { error = ex.Message, type = content.GetType().Name }, JsonOptions),
+                });
+            }
         }
         return new MessageView { Role = message.Role.Value, Blocks = blocks };
     }
+
+    private static MessageBlock MapBlock(AIContent content) => content switch
+    {
+        TextContent t => new MessageBlock { Kind = MessageBlockKind.Text, Text = t.Text },
+        FunctionCallContent fc => new MessageBlock
+        {
+            Kind = MessageBlockKind.ToolCall,
+            ToolName = fc.Name,
+            ArgumentsJson = JsonSerializer.Serialize(fc.Arguments, JsonOptions),
+        },
+        FunctionResultContent fr => new MessageBlock
+        {
+            Kind = MessageBlockKind.ToolResult,
+            ResultJson = fr.Result switch
+            {
+                null => "null",
+                string s => s,
+                _ => SafeSerialize(fr.Result),
+            },
+        },
+        TextReasoningContent r => new MessageBlock { Kind = MessageBlockKind.Reasoning, Text = r.Text },
+        _ => new MessageBlock { Kind = MessageBlockKind.Unknown, RawJson = SafeSerialize(content) },
+    };
 
     /// <summary>序列化任意对象;若类型不受 JSON 多态契约支持(如未注册的 AIContent 子类),回退为类型名 JSON,保证不抛。</summary>
     private static string SafeSerialize(object obj)

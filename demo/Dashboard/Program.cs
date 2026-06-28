@@ -84,11 +84,16 @@ app.MapPost("/api/logout", async (HttpContext ctx) =>
     return Results.Ok();
 }).RequireAuthorization();
 
-// spec §10: 数据端点 DB 异常统一返回 503
-static async Task<IResult> Db<T>(Func<Task<T>> query)
+// spec §10: 数据端点异常统一返回 503;客户端断连(OCE)交回框架,勿伪装 503
+async Task<IResult> Db<T>(Func<Task<T>> query)
 {
     try { return Results.Ok(await query()); }
-    catch { return Results.Json(new { error = "database-unavailable" }, statusCode: 503); }
+    catch (OperationCanceledException) { throw; } // 客户端断连:不返 503,交回 ASP.NET Core 处理
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Dashboard 数据端点查询失败,返回 503");
+        return Results.Json(new { error = "database-unavailable" }, statusCode: 503);
+    }
 }
 
 // 数据端点(均需登录)

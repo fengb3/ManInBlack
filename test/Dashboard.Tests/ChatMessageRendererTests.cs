@@ -60,5 +60,27 @@ public class ChatMessageRendererTests
         Assert.NotNull(b.RawJson);
     }
 
+    [Fact]
+    public void Render_BlockThatFailsToSerialize_FallsBackToUnknown_NotDroppingMessage()
+    {
+        // 某个块序列化抛异常(FunctionCallContent 的 arguments 含抛异常属性),
+        // 不应让整条消息被丢弃,而应降级为 Unknown 块、保留其余块。
+        var boom = new FunctionCallContent("c1", "tool",
+            new Dictionary<string, object?> { ["x"] = new Boom() });
+        var msg = new ChatMessage(ChatRole.Assistant, [new TextContent("ok"), boom]);
+
+        var view = ChatMessageRenderer.Render(msg);
+
+        Assert.Equal("assistant", view.Role);
+        Assert.Equal(2, view.Blocks.Count); // 两块都在,没丢整条
+        Assert.Equal(MessageBlockKind.Text, view.Blocks[0].Kind);
+        var bad = view.Blocks[1];
+        Assert.Equal(MessageBlockKind.Unknown, bad.Kind);
+        Assert.Contains("boom", bad.RawJson!); // 错误信息进了 RawJson
+    }
+
     sealed class OtherContent : AIContent { }
+
+    // 序列化时读 X 属性抛 InvalidOperationException(System.Text.Json 包装为 JsonException)
+    sealed class Boom { public int X => throw new InvalidOperationException("boom"); }
 }
