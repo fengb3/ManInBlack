@@ -33,6 +33,7 @@
     <Project Path="demo/FeishuAdaptor/FeishuAdaptor.csproj" />
     <Project Path="demo/GitHubAdaptor/GitHubAdaptor.csproj" />
     <Project Path="demo/Playground/Playground.csproj" />
+    <Project Path="demo/AppHost.ServiceDefaults/ManInBlack.AppHost.ServiceDefaults.csproj" />
   </Folder>
   <Project Path="test/ManInBlack.AI.Tests/ManInBlack.AI.Tests.csproj" />
   <Folder Name="/Test/">
