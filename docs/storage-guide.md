@@ -10,6 +10,8 @@ ManInBlack 使用 **SQLite**（通过 EF Core 10 + `Microsoft.EntityFrameworkCor
 
 无需新增配置键——`RootPath` 已有的默认值（`~/.man-in-black`）即为 DB 所在目录。
 
+> 可用 [Dashboard](dashboard-guide.md) demo 在浏览器查看库内会话消息与用户。
+
 ---
 
 ## 数据库结构
