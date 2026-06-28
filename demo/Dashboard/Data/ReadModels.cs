@@ -16,12 +16,12 @@ public sealed record UserSummary
     public required IReadOnlyList<string> SessionIds { get; init; }
 }
 
-public enum MessageBlockKind { Text, ToolCall, ToolResult, Unknown }
+public enum MessageBlockKind { Text, ToolCall, ToolResult, Reasoning, Unknown }
 
 public sealed record MessageBlock
 {
     public required MessageBlockKind Kind { get; init; }
-    public string? Text { get; init; }          // Text
+    public string? Text { get; init; }          // Text / Reasoning
     public string? ToolName { get; init; }       // ToolCall
     public string? ArgumentsJson { get; init; }  // ToolCall
     public string? ResultJson { get; init; }     // ToolResult

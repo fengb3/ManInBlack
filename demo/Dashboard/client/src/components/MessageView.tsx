@@ -30,10 +30,27 @@ function ToolBlock({ label, name, status, json }: {
   )
 }
 
+// 思考链(reasoning):默认折叠的「思考」卡片,暗化正文
+function ReasoningBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={'block reasoning' + (open ? ' open' : '')}>
+      <div className="block-head" onClick={() => setOpen(o => !o)}>
+        {CHEV}<span className="b-label">思考</span>
+      </div>
+      <div className="block-body reasoning-body">
+        <div className="text"><ReactMarkdown>{text}</ReactMarkdown></div>
+      </div>
+    </div>
+  )
+}
+
 function BlockView({ block }: { block: MessageBlock }) {
   switch (block.kind) {
     case 'text':
       return <div className="text"><ReactMarkdown>{block.text || ''}</ReactMarkdown></div>
+    case 'reasoning':
+      return <ReasoningBlock text={block.text || ''} />
     case 'toolCall':
       return <ToolBlock label="工具调用" name={block.toolName} json={block.argumentsJson || ''} />
     case 'toolResult':

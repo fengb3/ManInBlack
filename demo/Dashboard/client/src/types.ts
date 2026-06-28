@@ -1,4 +1,4 @@
-export type MessageBlockKind = 'text' | 'toolCall' | 'toolResult' | 'unknown'
+export type MessageBlockKind = 'text' | 'toolCall' | 'toolResult' | 'reasoning' | 'unknown'
 
 export interface MessageBlock {
   kind: MessageBlockKind

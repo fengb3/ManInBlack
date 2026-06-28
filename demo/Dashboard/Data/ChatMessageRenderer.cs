@@ -36,6 +36,7 @@ public static class ChatMessageRenderer
                         _ => SafeSerialize(fr.Result),
                     },
                 },
+                TextReasoningContent r => new MessageBlock { Kind = MessageBlockKind.Reasoning, Text = r.Text },
                 _ => new MessageBlock { Kind = MessageBlockKind.Unknown, RawJson = SafeSerialize(content) },
             });
         }

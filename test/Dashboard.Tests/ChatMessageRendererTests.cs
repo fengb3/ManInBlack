@@ -41,6 +41,16 @@ public class ChatMessageRendererTests
     }
 
     [Fact]
+    public void Render_Reasoning_MapsReasoningBlock()
+    {
+        var msg = new ChatMessage(ChatRole.Assistant, [new TextReasoningContent("let me think...")]);
+        var view = ChatMessageRenderer.Render(msg);
+        var b = Assert.Single(view.Blocks);
+        Assert.Equal(MessageBlockKind.Reasoning, b.Kind);
+        Assert.Equal("let me think...", b.Text);
+    }
+
+    [Fact]
     public void Render_UnknownContent_MapsUnknownBlock()
     {
         var msg = new ChatMessage(ChatRole.System, [new OtherContent()]);
