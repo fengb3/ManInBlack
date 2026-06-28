@@ -107,6 +107,7 @@ factory.RegisterPipeline("sub-agent", builder => builder
 - 工具调用后会重置 `_lastLlmType`，确保后续文本创建新卡片而非追加到旧卡片
 - 工具结果超过 500 字符时截断显示
 - 子 Agent 与父 Agent 共享同一工作空间（通过 `RootUserId` 向上追溯到根用户）
+- 上传文件后发给 agent 的提示词为：`用户上传了文件 {fileName} 已经保存在了你的工作路径 {workspaceDir}，在你了解用户为何上传它之前，不要读取文件`（`AgentLauncher.BuildFileReceivedNotice`）。同时告知文件名与确切工作路径，并要求 agent 先了解用户意图、再决定是否读取。
 - **用户上传的文件会落到该发送者自己的工作空间**（`{RootPath}/workspaces/{SelfHostUserId}/`）。文件下载发生在 Agent 运行之前的独立 DI scope，此时 `AgentContext` 尚未被 `AgentFactory` 填充，而 `IUserWorkspace`（`FileUserWorkspace`）依据 `AgentContext.RootUserId` 决定目录。因此 `HandleMessage` 通过 `AgentLauncher.ResolveWorkspaceDirectory(sp, userId)` 在解析 workspace 前先把真实发送者写入 `AgentContext.RootUserId/ParentId`——否则两者为空，所有用户的文件都会静默堆进「空字符串用户」的工作空间（表现为文件存到了别人的 workspace 编号下）。
 
 ---

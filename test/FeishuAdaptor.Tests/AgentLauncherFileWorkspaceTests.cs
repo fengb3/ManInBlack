@@ -77,6 +77,19 @@ public class AgentLauncherFileWorkspaceTests
         }
     }
 
+    [Fact]
+    public void BuildFileReceivedNotice_包含文件名与工作空间路径()
+    {
+        var notice = AgentLauncher.BuildFileReceivedNotice(
+            "文集.pdf",
+            "/root/.man-in-black/workspaces/1"
+        );
+
+        // 文件名和工作空间路径都要出现在发给 agent 的提示词里
+        Assert.Contains("文集.pdf", notice);
+        Assert.Contains("/root/.man-in-black/workspaces/1", notice);
+    }
+
     /// <summary>
     /// 内存版 IUserStorage,模拟 SQLite 自增主键:不同 userId 对应不同 SelfHostUserId。
     /// 其中空字符串用户映射到 "3",复现历史 bug 的归宿。

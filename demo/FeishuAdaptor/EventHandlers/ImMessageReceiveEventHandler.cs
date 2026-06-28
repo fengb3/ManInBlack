@@ -142,6 +142,15 @@ public class AgentLauncher(
         return sp.GetRequiredService<IUserWorkspace>().WorkingDirectory;
     }
 
+    /// <summary>
+    /// 构造「用户上传文件」后发给 agent 的提示词。
+    /// </summary>
+    internal static string BuildFileReceivedNotice(string fileName, string workspaceDir)
+    {
+        return $"用户上传了文件 {fileName} 已经保存在了你的工作路径 {workspaceDir}，"
+            + "在你了解用户为何上传它之前，不要读取文件";
+    }
+
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
@@ -168,7 +177,8 @@ public class AgentLauncher(
                     var messageId = input.Event!.Message!.MessageId!;
 
                     // 文件落到「当前发送者」的工作空间,而非空字符串用户
-                    var savePath = Path.Combine(ResolveWorkspaceDirectory(sp, userId), fileName);
+                    var workspaceDir = ResolveWorkspaceDirectory(sp, userId);
+                    var savePath = Path.Combine(workspaceDir, fileName);
 
                     using var response =
                         await tenantApi.GetImV1MessagesByMessageIdResourcesByFileKeyAsync(
@@ -183,11 +193,7 @@ public class AgentLauncher(
                     await using var fileStream = File.Create(savePath);
                     await stream.CopyToAsync(fileStream, ct);
 
-                    result =
-                        "["
-                        + $"User has send you a file: {fileName} — saved to your workspace. "
-                        + "don't read the file before you know user why they upload this file."
-                        + "]";
+                    result = BuildFileReceivedNotice(fileName, workspaceDir);
 
                     logger.LogInformation(
                         "Downloaded file {fileName} for user {userId}",
