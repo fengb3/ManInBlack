@@ -6,6 +6,7 @@ using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -122,6 +123,25 @@ public class AgentLauncher(
         }
     }
 
+    /// <summary>
+    /// 在 Agent 运行之前的独立 scope 中,解析指定用户的工作空间目录。
+    /// </summary>
+    /// <remarks>
+    /// 文件下载发生在 Agent 运行之前,此时 scope 内的 <see cref="AgentContext"/> 尚未被
+    /// AgentFactory 填充。<see cref="IUserWorkspace"/> 的实现(FileUserWorkspace)依据
+    /// <see cref="AgentContext.RootUserId"/> 决定目录,因此这里必须先写入真实发送者,
+    /// 否则 RootUserId/ParentId 为空,所有用户的文件都会落到「空字符串用户」的工作空间。
+    /// </remarks>
+    internal static string ResolveWorkspaceDirectory(IServiceProvider sp, string userId)
+    {
+        var agentContext = sp.GetRequiredService<AgentContext>();
+        agentContext.RootUserId = userId;
+        agentContext.ParentId = userId;
+        agentContext.ParentType = "feishu_user";
+
+        return sp.GetRequiredService<IUserWorkspace>().WorkingDirectory;
+    }
+
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
@@ -141,14 +161,14 @@ public class AgentLauncher(
                 try
                 {
                     var tenantApi = sp.GetRequiredService<IFeishuTenantApi>();
-                    var userWorkspace = sp.GetRequiredService<IUserWorkspace>();
 
                     var doc = JsonDocument.Parse(messageContent);
                     var fileKey = doc.RootElement.GetProperty("file_key").GetString()!;
                     var fileName = doc.RootElement.GetProperty("file_name").GetString()!;
                     var messageId = input.Event!.Message!.MessageId!;
 
-                    var savePath = Path.Combine(userWorkspace.WorkingDirectory, fileName);
+                    // 文件落到「当前发送者」的工作空间,而非空字符串用户
+                    var savePath = Path.Combine(ResolveWorkspaceDirectory(sp, userId), fileName);
 
                     using var response =
                         await tenantApi.GetImV1MessagesByMessageIdResourcesByFileKeyAsync(
