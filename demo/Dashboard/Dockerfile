@@ -4,7 +4,7 @@ WORKDIR /client
 COPY demo/Dashboard/client/package*.json ./
 RUN npm ci
 COPY demo/Dashboard/client/ ./
-RUN npm run build          # 产物 → /client/dist
+RUN npm run build          # 产物 → /wwwroot
 
 # 阶段 2:.NET SDK 发布(关掉 BuildClient,用阶段 1 的 dist)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
