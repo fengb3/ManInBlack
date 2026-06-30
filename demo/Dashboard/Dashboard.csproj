@@ -14,7 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AppHost.ServiceDefaults\ManInBlack.AppHost.ServiceDefaults.csproj" />
   </ItemGroup>
-  <Target Name="BuildClient" BeforeTargets="Publish">
+  <Target Name="BuildClient" BeforeTargets="Publish" Condition="'$(BuildClient)' != 'false'">
     <Exec Command="npm ci" WorkingDirectory="client" Condition="Exists('client/package-lock.json')" />
     <Exec Command="npm install" WorkingDirectory="client" Condition="!Exists('client/package-lock.json')" />
     <Exec Command="npm run build" WorkingDirectory="client" />
