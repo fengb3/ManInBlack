@@ -3,6 +3,10 @@
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+// 生产(发布/compose)目标:Docker Compose publisher。
+// 容器级配置(卷/HOME/端口/caps)统一在 Task 5 的 compose 定稿。
+builder.AddDockerComposeEnvironment("prod");
+
 // 飞书 bot:沿用其 launchSettings 的 http profile(:5249);/health 由 ServiceDefaults 提供。
 var feishu = builder.AddProject<Projects.FeishuAdaptor>("feishu")
     .WithHttpHealthCheck("/health");
