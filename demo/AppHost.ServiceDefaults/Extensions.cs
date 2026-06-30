@@ -108,13 +108,13 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
+        // /health 无条件映射:生产容器内 healthcheck/compose restart 需要它。
+        // 仅容器内本地探测、不公网发布(Dashboard 端口绑 127.0.0.1),无新增公网信息泄露面。
+        app.MapHealthChecks(HealthEndpointPath);
+
+        // /alive 仍仅 Development(诊断用,生产无需暴露)
         if (app.Environment.IsDevelopment())
         {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
-
             // Only health checks tagged with the "live" tag must pass for app to be considered alive
             app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
             {
