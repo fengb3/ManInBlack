@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FeishuAdaptor.FeishuCard;
 using FeishuNetSdk;
 using FeishuNetSdk.Im.Events;
@@ -6,6 +6,7 @@ using FeishuNetSdk.Services;
 using ManInBlack.AI;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
+using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -58,12 +59,14 @@ public class AgentLauncher(
     public async Task LaunchAsync(EventV2Dto<ImMessageReceiveV1EventBodyDto> input)
     {
         var userId = input.Event!.Sender!.SenderId!.UserId!;
+        var openId = input.Event!.Sender!.SenderId!.OpenId!;
 
         var cts = factory.RegisterAndCancelExisting(userId);
 
         logger.LogInformation(
-            "Received message from user {userId}: {content}",
+            "Received message from user {userId} (open id: {openId}): {content}",
             userId,
+            openId,
             input.Event.Message?.Content
         );
 
@@ -85,15 +88,23 @@ public class AgentLauncher(
                 ctx =>
                 {
                     ctx.SystemPrompt += $"""
-                        <system>
-                        你的面对的用户的 飞书 user id 是: {userId}
-                        </system>
-                        """;
+                    <system>
+                    你的面对的用户的飞书 
+                    user id: {userId}
+                    open id: {openId}
+                    </system>
+                    """;
 
                     var bus = ctx.ServiceProvider.GetRequiredService<EventBus>();
-                    cardSession = new FeishuCardSession(ctx.ServiceProvider, userId, bus, ctx.AgentId);
+                    cardSession = new FeishuCardSession(
+                        ctx.ServiceProvider,
+                        userId,
+                        bus,
+                        ctx.AgentId
+                    );
                     cardSession.Subscribe();
-                });
+                }
+            );
 
             await foreach (var _ in updates) { }
 
@@ -115,10 +126,7 @@ public class AgentLauncher(
         finally
         {
             factory.Release(userId, cts);
-            logger.LogInformation(
-                "Finished processing message from user {userId}",
-                userId
-            );
+            logger.LogInformation("Finished processing message from user {userId}", userId);
         }
     }
 
@@ -141,6 +149,10 @@ public class AgentLauncher(
                 try
                 {
                     var tenantApi = sp.GetRequiredService<IFeishuTenantApi>();
+
+                    var agentContext = sp.GetRequiredService<AgentContext>();
+                    agentContext.RootUserId = userId;
+
                     var userWorkspace = sp.GetRequiredService<IUserWorkspace>();
 
                     var doc = JsonDocument.Parse(messageContent);
@@ -196,7 +208,8 @@ public class AgentLauncher(
                     messageType,
                     userId
                 );
-                result = $"[Received unsupported message type: {messageType}, content: {messageContent}]";
+                result =
+                    $"[Received unsupported message type: {messageType}, content: {messageContent}]";
                 break;
             }
         }
