@@ -130,6 +130,34 @@ public class AgentLauncher(
         }
     }
 
+    /// <summary>
+    /// 在 Agent 运行之前的独立 scope 中,解析指定用户的工作空间目录。
+    /// </summary>
+    /// <remarks>
+    /// 文件下载发生在 Agent 运行之前,此时 scope 内的 <see cref="AgentContext"/> 尚未被
+    /// AgentFactory 填充。<see cref="IUserWorkspace"/> 的实现(FileUserWorkspace)依据
+    /// <see cref="AgentContext.RootUserId"/> 决定目录,因此这里必须先写入真实发送者,
+    /// 否则 RootUserId/ParentId 为空,所有用户的文件都会落到「空字符串用户」的工作空间。
+    /// </remarks>
+    internal static string ResolveWorkspaceDirectory(IServiceProvider sp, string userId)
+    {
+        var agentContext = sp.GetRequiredService<AgentContext>();
+        agentContext.RootUserId = userId;
+        agentContext.ParentId = userId;
+        agentContext.ParentType = "feishu_user";
+
+        return sp.GetRequiredService<IUserWorkspace>().WorkingDirectory;
+    }
+
+    /// <summary>
+    /// 构造「用户上传文件」后发给 agent 的提示词。
+    /// </summary>
+    internal static string BuildFileReceivedNotice(string fileName, string workspaceDir)
+    {
+        return $"用户上传了文件 {fileName} 已经保存在了你的工作路径 {workspaceDir}，"
+            + "在你了解用户为何上传它之前，不要读取文件";
+    }
+
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
@@ -160,7 +188,9 @@ public class AgentLauncher(
                     var fileName = doc.RootElement.GetProperty("file_name").GetString()!;
                     var messageId = input.Event!.Message!.MessageId!;
 
-                    var savePath = Path.Combine(userWorkspace.WorkingDirectory, fileName);
+                    // 文件落到「当前发送者」的工作空间,而非空字符串用户
+                    var workspaceDir = ResolveWorkspaceDirectory(sp, userId);
+                    var savePath = Path.Combine(workspaceDir, fileName);
 
                     using var response =
                         await tenantApi.GetImV1MessagesByMessageIdResourcesByFileKeyAsync(
@@ -175,11 +205,7 @@ public class AgentLauncher(
                     await using var fileStream = File.Create(savePath);
                     await stream.CopyToAsync(fileStream, ct);
 
-                    result =
-                        "["
-                        + $"User has send you a file: {fileName} — saved to your workspace. "
-                        + "don't read the file before you know user why they upload this file."
-                        + "]";
+                    result = BuildFileReceivedNotice(fileName, workspaceDir);
 
                     logger.LogInformation(
                         "Downloaded file {fileName} for user {userId}",

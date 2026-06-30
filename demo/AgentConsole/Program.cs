@@ -3,6 +3,7 @@ using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Events;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Persistence;
 using ManInBlack.AI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,19 @@ services.AddManInBlack()
 // Agent 定义现在从 settings.json 的 Agents 字段自动加载，无需 AddAgentDefinition 调用
 
 var rootSp = services.BuildServiceProvider();
+
+// 一次性 JSON→SQLite 迁移子命令(执行后退出,不进入对话)
+if (args.Length > 0 && args[0] == "migrate-storage")
+{
+    await rootSp.MigrateManInBlackStorageAsync();
+    var migrator = rootSp.GetRequiredService<JsonToSqliteMigrator>();
+    var summary = await migrator.MigrateAsync();
+    Console.WriteLine($"迁移完成:消息 {summary.Messages},快照 {summary.Snapshots},用户 {summary.Users},跳过 {summary.Skipped}");
+    return;
+}
+
+// 启动期应用 EF Core 迁移(已最新则空操作)
+await rootSp.MigrateManInBlackStorageAsync();
 
 var factory = rootSp.GetRequiredService<AgentFactory>();
 

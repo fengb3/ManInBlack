@@ -107,3 +107,26 @@ factory.RegisterPipeline("sub-agent", builder => builder
 - 工具调用后会重置 `_lastLlmType`，确保后续文本创建新卡片而非追加到旧卡片
 - 工具结果超过 500 字符时截断显示
 - 子 Agent 与父 Agent 共享同一工作空间（通过 `RootUserId` 向上追溯到根用户）
+- 上传文件后发给 agent 的提示词为：`用户上传了文件 {fileName} 已经保存在了你的工作路径 {workspaceDir}，在你了解用户为何上传它之前，不要读取文件`（`AgentLauncher.BuildFileReceivedNotice`）。同时告知文件名与确切工作路径，并要求 agent 先了解用户意图、再决定是否读取。
+- **用户上传的文件会落到该发送者自己的工作空间**（`{RootPath}/workspaces/{SelfHostUserId}/`）。文件下载发生在 Agent 运行之前的独立 DI scope，此时 `AgentContext` 尚未被 `AgentFactory` 填充，而 `IUserWorkspace`（`FileUserWorkspace`）依据 `AgentContext.RootUserId` 决定目录。因此 `HandleMessage` 通过 `AgentLauncher.ResolveWorkspaceDirectory(sp, userId)` 在解析 workspace 前先把真实发送者写入 `AgentContext.RootUserId/ParentId`——否则两者为空，所有用户的文件都会静默堆进「空字符串用户」的工作空间（表现为文件存到了别人的 workspace 编号下）。
+
+---
+
+## 阿里云迁移 runbook（JSON → SQLite）
+
+以下步骤将阿里云服务器上旧的 JSON 文件数据迁移到 SQLite。
+
+```bash
+# 1. 发新二进制(含 SQLite 存储 + migrator + migrate-storage 参数)到服务器
+scp mib-feishu.tar.gz aliyun:~ && ssh aliyun 'tar xzf mib-feishu.tar.gz -C /opt/mib-feishu && chmod -R 755 /opt/mib-feishu'
+# 2. 停服
+ssh aliyun 'systemctl stop mib-feishu'
+# 3. 迁移:读 /root/.man-in-black/sessions + users → 生成 maninblack.db
+ssh aliyun '/opt/mib-feishu/FeishuAdaptor migrate-storage'
+# 4. 核对(journalctl -u mib-feishu 看汇总计数 / ls /root/.man-in-black/maninblack.db)
+# 5. 起服
+ssh aliyun 'systemctl start mib-feishu'
+```
+
+迁移工具为幂等操作，可安全重复运行。旧的 `sessions/` 和 `users/` 目录原地保留不删除，确认无误后手动清理即可。详见 [存储指南](./storage-guide.md)。
+

@@ -138,6 +138,8 @@ services.AddManInBlack()
 | `McpServerBuilder` | `.Transport()` / `.Command()` / `.Arguments()` / `.Endpoint()` / `.Header()` / `.Enabled()` | MCP 服务器配置 |
 | `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode(WorkspaceMode.CustomPath).CustomPath(...))` | 存储与工作空间配置 |
 
+> **存储说明：** `RootPath`（默认 `~/.man-in-black`）下存放 SQLite 数据库文件 `maninblack.db`，无需新增配置键。旧的 `sessions/` 和 `users/` 子目录不再产生新数据（仅一次性迁移工具读取）。详见 [存储指南](./storage-guide.md)。
+
 ### 方式二：AddManInBlackFromSettings（控制台 / 测试）
 
 自动从 `~/.man-in-black/settings.json` 加载配置并注册所有服务：

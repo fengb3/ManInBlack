@@ -13,6 +13,10 @@ dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # 过
 dotnet test test/FeishuAdaptor.Tests                            # 飞书适配器测试（NSubstitute）
 dotnet run --project demo/AgentConsole                          # 控制台 demo
 dotnet run --project demo/FeishuAdaptor                         # 飞书 bot demo
+dotnet run --project demo/Dashboard                            # Dashboard API（:5080）
+cd demo/Dashboard/client && npm run dev                        # Dashboard 前端（:5173）
+dotnet publish demo/Dashboard -c Release                       # 发布（含前端构建）
+dotnet test test/Dashboard.Tests                               # Dashboard 测试
 ```
 
 未配置 linter、formatter 或 CI 管道。无 `global.json`、`Directory.Build.props` 或 `.editorconfig`。
@@ -49,3 +53,5 @@ dotnet run --project demo/FeishuAdaptor                         # 飞书 bot dem
 - [Provider 配置指南](docs/provider-guide.md)
 - [飞书适配器指南](docs/feishu-guide.md)
 - [快速开始](docs/quick-start.md)
+- [存储指南](docs/storage-guide.md)
+- [Dashboard 指南](docs/dashboard-guide.md)

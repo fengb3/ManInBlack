@@ -1,11 +1,9 @@
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Middlewares;
-using ManInBlack.AI.Services;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace ManInBlack.AI.Tests.Middlewares;
@@ -170,39 +168,4 @@ public class CheckpointTests
         Assert.Equal("SessionEnd", snapshot.CheckpointReason);
     }
 
-    /// <summary>
-    /// 损坏快照应返回 null 且不抛异常
-    /// </summary>
-    [Fact]
-    public async Task LoadSnapshot_CorruptedJson_ShouldReturnNull()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), $"mib_test_{Guid.NewGuid()}");
-        Directory.CreateDirectory(tempDir);
-        try
-        {
-            var sessionDir = Path.Combine(tempDir, "sessions");
-            Directory.CreateDirectory(sessionDir);
-
-            await File.WriteAllTextAsync(Path.Combine(sessionDir, "s1.state.json"), "{invalid json");
-
-            var options = new AgentStorageOptions { RootPath = tempDir };
-            var storage = new FileAgentStateStorage(
-                Microsoft.Extensions.Options.Options.Create(options),
-                new FakeLogger<FileAgentStateStorage>());
-
-            var result = await storage.LoadSnapshotAsync("s1");
-            Assert.Null(result);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, true);
-        }
-    }
-
-    private class FakeLogger<T> : ILogger<T>
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => true;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
-    }
 }
