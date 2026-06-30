@@ -499,3 +499,6 @@ demo/FeishuAdaptor/deploy.ps1
 # 通用的「systemd→Aspire 迁移手册」已脱敏,另存于 docs/(入库)。
 docs/superpowers/specs/*aliyun-deployment*
 docs/superpowers/plans/*aliyun-deployment*
+
+# 阿里云部署产物(含服务器路径,私有)
+/deploy/aspire-aliyun/
