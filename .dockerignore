@@ -1,25 +1,20 @@
-﻿**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/.idea
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/azds.yaml
-**/bin
-**/charts
-**/docker-compose*
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
-LICENSE
-README.md
+# 构建产物
+**/bin/
+**/obj/
+# 前端
+**/node_modules/
+demo/Dashboard/wwwroot/
+# Git/IDE/工具
+.git/
+.vs/
+.idea/
+.vscode/
+# 私有部署产物与文档(不入镜像)
+deploy/
+.superpowers/
+docs/superpowers/
+# 日志/数据库/临时
+*.log
+*.db
+*.db-*
+*.tar

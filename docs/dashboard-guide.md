@@ -23,6 +23,8 @@ cd demo/Dashboard/client && npm run dev
 
 浏览器访问 `http://localhost:5173`。
 
+> 也可用 Aspire 一条命令同时启动飞书 + Dashboard + 前端:`dotnet run --project demo/AppHost`。详见 [Aspire 编排指南](./aspire-guide.md)。
+
 ## 发布与部署
 
 ```bash

@@ -494,3 +494,11 @@ $RECYCLE.BIN/
 /*/*/agent-workspace
 demo/FeishuAdaptor/deploy.ps1
 /.sisyphus
+
+# 阿里云私有部署执行文档(spec + plan)——含私有服务器细节(IP/路径/密钥占位),不入库。
+# 通用的「systemd→Aspire 迁移手册」已脱敏,另存于 docs/(入库)。
+docs/superpowers/specs/*aliyun-deployment*
+docs/superpowers/plans/*aliyun-deployment*
+
+# 阿里云部署产物(含服务器路径,私有)
+/deploy/aspire-aliyun/

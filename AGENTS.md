@@ -14,6 +14,7 @@ dotnet test test/FeishuAdaptor.Tests                            # 飞书适配�
 dotnet run --project demo/AgentConsole                          # 控制台 demo
 dotnet run --project demo/FeishuAdaptor                         # 飞书 bot demo
 dotnet run --project demo/Dashboard                            # Dashboard API（:5080）
+dotnet run --project demo/AppHost                              # Aspire:同时启动飞书 + Dashboard + 前端
 cd demo/Dashboard/client && npm run dev                        # Dashboard 前端（:5173）
 dotnet publish demo/Dashboard -c Release                       # 发布（含前端构建）
 dotnet test test/Dashboard.Tests                               # Dashboard 测试
@@ -55,3 +56,4 @@ dotnet test test/Dashboard.Tests                               # Dashboard 测�
 - [快速开始](docs/quick-start.md)
 - [存储指南](docs/storage-guide.md)
 - [Dashboard 指南](docs/dashboard-guide.md)
+- [Aspire 编排指南](docs/aspire-guide.md)

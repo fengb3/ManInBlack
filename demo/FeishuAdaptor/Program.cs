@@ -12,6 +12,7 @@ using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 
 // 将 ManInBlack 配置源添加到 Host Configuration（启用 reloadOnChange）
 builder.Configuration.AddManInBlackSettings();
@@ -88,18 +89,8 @@ if (args.Contains("migrate-storage"))
 // 启动期应用 EF Core 迁移(已最新则空操作)
 await app.Services.MigrateManInBlackStorageAsync();
 
-// 愿你健康, 开心, 美满, 幸福
-app.MapGet(
-    "/health",
-    () =>
-    {
-        // returns random health status for demonstration purposes
-        string[] healthyTexts = ["feeling great!", "ready to serve!", "fully operational!"];
-        var random = new Random();
-        var text = healthyTexts[random.Next(healthyTexts.Length)];
-        return Results.Ok(new { status = "healthy", message = text });
-    }
-);
+// /health、/alive 端点由 ServiceDefaults 提供(仅 Development)。Aspire 据此做健康探测。
+app.MapDefaultEndpoints();
 
 // Map Feishu event endpoint, and the FeishuAdaptor will handle incoming events according to the registered handlers
 if (!string.IsNullOrEmpty(feishuSettings.WebhookEndpoint))

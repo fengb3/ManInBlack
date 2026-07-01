@@ -34,4 +34,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="FeishuAdaptor.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AppHost.ServiceDefaults\ManInBlack.AppHost.ServiceDefaults.csproj" />
+  </ItemGroup>
 </Project>

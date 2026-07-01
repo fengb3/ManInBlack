@@ -246,3 +246,4 @@ services.AddManInBlack()
 - 查看 [Middleware 开发指北](./middleware-guide.md) 学习编写自定义中间件
 - 阅读 [中间件测试指北](./testing-guide.md) 了解测试方法论
 - 参考 [Provider 配置指南](./provider-guide.md) 完成所有提供商配置
+- 想一条命令同时启动飞书 bot + Dashboard + 前端?见 [Aspire 编排指南](./aspire-guide.md)
