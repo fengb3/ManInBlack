@@ -109,7 +109,7 @@ public static class Extensions
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         // /health 无条件映射:生产容器内 healthcheck/compose restart 需要它。
-        // 仅容器内本地探测、不公网发布(Dashboard 端口绑 127.0.0.1),无新增公网信息泄露面。
+        // 仅容器内本地探测、不公网发布(Dashboard 端口绑 127.0.0.1、飞书无发布端口),无新增公网信息泄露面。
         app.MapHealthChecks(HealthEndpointPath);
 
         // /alive 仍仅 Development(诊断用,生产无需暴露)

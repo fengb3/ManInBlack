@@ -143,11 +143,13 @@ compose 中:
 
 ```yaml
 volumes:
-  - <data-path>:<data-path>
+  - <data-path>:/root/.man-in-black
 user: "0:0"
 ```
 
-容器内应用使用 `<data-path>` 作为数据目录(需在应用配置中指定,而非依赖 `~`)。
+> **注意:** FeishuAdaptor 以 `~/.man-in-black` 为根(`HOME=/root` → `/root/.man-in-black`),其卷须挂到该路径;Dashboard 经 `Storage:RootPath` 显式配置路径,不依赖 HOME。
+
+容器内应用使用挂载目标路径作为数据目录。
 
 ### 5.3 SQLite 并发
 

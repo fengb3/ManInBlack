@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/publish .
+# 容器内以 ASPNETCORE_URLS=8080 监听(launchSettings 的 5249 仅本地 dev)。
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "FeishuAdaptor.dll"]
