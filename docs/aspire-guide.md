@@ -38,3 +38,14 @@ dotnet run --project demo/FeishuAdaptor            # 飞书 bot
 dotnet run --project demo/Dashboard                # Dashboard API
 cd demo/Dashboard/client && npm run dev            # Vite(:5173,proxy 回落 :5080)
 ```
+
+## 生产部署(Podman)
+
+本地 Aspire AppHost 用于开发调试;生产环境走 **Aspire → Docker Compose → Podman** 容化路径:
+
+1. AppHost 引入 `Aspire.Hosting.Docker`,调用 `builder.AddDockerComposeEnvironment("prod")` 导出 compose 清单。
+2. 各项目编写 Dockerfile,本地 `aspire publish` → `docker build` → `docker save` 打包镜像 tar。
+3. 目标机(Podman 4.3 + `podman-compose`)加载镜像并拉起容器,数据卷 bind-mount 持久化。
+4. 健康检查、开机自启由 systemd unit 管理 Podman Compose 实现;端口仅绑 `127.0.0.1`,通过 SSH 隧道访问。
+
+完整步骤、踩坑记录与回滚方案见 **[systemd → Aspire 迁移手册](migration-systemd-to-aspire.md)**。
