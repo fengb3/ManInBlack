@@ -17,12 +17,13 @@
 builder.AddDockerComposeEnvironment("prod");
 ```
 
-运行 AppHost 后会在 `aspire-output/` 下生成 `compose.yaml` 及 `.env` 文件。
+本项目的完整写法见 `demo/AppHost/Program.cs`:`AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)` + 各项目 `.PublishAsDockerFile(c => c.WithDockerfile(...))`。
 
-**注意事项:**
+**注意(13.4.6 实测):**
 
-- `AddProject` 返回的是 `ProjectResource`,而非 `ContainerResource`。Aspire 13.4.6 中 `WithBindMount` 等 API 要求 `ContainerResource`,类型不匹配会编译失败(CS0311)。
-- 因此 **卷挂载、`HOME` 环境变量、端口绑定、capability 添加等容器级配置不要写进 `Program.cs`**,统一在生成的 compose 文件中手动配置。
+- `AddProject` 返回 `ProjectResource`,`WithBindMount` 等 API 要 `ContainerResource`,直接调会 CS0311。
+- **但** 容器级配置(卷 / `HOME` / 端口 / `cap_add` / `security_opt` / healthcheck)可全部在 `ConfigureComposeFile` 回调里写进代码——`Service` 模型是完整 compose schema,这些字段都有。本项目就采用此方式(见 `ConfigureProdCompose`),生成 compose 直接生产可用,不再手改。
+- 各项目必须 `.PublishAsDockerFile(c => c.WithDockerfile(...))` 指定自带 Dockerfile,否则 `aspire do prepare-prod` 会走 .NET SDK 默认容器发布(裸 `aspnet:10.0` 基座,没 node/python/bwrap,且 build 失败)。
 
 ## 2. Dockerfile
 
@@ -83,23 +84,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 `--no-install-recommends` 节省镜像体积。
 
-## 3. 本地构建
+## 3. 本地构建(开发机)
 
-三步走:
+一条命令(`deploy/build-prod.sh`,内部三步):
 
 ```bash
-# 1. Aspire 导出 compose 清单(产物在项目下 aspire-output/)
-dotnet run --project demo/AppHost
-
-# 2. 构建各服务镜像(linux/amd64)
-docker build -t feishu:latest -f deploy/Dockerfile.feishu .
-docker build -t dashboard:latest -f deploy/Dockerfile.dashboard .
-
-# 3. 打包镜像 tar
-docker save -o images.tar feishu:latest dashboard:latest
+deploy/build-prod.sh
+#   1. aspire do prepare-prod  → 生成 docker-compose.yaml + .env.Production + build feishu/dashboard 镜像
+#      (用 Program.cs 里 WithDockerfile 指定的 Dockerfile;产物在 deploy/aspire-aliyun/dist/)
+#   2. 把 .env.Production 并成单一 .env(服务器侧 podman compose 自动读)
+#   3. docker save -o images.tar <两个镜像>
 ```
 
-**注意:** `aspire publish` 的产物在项目目录下的 `aspire-output/`,**不是** `--output` 指定路径。
+**关键区分:** `aspire publish` 只生成 compose、**不 build**;`aspire do prepare-prod`(env 名 `prod`)才 **build 镜像**。镜像 tag 是 Aspire 默认的 `<资源>:<sha>`(如 `feishu:b0064988...`)。**坑(实测多种 API 均如此):无 registry 时,没有任何 Aspire API 能改 build tag**——`WithRemoteImageTag` 单独用、或配 `WithRemoteImageName`,都只改 `.env` 引用、不改 build tag(配 `AddContainerRegistry` 后 `WithRemoteImageName/Tag` 才会真正改 build tag)。`prepare-prod` 的 `.env` 又引用时间戳 tag(同样对不上,那个 tag 只有 `aspire deploy` 才上)。结论:`build-prod.sh` 读实际 build 出的 sha 重写 `.env` 对齐,再 `docker save`。想要固定/版本号 tag,只能 retag 或上 registry。
 
 `images.tar` 远小于各镜像之和——共享 base 层去重,属于正常现象。
 
@@ -281,5 +278,6 @@ sudo systemctl start dashboard.service
 | HOME 不能设成数据路径 | `HOME=/root`,数据路径通过应用配置指定,避免 `~/.man-in-black` 嵌套 |
 | dev/prod settings.json 不可整份覆盖 | 逐段合并新增配置,保留已有配置不动 |
 | 健康检查仅 Development 映射 | Production 也需映射 `/health`,compose healthcheck 用 `curl` 探测 |
-| aspire publish 产物路径 | 在项目目录下 `aspire-output/`,不是 `--output` 指定路径 |
-| `AddProject` 返回 `ProjectResource` | `WithBindMount` 等 API 要求 `ContainerResource`,Aspire 13.4.6 编译不通过;容器配置放 compose |
+| `aspire publish` 不 build 镜像 | 用 `aspire do prepare-prod` 才 build;publish 只产 compose + 空 `.env` |
+| `AddProject` 返回 `ProjectResource` | `WithBindMount` 等仍要 `ContainerResource`(CS0311),但容器配置改用 `ConfigureComposeFile` 在代码里写,不再手改 compose |
+| 裸 `AddProject` 发布 build 失败 | 默认走 .NET SDK 容器发布(裸基座),必须 `.PublishAsDockerFile(WithDockerfile)` 指定自带 Dockerfile |
