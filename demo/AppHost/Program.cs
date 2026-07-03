@@ -17,7 +17,7 @@ builder.AddDockerComposeEnvironment("prod")
     .ConfigureComposeFile(ConfigureProdCompose);
 
 // 飞书 bot:沿用其 launchSettings 的 http profile(:5249);/health 由 ServiceDefaults 提供(生产也映射)。
-// 生产镜像用 demo/FeishuAdaptor/Dockerfile(装了 node/python/bwrap/curl),镜像内 ASPNETCORE_URLS=8080。
+// 生产镜像用 demo/FeishuAdaptor/Dockerfile(装了 node/python/bwrap/curl);监听 8080 由 Aspire 注入 ASPNETCORE_URLS(镜像不设端口)。
 // 镜像 tag 用 Aspire 默认的 <资源>:<sha>(无 registry 时无法改成版本号——已实测多种 API 都不行),
 // build-prod.sh 会读实际 sha 对齐 .env。
 var feishu = builder.AddProject<Projects.FeishuAdaptor>("feishu")
@@ -25,7 +25,7 @@ var feishu = builder.AddProject<Projects.FeishuAdaptor>("feishu")
     .PublishAsDockerFile(c => c.WithDockerfile("../..", "demo/FeishuAdaptor/Dockerfile", null));
 
 // Dashboard API:沿用其 launchSettings(:5080)。
-// 生产镜像用 demo/Dashboard/Dockerfile(node 阶段构建前端),镜像内 ASPNETCORE_URLS=5080。
+// 生产镜像用 demo/Dashboard/Dockerfile(node 阶段构建前端);监听 5080 由 Aspire 注入 ASPNETCORE_URLS(镜像不设端口)。
 var dashboard = builder.AddProject<Projects.Dashboard>("dashboard")
     .WithHttpHealthCheck("/health")
     .PublishAsDockerFile(c => c.WithDockerfile("../..", "demo/Dashboard/Dockerfile", null));
@@ -50,13 +50,14 @@ void ConfigureProdCompose(ComposeFile composeFile)
     var feishu = composeFile.Services["feishu"];
     feishu.User = "0:0";
     feishu.Restart = "unless-stopped";
-    feishu.Ports = ["11411:8080"];                   // 公网入站:飞书 webhook 回调打宿主 11411(镜像内 ASPNETCORE_URLS=8080)
+    feishu.Ports = ["11411:8080"];                   // 公网入站:飞书 webhook 回调打宿主 11411(app 监听 8080,由 Aspire 注入 ASPNETCORE_URLS)
     feishu.Privileged = true;                        // 开 sandbox 必须:kernel 4.19 下仅 SYS_ADMIN 不够
     feishu.CapAdd = ["SYS_ADMIN"];                   // bwrap namespace 所需(privileged 下冗余,留作降级)
     feishu.SecurityOpt = ["apparmor=unconfined"];    // 配合 SYS_ADMIN,绕过 apparmor 限制
     feishu.Environment["HOME"] = "/root";            // 否则 ~/.man-in-black 解析成数据路径下嵌套
     feishu.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
-    feishu.Environment.Remove("HTTP_PORTS");         // 让镜像内 ASPNETCORE_URLS=8080 唯一生效,避免双配置
+    feishu.Environment["ASPNETCORE_URLS"] = "http://0.0.0.0:8080";   // 端口归 Aspire 控(镜像不设),compose 映射 11411:8080
+    feishu.Environment.Remove("HTTP_PORTS");                         // 删 Aspire 默认注入的 HTTP_PORTS=8080,让 ASPNETCORE_URLS 成唯一端口源
     feishu.Environment.Remove("OTEL_EXPORTER_OTLP_ENDPOINT"); // 关掉遥测面板后,别往不存在的 endpoint 发
     feishu.Volumes = [new Volume { Name = "/root/.man-in-black", Source = "/root/.man-in-black", Target = "/root/.man-in-black", Type = "bind" }];
     feishu.Healthcheck = new Healthcheck
@@ -73,7 +74,8 @@ void ConfigureProdCompose(ComposeFile composeFile)
     dashboard.Restart = "unless-stopped";
     dashboard.Environment["HOME"] = "/root";
     dashboard.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
-    dashboard.Environment.Remove("HTTP_PORTS");
+    dashboard.Environment["ASPNETCORE_URLS"] = "http://0.0.0.0:5080"; // 端口归 Aspire 控(镜像不设),compose 映射 127.0.0.1:5080:5080
+    dashboard.Environment.Remove("HTTP_PORTS");                       // Aspire 默认 HTTP_PORTS=8080 与 5080 冲突,删掉让 ASPNETCORE_URLS 唯一生效
     dashboard.Environment.Remove("OTEL_EXPORTER_OTLP_ENDPOINT");
     dashboard.Volumes = [new Volume { Name = "/root/.man-in-black", Source = "/root/.man-in-black", Target = "/root/.man-in-black", Type = "bind" }];
     dashboard.Ports = ["127.0.0.1:5080:5080"];       // 仅 loopback,公网不可达,经 SSH 隧道访问
