@@ -158,6 +158,44 @@ public class AgentLauncher(
             + "在你了解用户为何上传它之前，不要读取文件";
     }
 
+    /// <summary>
+    /// 把文本中的 @_user_N 占位符内联替换为被@者的可读信息:
+    /// <c>@名字(open_id:.., user_id:.., union_id:..)</c>,只输出非空字段(<c>tenant_key</c> 不纳入)。
+    /// mentions 为 null 时原样返回。对 p2p / group 均可复用。
+    /// </summary>
+    internal static string ResolveMentions(
+        string text,
+        IEnumerable<ImMessageReceiveV1EventBodyDto.EventMessage.MentionEvent>? mentions)
+    {
+        if (mentions is null)
+            return text;
+
+        // 按 key 长度降序替换:避免 @_user_1 误伤 @_user_10(消息含 10+ 个 @提及时)
+        foreach (var mention in mentions
+                     .Where(m => !string.IsNullOrEmpty(m.Key))
+                     .OrderByDescending(m => m.Key.Length))
+        {
+            text = text.Replace(mention.Key, FormatMention(mention));
+        }
+
+        return text;
+    }
+
+    private static string FormatMention(ImMessageReceiveV1EventBodyDto.EventMessage.MentionEvent mention)
+    {
+        static bool Real(string? v) => !string.IsNullOrEmpty(v) && v != "all";
+
+        var name = string.IsNullOrEmpty(mention.Name) ? "未知用户" : mention.Name;
+
+        var id = mention.Id;
+        var parts = new List<string>();
+        if (Real(id?.OpenId)) parts.Add($"open_id:{id!.OpenId}");
+        if (Real(id?.UserId)) parts.Add($"user_id:{id!.UserId}");
+        if (Real(id?.UnionId)) parts.Add($"union_id:{id!.UnionId}");
+
+        return parts.Count == 0 ? $"@{name}" : $"@{name}({string.Join(", ", parts)})";
+    }
+
     private async Task<string> HandleMessage(
         IServiceProvider sp,
         EventV2Dto<ImMessageReceiveV1EventBodyDto> input,
@@ -224,7 +262,7 @@ public class AgentLauncher(
             {
                 var doc = JsonDocument.Parse(messageContent);
                 var text = doc.RootElement.GetProperty("text").GetString()!;
-                result = text;
+                result = ResolveMentions(text, input.Event.Message?.Mentions);
                 break;
             }
             default:
