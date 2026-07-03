@@ -79,17 +79,17 @@ internal static string ResolveMentions(
 
 ## 6. 单个 mention 的格式
 
-固定字段顺序,**只输出非空字段**:
+固定字段顺序,**只输出非空字段**(`tenant_key` 按需求不纳入):
 
 ```
-@<Name>(open_id:<v>, user_id:<v>, union_id:<v>, tenant_key:<v>)
+@<Name>(open_id:<v>, user_id:<v>, union_id:<v>)
 ```
 
 - 只包含非空字段(外部用户常无 `user_id`);仅 `open_id` 时渲染为 `@张三(open_id:ou_zhang)`。
 - 示例(原文 `@_user_1 你好,请把报告发给@_user_2`):
 
   ```
-  @张三(open_id:ou_zhang, user_id:zhangsan, union_id:on_zhang, tenant_key:t1) 你好,请把报告发给@李四(open_id:ou_li, user_id:lisi, union_id:on_li, tenant_key:t1)
+  @张三(open_id:ou_zhang, user_id:zhangsan, union_id:on_zhang) 你好,请把报告发给@李四(open_id:ou_li, user_id:lisi, union_id:on_li)
   ```
 
 ## 7. 边界情况(默认处理)
@@ -98,7 +98,7 @@ internal static string ResolveMentions(
 - `@所有人` / mention-all → `Id` 可能为 `"all"` 或字段为空;输出存在的字段,若 id 字段全空则仅
   `@<Name>`(如 `@所有人`)。
 - 被@的是 bot 自身 → 与普通用户一致地输出其信息(不做特例),符合「带上所有可获取信息」。
-- 字段顺序固定:`open_id, user_id, union_id, tenant_key`。
+- 字段顺序固定:`open_id, user_id, union_id`(不含 `tenant_key`)。
 
 ## 8. 测试
 
