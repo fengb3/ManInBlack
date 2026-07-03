@@ -44,11 +44,15 @@ builder.Build().Run();
 // 详见 docs/aspire-guide.md「生产部署」与 docs/migration-systemd-to-aspire.md。
 void ConfigureProdCompose(ComposeFile composeFile)
 {
-    // 飞书:容器内 bubblewrap 需特权;数据卷挂到 ~/.man-in-black;监听 8080(镜像内 ASPNETCORE_URLS)。
+    // 飞书:agent 开 bwarp 沙箱(UseSandbox)时,bwrap 要在 user+pid namespace 挂 /proc,
+    // kernel 4.19 下 SYS_ADMIN + seccomp/apparmor 都不够,必须 privileged(代价:容器获宿主全部能力)。
+    // 卷挂 ~/.man-in-black;监听 8080(镜像内 ASPNETCORE_URLS)。
     var feishu = composeFile.Services["feishu"];
     feishu.User = "0:0";
     feishu.Restart = "unless-stopped";
-    feishu.CapAdd = ["SYS_ADMIN"];                   // bwrap 容器内创建 namespace 所需
+    feishu.Ports = ["11411:8080"];                   // 公网入站:飞书 webhook 回调打宿主 11411(镜像内 ASPNETCORE_URLS=8080)
+    feishu.Privileged = true;                        // 开 sandbox 必须:kernel 4.19 下仅 SYS_ADMIN 不够
+    feishu.CapAdd = ["SYS_ADMIN"];                   // bwrap namespace 所需(privileged 下冗余,留作降级)
     feishu.SecurityOpt = ["apparmor=unconfined"];    // 配合 SYS_ADMIN,绕过 apparmor 限制
     feishu.Environment["HOME"] = "/root";            // 否则 ~/.man-in-black 解析成数据路径下嵌套
     feishu.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";

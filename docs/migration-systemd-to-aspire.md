@@ -17,7 +17,7 @@
 builder.AddDockerComposeEnvironment("prod");
 ```
 
-本项目的完整写法见 `demo/AppHost/Program.cs`:`AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)` + 各项目 `.PublishAsDockerFile(c => c.WithDockerfile(...))`。
+本项目的完整写法见 `demo/AppHost/Program.cs`:`AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)` + 各项目 `.PublishAsDockerFile(c => c.WithDockerfile(...))`。运行 `aspire publish`(或 `aspire do prepare-prod` / `aspire deploy`)后会在 AppHost 项目下 `aspire-output/` 生成 `docker-compose.yaml` 及 `.env` 文件(详见第 3 节)。
 
 **注意(13.4.6 实测):**
 
@@ -84,9 +84,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 `--no-install-recommends` 节省镜像体积。
 
+> **开 sandbox 必须 privileged(重要)**:agent 若开 bwarp 沙箱(`UseSandbox` opt-in;`SandboxPresets.Unshare(User|Pid)` → bwrap `--unshare-user --unshare-pid --proc`),需在 user+pid namespace 挂 /proc,**kernel 4.19 下 `cap_add: SYS_ADMIN` + `security_opt: seccomp=unconfined` 都不够**,必须置 **`privileged: true`**(代价:容器获宿主全部能力,bot 若被攻破≈宿主沦陷;Kylin 无 AppArmor,故 `apparmor=unconfined` 无意义)。本项目在 `ConfigureProdCompose` 里以 `feishu.Privileged = true`(`Service.Privileged`)代码配置,生成的 compose 直接带上;**不开 sandbox 则 `SYS_ADMIN`+`apparmor` 即够,无需 privileged**。详见文末踩坑表。
+
 ## 3. 本地构建(开发机)
 
-一条命令(`deploy/build-prod.sh`,内部三步):
+Aspire 把"生成 compose 清单"和"构建镜像"拆成两个命令,**不要混用**:
+
+- `aspire publish` —— **只**生成 `docker-compose.yaml` + `.env`(占位符未填),**不构建镜像**。`aspire-output/.env` 里会是 `FEISHU_IMAGE=` 这样的空值,仅供查看拓扑。
+- `aspire do prepare-prod` —— 生成 compose + 填好值的 `.env.production` + **构建每个服务的镜像**(Aspire 找到/生成各项目的 Dockerfile 后,调底层容器运行时 build)。这才是 aspire 原生的"构建镜像"步骤。
+- `aspire deploy` —— 在 `prepare` 之上再跑 `docker compose up -d`(本机一键起容器,适合本机自部署)。
+
+我们的目标是把镜像搬到**远程 rootful Podman 主机(无 registry)**,所以用 `prepare-prod`(只构建、不在本机起容器),再 `save`/`load`。本项目把它封成一条命令(`deploy/build-prod.sh`,内部三步):
 
 ```bash
 deploy/build-prod.sh
@@ -99,6 +107,50 @@ deploy/build-prod.sh
 **关键区分:** `aspire publish` 只生成 compose、**不 build**;`aspire do prepare-prod`(env 名 `prod`)才 **build 镜像**。镜像 tag 是 Aspire 默认的 `<资源>:<sha>`(如 `feishu:b0064988...`)。**坑(实测多种 API 均如此):无 registry 时,没有任何 Aspire API 能改 build tag**——`WithRemoteImageTag` 单独用、或配 `WithRemoteImageName`,都只改 `.env` 引用、不改 build tag(配 `AddContainerRegistry` 后 `WithRemoteImageName/Tag` 才会真正改 build tag)。`prepare-prod` 的 `.env` 又引用时间戳 tag(同样对不上,那个 tag 只有 `aspire deploy` 才上)。结论:`build-prod.sh` 读实际 build 出的 sha 重写 `.env` 对齐,再 `docker save`。想要固定/版本号 tag,只能 retag 或上 registry。
 
 `images.tar` 远小于各镜像之和——共享 base 层去重,属于正常现象。
+
+下面是 `build-prod.sh` 三步的底层展开(也可手动逐步执行):
+
+### 3.1 选定容器运行时(手动执行时)
+
+Aspire 并行探测 Docker 与 Podman,**正在运行的那个优先,Docker 作为平局赢家**。开发机一般是 Docker Desktop(运行中)→ Aspire 会用 `docker build`。可用环境变量强制:
+
+```bash
+# 强制用 Podman 构建(若开发机也装了 Podman)
+export ASPIRE_CONTAINER_RUNTIME=podman
+```
+
+### 3.2 底层展开:`aspire do prepare-prod`(生成 compose + 镜像)
+
+```bash
+# 在仓库根目录(demo/AppHost 是 AppHost 项目)
+aspire do prepare-prod --apphost demo/AppHost/ManInBlack.AppHost.csproj
+```
+
+产物全部落在 `demo/AppHost/aspire-output/`(或 `--output-path` 指定目录):
+
+| 产物 | 说明 |
+|------|------|
+| `docker-compose.yaml` | 各服务的编排清单 |
+| `.env.production` | 填好值的参数文件(`FEISHU_IMAGE` / `DASHBOARD_IMAGE` 等) |
+| 各资源 Dockerfile | Aspire 为 `AddProject` 资源生成/复用的 Dockerfile |
+
+`build-feishu` / `build-dashboard` 流水线步骤会调底层运行时 build 出镜像,镜像名/Tag 与 compose 里 `image:` 字段由**同一套逻辑生成**,因此天然一致。
+
+### 3.3 打包传输到远程 Podman 主机
+
+Aspire 没有原生"导出 tar 给离线远程主机"的步骤,镜像仍需手动 `save` → `load`(共享 base 层去重,tar 远小于各镜像之和):
+
+```bash
+# 用 prepare 阶段实际构建出的镜像名(查 .env.production 里的 FEISHU_IMAGE / DASHBOARD_IMAGE)
+docker save -o images.tar <feishu-image> <dashboard-image>
+
+# 传到目标机后
+sudo podman load -i images.tar
+```
+
+> **ℹ️ 关于镜像 tag 对齐:** 手写 `docker build -t` 时曾出现 `docker.io/library/<name>` 与 compose 引用的 `localhost/<name>` 不一致、导致新镜像被静默忽略的坑。改用 `aspire do prepare-prod` 后,compose 的 `image:` 字段与实际构建出的镜像 Tag 由同一套逻辑产出,二者天然一致,**此坑不再适用**。仍要 `save`/`load` 时,从 `.env.production` 复制真实的 `*_IMAGE` 值,不要自己猜 tag。
+
+> **⚠️ 容器运行时无代理 → 镜像内 `dotnet restore` 失败(国内开发机):** `aspire do prepare-prod` 的 `build-*` 步骤**仍然走底层运行时(Docker/Podman)的 build**,即在容器/守护进程内执行 `dotnet restore`,并不会绕过守护进程网络。Docker Desktop 守护进程(WSL2 VM)不走宿主机代理,直连 nuget.org 仍会 SSL EOF(`NU1301: unexpected EOF`)。对策:① 给守护进程配 HTTP_PROXY(指向宿主机 `host.docker.internal:<port>`);② 或先在宿主机 `dotnet publish -o <dir> --os linux`,再用一个只 `COPY <dir>` 的临时 Dockerfile 构建镜像;③ 或 `ASPIRE_CONTAINER_RUNTIME=podman` 改用宿主机 Podman(其 build 走宿主机网络/代理)。(已删除仓库根 `NuGet.Config` —— 它对守护进程内的 restore 无效,因为守护进程连不上镜像站。)
 
 ## 4. 目标机 Podman
 
@@ -271,13 +323,17 @@ sudo systemctl start dashboard.service
 | 坑 | 说明 |
 |----|------|
 | chiseled 镜像无 shell/apt | 需要 node/python/bwrap 的项目用非 chiseled 基座 + `apt install` |
-| bwrap 容器内需特权 | `cap_add: SYS_ADMIN` + `security_opt: apparmor=unconfined`;`UseSandbox` 是 opt-in,默认关 |
+| bwrap 容器内挂 /proc 失败 | agent 开 bwarp 沙箱(`UseSandbox`,opt-in)时,`.Unshare(User|Pid)`(bwrap `--unshare-user --unshare-pid --proc`)在 user+pid ns 挂 proc 报 `Can't mount proc on /newroot/proc: Operation not permitted`;**kernel 4.19 实测仅 `privileged: true` 可用**(`cap_add: SYS_ADMIN`、`security_opt: seccomp=unconfined` 均失败)→ 开 sandbox 时须在 `ConfigureProdCompose` 里 `feishu.Privileged = true`(`Service.Privileged`);不开 sandbox 则 `SYS_ADMIN`+`apparmor` 足够 |
 | .NET 10 无 bookworm-slim tag | 使用 `aspnet:10.0`(Ubuntu Noble)或 alpine |
 | Podman 4.3 无内置 compose | 用 `pipx install podman-compose` 安装独立工具 |
 | pip 被 PEP 668 拦截 | 用 `pipx install`,不要 `pip install` 或 `--break-system-packages` |
 | HOME 不能设成数据路径 | `HOME=/root`,数据路径通过应用配置指定,避免 `~/.man-in-black` 嵌套 |
 | dev/prod settings.json 不可整份覆盖 | 逐段合并新增配置,保留已有配置不动 |
 | 健康检查仅 Development 映射 | Production 也需映射 `/health`,compose healthcheck 用 `curl` 探测 |
-| `aspire publish` 不 build 镜像 | 用 `aspire do prepare-prod` 才 build;publish 只产 compose + 空 `.env` |
+| `aspire publish` vs `aspire do prepare-prod` | `publish` 只生成 compose + 空 `.env`(不构建镜像);`prepare-prod` 才构建镜像 + 填 `.env.production`。远程主机部署用 `prepare-prod` |
+| Aspire 产物路径 | 默认 AppHost 项目下 `aspire-output/`;可用 `-o/--output-path` 改 |
 | `AddProject` 返回 `ProjectResource` | `WithBindMount` 等仍要 `ContainerResource`(CS0311),但容器配置改用 `ConfigureComposeFile` 在代码里写,不再手改 compose |
 | 裸 `AddProject` 发布 build 失败 | 默认走 .NET SDK 容器发布(裸基座),必须 `.PublishAsDockerFile(WithDockerfile)` 指定自带 Dockerfile |
+| 手写 `docker build -t` 的 tag 与 compose `image:` 不一致 | 曾导致 `podman load` 后新镜像被**静默忽略**(docker.io/library vs localhost)。改用 `aspire do prepare-prod` 后 compose 与镜像 Tag 同源,此坑消除;`save`/`load` 时按 `.env.production` 的 `*_IMAGE` 取真实 tag |
+| 飞书长连接 ACK 偶发超时 → 重复回复 | 容器内 ACK 延迟呈**双峰**(<1s 或 >3.7s,中间空白),已排除网络(host-net 仍超时)与 Docker 差异(同代码 Docker 机正常),**根因未明**。**已修复:FeishuAdaptor 改用 webhook 模式(HTTP 200 ACK)后超时消失**;同时保留**兜底——在事件处理器按 `eventId` 去重**,丢弃飞书的重推(同 eventId 在 ~5min 内到达),保证每条消息只处理/回复一次(见 `ImMessageReceiveEventHandler`) |
+| 容器运行时无代理 → `aspire do prepare-prod` 的 build 步骤 restore 失败 | `build-*` 步骤仍走底层运行时(Docker/Podman)的 build,守护进程(WSL2 VM)不走宿主机代理 → nuget.org SSL EOF。对策:给守护进程配代理 / 宿主机 `dotnet publish` 后 COPY / 改用 `ASPIRE_CONTAINER_RUNTIME=podman` 走宿主机网络 |
