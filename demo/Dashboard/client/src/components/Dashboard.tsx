@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import type { SessionSummary } from '../types'
+import duck from '../assets/duck.png'
 import SessionsPanel from './SessionsPanel'
 import SearchPanel from './SearchPanel'
 import MessageList from './MessageList'
@@ -8,13 +9,6 @@ import MessageList from './MessageList'
 type Tab = 'sessions' | 'search'
 type Theme = 'light' | 'dark'
 
-const HAT = (
-  <svg viewBox="0 0 24 24" fill="none">
-    <path d="M5 13.5c0-.3.2-.5.5-.5h13a.5.5 0 0 1 .5.5v.5H5v-.5Z" fill="#fff" />
-    <path d="M7 13.5c0-3 1.5-5 5-5s5 2 5 5" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-    <path d="M5.5 14h13" stroke="#fff" strokeWidth={2} strokeLinecap="round" />
-  </svg>
-)
 const MENU = (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>)
 const SUN = (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" /></svg>)
 const MOON = (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>)
@@ -54,7 +48,7 @@ export default function Dashboard({ theme, onToggleTheme, onLogout }: {
       <header className="topbar">
         <button className="icon-btn menu-btn" aria-label="打开侧栏" onClick={() => setSidebarOpen(true)}>{MENU}</button>
         <div className="brand">
-          <span className="logo" aria-hidden="true">{HAT}</span>
+          <span className="logo" aria-hidden="true"><img src={duck} alt="" /></span>
           <h1>ManInBlack Dashboard</h1>
           <span className="demo-pill">只读</span>
         </div>

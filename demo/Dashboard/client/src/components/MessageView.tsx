@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { MessageView as MV, MessageBlock } from '../types'
 import { ROLE_LABEL, copyText } from '../utils'
 
@@ -39,7 +40,7 @@ function ReasoningBlock({ text }: { text: string }) {
         {CHEV}<span className="b-label">思考</span>
       </div>
       <div className="block-body reasoning-body">
-        <div className="text"><ReactMarkdown>{text}</ReactMarkdown></div>
+        <div className="text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>
       </div>
     </div>
   )
@@ -48,7 +49,7 @@ function ReasoningBlock({ text }: { text: string }) {
 function BlockView({ block }: { block: MessageBlock }) {
   switch (block.kind) {
     case 'text':
-      return <div className="text"><ReactMarkdown>{block.text || ''}</ReactMarkdown></div>
+      return <div className="text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text || ''}</ReactMarkdown></div>
     case 'reasoning':
       return <ReasoningBlock text={block.text || ''} />
     case 'toolCall':

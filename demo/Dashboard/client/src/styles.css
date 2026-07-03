@@ -43,12 +43,13 @@ body{
 button{font-family:inherit;cursor:pointer}
 ::selection{background:color-mix(in oklab,var(--accent),transparent 70%)}
 
-/* 共用 logo(帽檐礼帽,呼应 Man in Black) */
+/* 共用 logo(橡皮小鸭子头像) */
 .logo{
-  border-radius:9px;flex:none;
+  width:28px;height:28px;border-radius:9px;flex:none;overflow:hidden;
   background:linear-gradient(135deg,#ff8a5c,#ff5f6a);display:grid;place-items:center;color:#fff;
   box-shadow:0 4px 12px rgba(255,95,95,.35);
 }
+.logo img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.6)}
 .logo svg{width:17px;height:17px}
 
 /* ============================================================
@@ -319,6 +320,11 @@ button{font-family:inherit;cursor:pointer}
 .text pre code{display:block;font-family:var(--font-mono);font-size:13px;color:#e9e6ef;background:transparent;padding:14px 16px;overflow-x:auto;border:0;line-height:1.55}
 [data-theme="dark"] .text pre{background:#100f15}
 .text blockquote{border-left:2px solid var(--border);padding-left:var(--space-3);color:var(--fg-2);margin:0 0 var(--space-3)}
+/* GFM 表格(remark-gfm 解析):block+overflow 让宽表横向滚动而不撑破 72ch 正文 */
+.text table{display:block;width:max-content;max-width:100%;margin:0 0 var(--space-3);border-collapse:collapse;overflow:auto}
+.text thead th{font-weight:600;color:var(--fg);background:var(--surface-warm)}
+.text th,.text td{border:1px solid var(--border);padding:var(--space-2) var(--space-3);text-align:left;vertical-align:top}
+.text tbody tr:nth-child(even){background:color-mix(in oklab,var(--surface-warm),transparent 60%)}
 
 /* 工具/结果/未知 可折叠卡片 */
 .block{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:var(--space-2);background:var(--surface)}

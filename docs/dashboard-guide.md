@@ -38,5 +38,5 @@ dotnet publish demo/Dashboard -c Release -o ./publish
 ## 安全
 
 - cookie 鉴权，密码固定时长比对（防计时侧信道）；fail-closed。
-- 工具调用/结果 JSON 走 `JSON.stringify` 插入，React 默认转义，无 XSS 注入面；文本块经 react-markdown 渲染。
+- 工具调用/结果 JSON 走 `JSON.stringify` 插入，React 默认转义，无 XSS 注入面；文本块经 `react-markdown` + `remark-gfm` 插件渲染（支持 GFM 表格、删除线、任务列表、自动链接），**未启用 `rehype-raw`**——LLM 输出的原始 HTML 一律转义不执行，无 XSS 面。
 - 严格只读：连接串 `Mode=ReadOnly`，无任何写端点。

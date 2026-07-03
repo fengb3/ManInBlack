@@ -1,14 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api'
+import duck from '../assets/duck.png'
 
-// 帽檐礼帽(呼应 Man in Black)+ 锁图标
-const HAT = (
-  <svg viewBox="0 0 24 24" fill="none">
-    <path d="M5 13.5c0-.3.2-.5.5-.5h13a.5.5 0 0 1 .5.5v.5H5v-.5Z" fill="#fff" />
-    <path d="M7 13.5c0-3 1.5-5 5-5s5 2 5 5" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-    <path d="M5.5 14h13" stroke="#fff" strokeWidth={2} strokeLinecap="round" />
-  </svg>
-)
+// 锁图标
 const LOCK = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
     <rect x="5" y="11" width="14" height="9" rx="2" />
@@ -41,7 +35,7 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
     <div className="login-page">
       <main className="login-card" role="main">
         <div className="brand">
-          <span className="logo" aria-hidden="true">{HAT}</span>
+          <span className="logo" aria-hidden="true"><img src={duck} alt="" /></span>
           <span className="kicker">只读聊天记录查看器</span>
         </div>
 
