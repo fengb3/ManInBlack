@@ -9,12 +9,12 @@
 #      这里读实际 build 出的 sha,重写 .env 对齐。
 #   3. docker save 打包这两个镜像
 #
-# 产物:deploy/aspire-aliyun/dist/{docker-compose.yaml, .env, images.tar}
-# 之后:scp dist/* 到服务器,在服务器跑 deploy/aspire-aliyun/deploy.sh
+# 产物:deploy/output/dist/{docker-compose.yaml, .env, images.tar}
+# 之后:scp dist/* 到服务器,在服务器跑 deploy/output/deploy.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIST="$ROOT/deploy/aspire-aliyun/dist"
+DIST="$ROOT/deploy/output/dist"
 
 echo "==> [1/3] aspire do prepare-prod(生成 compose + build 镜像)"
 rm -rf "$DIST" "$ROOT/demo/AppHost/aspire-output"
@@ -47,5 +47,5 @@ echo "✅ 产物:"; ls -lah "$DIST"
 echo
 echo "下一步——传到服务器并部署:"
 echo "  scp $DIST/docker-compose.yaml $DIST/.env $DIST/images.tar <server>:~/mib/"
-echo "  # 服务器侧(把 deploy/aspire-aliyun/deploy.sh 也拷到 ~/mib/):"
+echo "  # 服务器侧(把 deploy/output/deploy.sh 也拷到 ~/mib/):"
 echo "  ssh <server> 'cd ~/mib && podman load -i images.tar && podman compose -f docker-compose.yaml up -d'"

@@ -318,6 +318,18 @@ sudo systemctl start feishu.service
 sudo systemctl start dashboard.service
 ```
 
+## 12. 开发机构建环境(TUN 代理;2026-07-03 实测)
+
+开发机跑透明代理(fake-IP 198.18.x,Clash/Surge 类 TUN 模式),`aspire do prepare-prod` 在容器内 build 时踩了三个网络相关的坑,**每次 build 都会复现**,均已修(见 `demo/FeishuAdaptor/Dockerfile`、`demo/Dashboard/Dockerfile`):
+
+1. **`npm ci` 加 `--mount=type=cache,target=/root/.npm` → rollup `Cannot find module @rollup/rollup-linux-x64-gnu`**。触发 [npm/cli#4828](https://github.com/npm/cli/issues/4828)(optional dep 装不进 `node_modules`),且损坏层被 buildx **反复缓存复用**(`#7 CACHED`)。**修:去掉该 cache mount**(`RUN npm ci`)。nuget 的 cache mount 不受此 bug 影响,保留。
+
+2. **apt `Hash Sum mismatch` + `Error reading from server`**。透明代理劫持 HTTP、吐**陈旧** Ubuntu 仓库缓存(Release 新、Packages 旧)→ Hash mismatch;**改 HTTPS 源**绕开(代理无证书无法 MITM 陈旧缓存)。但并发 build 时代理仍偶发 TLS 抖动 → `Error reading from server`,**配 `apt-get -o Acquire::Retries=10`** 重试兜底(update + install 都加)。
+
+3. **`dotnet restore` 并发 → `decryption failed or bad record mac`(SSL_ERROR_SSL)**。feishu+dashboard 两个镜像并行 restore,经 TUN 代理的并发 TLS 连接过载、丢包坏 record。隔离单 build 能成(NuGet 内置重试恢复);并行时耗尽重试。**修:restore 外层 `for i in 1..6` 重试循环**,配合 `--mount=type=cache,target=/root/.nuget/packages`(两个镜像**共享同一缓存**,已下载的包不重下,逐次收敛)。
+
+> 排查手法:`docker run`(不注入 daemon 代理、无 cache mount、单包)能成 → 把变量逐个加回去定位。三坑共同根因是开发机代理在容器内**并发**网络下的不稳定;生产服务器(阿里云)网络干净、运行期不受影响(依赖已烤进镜像层)。构建期三个修复都是"重试/绕开",不改变运行期行为。
+
 ## 踩坑总结
 
 | 坑 | 说明 |
@@ -337,3 +349,4 @@ sudo systemctl start dashboard.service
 | 手写 `docker build -t` 的 tag 与 compose `image:` 不一致 | 曾导致 `podman load` 后新镜像被**静默忽略**(docker.io/library vs localhost)。改用 `aspire do prepare-prod` 后 compose 与镜像 Tag 同源,此坑消除;`save`/`load` 时按 `.env.production` 的 `*_IMAGE` 取真实 tag |
 | 飞书长连接 ACK 偶发超时 → 重复回复 | 容器内 ACK 延迟呈**双峰**(<1s 或 >3.7s,中间空白),已排除网络(host-net 仍超时)与 Docker 差异(同代码 Docker 机正常),**根因未明**。**已修复:FeishuAdaptor 改用 webhook 模式(HTTP 200 ACK)后超时消失**;同时保留**兜底——在事件处理器按 `eventId` 去重**,丢弃飞书的重推(同 eventId 在 ~5min 内到达),保证每条消息只处理/回复一次(见 `ImMessageReceiveEventHandler`) |
 | 容器运行时无代理 → `aspire do prepare-prod` 的 build 步骤 restore 失败 | `build-*` 步骤仍走底层运行时(Docker/Podman)的 build,守护进程(WSL2 VM)不走宿主机代理 → nuget.org SSL EOF。对策:给守护进程配代理 / 宿主机 `dotnet publish` 后 COPY / 改用 `ASPIRE_CONTAINER_RUNTIME=podman` 走宿主机网络 |
+| 开发机 TUN 代理 → 容器内 build 的 npm/apt/nuget 网络抖动 | 透明代理(fake-IP 198.18.x)并发下不稳定:`npm ci` 的 cache mount 触发 npm/cli#4828(rollup MODULE_NOT_FOUND)→ 删 mount;apt HTTP 被吐陈旧缓存 → Hash mismatch(改 HTTPS 源)+ 并发 TLS 抖 → `Acquire::Retries=10`;并行 `dotnet restore` → SSL_ERROR_SSL → 外层重试(nuget cache mount 跨镜像共享收敛)。**每次 build 复现,已修在两个 Dockerfile,详见 §12** |

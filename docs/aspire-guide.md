@@ -54,10 +54,10 @@ cd demo/Dashboard/client && npm run dev            # Vite(:5173,proxy 回落 :50
 ```bash
 # 1. 开发机:生成 compose + build 镜像 + docker save(脚本内部跑 aspire do prepare-prod)
 deploy/build-prod.sh
-#    产物:deploy/aspire-aliyun/dist/{docker-compose.yaml, .env, images.tar}
+#    产物:deploy/output/dist/{docker-compose.yaml, .env, images.tar}
 
 # 2. 传到服务器
-scp deploy/aspire-aliyun/dist/{docker-compose.yaml,.env,images.tar} <server>:~/mib/
+scp deploy/output/dist/{docker-compose.yaml,.env,images.tar} <server>:~/mib/
 
 # 3. 服务器:加载镜像 + 拉起容器
 ssh <server> 'cd ~/mib && podman load -i images.tar && podman compose -f docker-compose.yaml up -d'

@@ -16,8 +16,15 @@ COPY ["src/ManInBlack.AI.Abstraction/ManInBlack.AI.Abstraction.csproj", "src/Man
 COPY ["bwarp/Bwarp/Bwarp.csproj", "bwarp/Bwarp/"]
 COPY ["src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj", "src/ManInBlack.AI.SourceGenerator/"]
 COPY ["demo/AppHost.ServiceDefaults/ManInBlack.AppHost.ServiceDefaults.csproj", "demo/AppHost.ServiceDefaults/"]
+# restore 受开发机 TUN 代理并发 TLS 抖动(decryption failed / bad record mac)影响;
+# 外层重试 + nuget 缓存挂载(已下载的包不重下)逐次收敛,直到全部包到位。隔离 restore 能成、
+# 仅 aspire 并行 build(feishu+dashboard 同时 restore)时并发连接过多耗尽 NuGet 内置重试。
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet restore "demo/FeishuAdaptor/FeishuAdaptor.csproj"
+    for i in 1 2 3 4 5 6; do \
+      if dotnet restore "demo/FeishuAdaptor/FeishuAdaptor.csproj"; then break; fi; \
+      [ "$i" = "6" ] && { echo "❌ dotnet restore 6 次均失败"; exit 1; }; \
+      echo "⚠️ dotnet restore 第 $i 次失败(代理 TLS 抖动),重试中..."; sleep 3; \
+    done
 COPY . .
 WORKDIR "/src/demo/FeishuAdaptor"
 RUN --mount=type=cache,target=/root/.nuget/packages \
@@ -32,9 +39,10 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
 # 不设 USER:生产 compose 强制 User=0:0,且 agent 的 bwrap 沙箱 + /root/.man-in-black 卷都需要 root。
 FROM base AS final
 WORKDIR /app
-# 换国内 apt 源:开发机国内网络 + 代理劫持 archive.ubuntu.com(fake-IP 198.18.x),aliyun 走直连更稳。
-RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g; s|http://security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources \
- && apt-get update && apt-get install -y --no-install-recommends \
+# 换国内 apt 源 + HTTPS + 重试:开发机透明代理(fake-IP 198.18.x)劫持 HTTP 吐陈旧缓存→Hash Sum
+# mismatch(HTTPS 走 TLS 绕开);并发 build 时代理偶发 TLS 抖动→"Error reading from server",配 Acquire::Retries。
+RUN sed -i 's|http://archive.ubuntu.com|https://mirrors.aliyun.com|g; s|http://security.ubuntu.com|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources \
+ && apt-get -o Acquire::Retries=10 update && apt-get -o Acquire::Retries=10 install -y --no-install-recommends \
       nodejs npm python3 bubblewrap ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=publish /app/publish .

@@ -500,8 +500,9 @@ demo/FeishuAdaptor/deploy.ps1
 docs/superpowers/specs/*aliyun-deployment*
 docs/superpowers/plans/*aliyun-deployment*
 
-# 阿里云部署产物(含服务器路径,私有)
+# 阿里云部署产物(含服务器路径/镜像,私有)。目录正从 aspire-aliyun 改名 output,两者都忽略
 /deploy/aspire-aliyun/
+/deploy/output/
 
 # Aspire CLI 本地生成的 apphost 定位文件(每次 aspire publish/prepare 都会重生,不入库)
 /aspire.config.json
