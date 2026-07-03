@@ -502,3 +502,6 @@ docs/superpowers/plans/*aliyun-deployment*
 
 # 阿里云部署产物(含服务器路径,私有)
 /deploy/aspire-aliyun/
+
+# Aspire CLI 本地生成的 apphost 定位文件(每次 aspire publish/prepare 都会重生,不入库)
+/aspire.config.json

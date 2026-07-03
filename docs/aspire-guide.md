@@ -41,11 +41,28 @@ cd demo/Dashboard/client && npm run dev            # Vite(:5173,proxy 回落 :50
 
 ## 生产部署(Podman)
 
-本地 Aspire AppHost 用于开发调试;生产环境走 **Aspire → Docker Compose → Podman** 容化路径:
+本地 Aspire AppHost 用于开发调试;生产走 **Aspire → Docker Compose → Podman** 容器化路径。一条命令生成 compose + 镜像,产出的 `docker-compose.yaml` 直接生产可用,无需手改。
 
-1. AppHost 引入 `Aspire.Hosting.Docker`,调用 `builder.AddDockerComposeEnvironment("prod")` 导出 compose 清单。
-2. 各项目编写 Dockerfile,本地 `aspire publish` → `docker build` → `docker save` 打包镜像 tar。
-3. 目标机(Podman 4.3 + `podman-compose`)加载镜像并拉起容器,数据卷 bind-mount 持久化。
-4. 健康检查、开机自启由 systemd unit 管理 Podman Compose 实现;端口仅绑 `127.0.0.1`,通过 SSH 隧道访问。
+### 原理(全在 `demo/AppHost/Program.cs`)
 
-完整步骤、踩坑记录与回滚方案见 **[systemd → Aspire 迁移手册](migration-systemd-to-aspire.md)**。
+- `AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)`:把所有容器级配置(`user` / `HOME` / bind mount / `cap_add` / `security_opt` / loopback 端口 / healthcheck)在代码里写死。`Service` 模型是完整 compose schema(`CapAdd`/`SecurityOpt`/`Volumes`/`Ports`/`Healthcheck`/`Environment` 都能设),生成的 compose 直接生产可用。
+- 各项目 `.PublishAsDockerFile(c => c.WithDockerfile("../..", "demo/<X>/Dockerfile", null))`:让发布时用项目自带的 Dockerfile build(含 node/python/bubblewrap 等运行时依赖),而非 .NET SDK 默认的容器发布(那个基座没这些依赖,build 也会失败)。
+- 飞书走 WebSocket 主动连飞书服务器,**无任何入站端口**(只有容器内部 expose + 容器内 healthcheck);Dashboard 仅绑 `127.0.0.1:5080`,公网不可达,经 SSH 隧道访问。
+
+### 三步发布
+
+```bash
+# 1. 开发机:生成 compose + build 镜像 + docker save(脚本内部跑 aspire do prepare-prod)
+deploy/build-prod.sh
+#    产物:deploy/aspire-aliyun/dist/{docker-compose.yaml, .env, images.tar}
+
+# 2. 传到服务器
+scp deploy/aspire-aliyun/dist/{docker-compose.yaml,.env,images.tar} <server>:~/mib/
+
+# 3. 服务器:加载镜像 + 拉起容器
+ssh <server> 'cd ~/mib && podman load -i images.tar && podman compose -f docker-compose.yaml up -d'
+```
+
+> 关键区分:`aspire publish` 只生成 compose、**不 build**;`aspire do prepare-prod` 才 **build 镜像**(用 `WithDockerfile` 指定的 Dockerfile)。详见 [Deploy to Docker Compose](https://aspire.dev/deployment/docker-compose/)。
+
+完整踩坑记录与回滚方案见 **[systemd → Aspire 迁移手册](migration-systemd-to-aspire.md)**。

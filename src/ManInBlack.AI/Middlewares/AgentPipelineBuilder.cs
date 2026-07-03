@@ -12,6 +12,8 @@ namespace ManInBlack.AI.Middlewares;
 public class AgentPipelineBuilder
 {
     private readonly List<Func<IServiceProvider, AgentMiddleware>> _middlewareFactories = [];
+    // 中间件类型名（注册顺序 = 外→内 = 运行时调用顺序），用于在 Build 时合并为一行日志
+    private readonly List<string> _middlewareNames = [];
 
     /// <summary>
     /// 添加中间件实例
@@ -19,6 +21,7 @@ public class AgentPipelineBuilder
     public AgentPipelineBuilder Use(AgentMiddleware middleware)
     {
         _middlewareFactories.Add(_ => middleware);
+        _middlewareNames.Add(middleware.GetType().Name);
         return this;
     }
 
@@ -27,12 +30,8 @@ public class AgentPipelineBuilder
     /// </summary>
     public AgentPipelineBuilder Use<TMiddleware>() where TMiddleware : AgentMiddleware
     {
-        _middlewareFactories.Add(sp =>
-        {
-            ILogger<TMiddleware> logger = sp.GetRequiredService<ILogger<TMiddleware>>();
-            logger.LogInformation("Resolving middleware {Middleware} ", typeof(TMiddleware).Name);
-            return sp.GetRequiredService<TMiddleware>();
-        });
+        _middlewareFactories.Add(sp => sp.GetRequiredService<TMiddleware>());
+        _middlewareNames.Add(typeof(TMiddleware).Name);
         return this;
     }
 
@@ -41,6 +40,11 @@ public class AgentPipelineBuilder
     /// </summary>
     public Func<AgentContext, IAsyncEnumerable<ChatResponseUpdate>> Build(IServiceProvider serviceProvider)
     {
+        // 将整条管道的中间件名合并为一行日志（外→内，即运行时调用顺序）
+        serviceProvider
+            .GetService<ILogger<AgentPipelineBuilder>>()
+            ?.LogInformation("Resolving middleware pipeline: {Pipeline}", string.Join(" → ", _middlewareNames));
+
         var chatClient = serviceProvider.GetRequiredService<IChatClient>();
         var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
