@@ -262,7 +262,7 @@ public class AgentLauncher(
             {
                 var doc = JsonDocument.Parse(messageContent);
                 var text = doc.RootElement.GetProperty("text").GetString()!;
-                result = text;
+                result = ResolveMentions(text, input.Event.Message?.Mentions);
                 break;
             }
             default:
