@@ -51,9 +51,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     ///
     /// 使用说明：
     ///
-    /// - 命令的第一行必须是以 # 开头的单行注释，用一句话说明命令的作用。
-    /// - 注释行之后，在下一行放置实际命令。
-    /// - 如果命令会创建新目录或文件，请先使用此工具运行 ls 验证父目录存在且位置正确。
+   /// - 如果命令会创建新目录或文件，请先使用此工具运行 ls 验证父目录存在且位置正确。
     /// - 始终用双引号包裹包含空格的文件路径（如 cd "path with spaces/file.txt"）。
     /// - 尽量在会话中使用绝对路径维持当前工作目录，避免使用 cd。用户明确要求时可使用 cd。
     /// - 可以指定可选的超时时间（毫秒），最长 600000ms（10 分钟）。默认超时 120000ms（2 分钟）。
@@ -65,7 +63,7 @@ public partial class CommandLineTools(IUserWorkspace workspace, IShellExecutor s
     ///   例如：需要运行 "git status" 和 "git diff"，在一条消息中并行发送两个 Bash 调用。
     /// - 如果命令相互依赖必须顺序执行，使用单个 Bash 调用并用 &amp;&amp; 链接。
     /// - 仅在不关心前一个命令是否失败时使用 ; 分隔命令。
-    /// - 除必须的首行注释外，不要使用额外的换行分隔命令（引号字符串中的换行除外）。
+    /// - 不要使用额外的换行分隔命令（引号字符串中的换行除外）。
     /// - 避免不必要的 sleep 命令：
     ///   - 可立即执行的命令之间不要 sleep。
     ///   - 如需轮询外部进程，使用 GetBackgroundTaskResult 检查状态，而非先 sleep。

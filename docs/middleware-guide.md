@@ -306,6 +306,20 @@ builder
 ```csharp
 builder.Use(new MyStatelessMiddleware());
 ```
+ 
+### 在 ToolsMiddleware 与 UseSimple 之间插入中间件
+
+`UseDefault(beforeSimple)` 重载提供了在工具声明之后、Agent 循环之前插入自定义中间件的钩子。
+典型场景：[`ToolIntentSchemaMiddleware`](../src/ManInBlack.AI/Middlewares/ToolIntentSchemaMiddleware.cs)
+在运行时为每个工具的 Schema 追加额外参数（如 `reason`），让 LLM 调用工具时说明意图，供 UI 展示。
+
+```csharp
+builder.UseDefault(b => b.Use(
+    new ToolIntentSchemaMiddleware("reason", "Briefly explain what you intend to accomplish.", required: true)));
+```
+
+> 追加的参数不会出现在工具方法签名上。源生成器 handler 不提取它，值留在 `ToolExecuteContext.Arguments` 中，
+> 由 `AgentLifecycleFilter` 随 `BeforeToolExecuteEvent.ArgumentsJson` 发布，供 UI 消费。
 
 ### 管道顺序与执行方向
 

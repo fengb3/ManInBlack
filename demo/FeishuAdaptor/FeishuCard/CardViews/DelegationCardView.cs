@@ -29,6 +29,7 @@ public record ChildToolRecord
     public string CallId { get; init; } = "";
     public string ToolName { get; init; } = "";
     public string Arguments { get; init; } = "";
+    public string Description { get; init; } = "";
     public string? Result { get; set; }
     public bool IsError { get; set; }
 }
@@ -96,9 +97,9 @@ public partial class DelegationCardView(
         await Task.CompletedTask;
     }
 
-    public async Task AddChildToolStartAsync(string callId, string toolName, string args, CancellationToken ct = default)
+    public async Task AddChildToolStartAsync(string callId, string toolName, string args, string description = "", CancellationToken ct = default)
     {
-        Tools.Add(new ChildToolRecord { CallId = callId, ToolName = toolName, Arguments = args });
+        Tools.Add(new ChildToolRecord { CallId = callId, ToolName = toolName, Arguments = args, Description = description });
         await FlushAsync(ct);
     }
 
@@ -174,6 +175,8 @@ public partial class DelegationCardView(
             foreach (var tool in Tools)
             {
                 var displayName = GetToolDisplayName(tool.ToolName);
+                if (!string.IsNullOrWhiteSpace(tool.Description))
+                    displayName = $"{displayName} - {tool.Description}";
                 var toolStatus = tool.Result is not null
                     ? (tool.IsError ? "失败" : "完成")
                     : "中...";

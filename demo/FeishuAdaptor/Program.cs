@@ -66,10 +66,12 @@ builder.Services.AddSerilog(loggerConfig =>
 builder.Services.AddManInBlack()
     .UseConfiguration(builder.Configuration)
     .AddFeishu(f => builder.Configuration.GetSection("Feishu").Bind(f))
-    .AddPipeline("feishu", pipeline => pipeline.UseDefault())
+    .AddPipeline("feishu", pipeline => pipeline.UseDefault(b => b.Use(
+        new ToolIntentSchemaMiddleware("purpose", "用一句话讲述你调用这个工具是为了做什么。", required: true))))
     .AddPipeline("sub-agent", builder => builder
         .Use<EventPublishingMiddleware>()
         .Use<ToolsMiddleware>()
+        .Use(new ToolIntentSchemaMiddleware("purpose", "用一句话讲述你调用这个工具是为了做什么。", required: true))
         .UseSimple());
 
 builder.Services.AddAutoRegisteredServices();

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FeishuAdaptor.FeishuCard.CardViews;
 using ManInBlack.AI.Events;
 using ManInBlack.AI.Services;
@@ -129,9 +130,8 @@ public class FeishuCardSession : IDisposable
             _toolExecutions[evt.CallId] = toolCard;
         }
 
-        var description = ExtractToolDescription(evt.ToolName, evt.ArgumentsJson);
-        var arguments = evt.ArgumentsJson ?? "无参数";
-        await toolCard.UpdateForToolStartAsync(evt.ToolName ?? "未知工具", arguments, description, ct);
+        var (purpose, cleanArgs) = ExtractPurpose(evt.ArgumentsJson);
+        await toolCard.UpdateForToolStartAsync(evt.ToolName ?? "未知工具", cleanArgs, purpose, ct);
     }
 
     private async Task OnAfterToolExecute(AfterToolExecuteEvent evt, CancellationToken ct)
@@ -202,10 +202,12 @@ public class FeishuCardSession : IDisposable
     private async Task OnChildBeforeToolExecute(BeforeToolExecuteEvent evt, CancellationToken ct)
     {
         if (_activeDelegationCard is null) return;
+        var (purpose, cleanArgs) = ExtractPurpose(evt.ArgumentsJson);
         await _activeDelegationCard.AddChildToolStartAsync(
             evt.CallId,
             evt.ToolName ?? "未知工具",
-            evt.ArgumentsJson ?? "无参数",
+            cleanArgs,
+            purpose,
             ct);
     }
 
@@ -226,24 +228,33 @@ public class FeishuCardSession : IDisposable
 
     #endregion
 
-    private static string ExtractToolDescription(string toolName, string? argumentsJson)
+    /// <summary>
+    /// 从工具参数 JSON 中提取 purpose 字段（工具调用意图），并将其从剩余参数中移除避免重复展示。
+    /// </summary>
+    private static (string purpose, string cleanArguments) ExtractPurpose(string? argumentsJson)
     {
-        if (toolName != "RunBash" || argumentsJson is null) return "";
+        if (string.IsNullOrEmpty(argumentsJson))
+            return ("", "无参数");
 
         try
         {
-            using var doc = JsonDocument.Parse(argumentsJson);
-            if (doc.RootElement.TryGetProperty("command", out var cmdProp))
-            {
-                var cmdStr = cmdProp.GetString() ?? "";
-                var firstLine = cmdStr.TrimStart().Split('\n')[0].Trim();
-                if (firstLine.StartsWith("#"))
-                    return firstLine.TrimStart('#', ' ').Trim();
-            }
-        }
-        catch { }
+            var node = JsonNode.Parse(argumentsJson)?.AsObject();
+            if (node is null)
+                return ("", argumentsJson);
 
-        return "";
+            var purpose = "";
+            if (node.TryGetPropertyValue("purpose", out var purposeNode) && purposeNode is not null)
+                purpose = purposeNode.GetValue<string>();
+
+            node.Remove("purpose");
+
+            var cleanJson = node.Count > 0 ? node.ToJsonString() : "无参数";
+            return (purpose, cleanJson);
+        }
+        catch
+        {
+            return ("", argumentsJson ?? "无参数");
+        }
     }
 
     private (T ViewModel, CardView<T> View) CreateCard<T>() where T : ViewModelBase
