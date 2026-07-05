@@ -32,6 +32,8 @@ internal static class SettingsMerger
 
         target.UseSandbox = source.UseSandbox;
 
+        target.ToolExtraParameter = source.ToolExtraParameter;
+
         if (source.Feishu is not null)
             target.Feishu = source.Feishu;
     }

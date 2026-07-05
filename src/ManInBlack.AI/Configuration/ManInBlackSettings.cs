@@ -29,10 +29,32 @@ public class ManInBlackSettings
     public bool UseSandbox { get; set; }
 
     /// <summary>
+    /// 工具额外参数注入配置:运行时为每个工具的 JSON Schema 追加一个参数。
+    /// </summary>
+    public ToolExtraParameterSettings ToolExtraParameter { get; set; } = new();
+
+    /// <summary>
     /// MCP server 配置，键为 server 名称。应用启动时按此连接 MCP client，
     /// 其提供的工具以 "{serverName}__{toolName}" 命名注入。详见 docs/mcp-guide.md。
     /// </summary>
     public Dictionary<string, McpServerSettings> McpServers { get; set; } = new();
+}
+
+/// <summary>
+/// 工具额外参数注入的配置项。可经 settings.json 的 "ToolExtraParameter" 节
+/// 或流式扩展 AddToolExtraParameter(...) 配置。
+/// </summary>
+public class ToolExtraParameterSettings
+{
+    /// <summary>追加的参数名。默认 "reason"。</summary>
+    public string ParamName { get; set; } = "reason";
+
+    /// <summary>追加参数的描述(LLM 可见)。</summary>
+    public string ParamDescription { get; set; } =
+        "Briefly explain what you intend to accomplish by calling this tool.";
+
+    /// <summary>是否在 schema 的 required 数组中标记此参数。默认 false。</summary>
+    public bool Required { get; set; }
 }
 
 public class StorageSettings

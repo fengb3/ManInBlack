@@ -143,6 +143,21 @@ public static class ManInBlackBuilderExtensions
     }
 
     /// <summary>
+    /// 配置工具额外参数注入(代码侧入口,等价于 settings.json 的 "ToolExtraParameter" 节)。
+    /// 在 <see cref="UseConfiguration"/>/<see cref="UseJson"/> 之后调用则以代码值为准。
+    /// </summary>
+    public static IManInBlackBuilder AddToolExtraParameter(
+        this IManInBlackBuilder builder,
+        Action<ToolExtraParameterBuilder> configure)
+    {
+        var b = new ToolExtraParameterBuilder();
+        configure(b);
+        ((ManInBlackBuilder)builder).AddContribution(
+            new ActionContribution(s => s.ToolExtraParameter = b.Settings));
+        return builder;
+    }
+
+    /// <summary>
     /// 载入 ~/.man-in-black/settings.json 作为配置源（缺失则创建默认）。
     /// 位置决定合并层：放链首则后续委托覆盖 JSON 同名 key。
     /// </summary>
