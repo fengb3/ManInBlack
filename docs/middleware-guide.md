@@ -310,12 +310,37 @@ builder.Use(new MyStatelessMiddleware());
 ### 在 ToolsMiddleware 与 UseSimple 之间插入中间件
 
 `UseDefault(beforeSimple)` 重载提供了在工具声明之后、Agent 循环之前插入自定义中间件的钩子。
-典型场景：[`ToolIntentSchemaMiddleware`](../src/ManInBlack.AI/Middlewares/ToolIntentSchemaMiddleware.cs)
+典型场景：[`ToolExtraParameterMiddleware`](../src/ManInBlack.AI/Middlewares/ToolExtraParameterMiddleware.cs)
 在运行时为每个工具的 Schema 追加额外参数（如 `reason`），让 LLM 调用工具时说明意图，供 UI 展示。
 
 ```csharp
-builder.UseDefault(b => b.Use(
-    new ToolIntentSchemaMiddleware("reason", "Briefly explain what you intend to accomplish.", required: true)));
+// settings.json:"ToolExtraParameter": { "ParamName": "reason", "Required": true }
+// 或代码侧:
+builder.UseDefault(b => b.Use<ToolExtraParameterMiddleware>());
+```
+
+`ToolExtraParameterMiddleware` 的参数从 `ManInBlackSettings.ToolExtraParameter` 读取,
+有两种等价配置入口:
+
+**JSON**(`settings.json` / `appsettings.json`):
+
+```json
+"ToolExtraParameter": {
+  "ParamName": "purpose",
+  "ParamDescription": "用一句话讲述你调用这个工具是为了做什么。",
+  "Required": true
+}
+```
+
+**流式扩展**(在 `AddManInBlack()` 链上,`UseConfiguration`/`UseJson` 之后调用则代码值优先):
+
+```csharp
+builder.Services.AddManInBlack()
+    .UseConfiguration(builder.Configuration)
+    .AddToolExtraParameter(p => p
+        .ParamName("purpose")
+        .ParamDescription("用一句话讲述你调用这个工具是为了做什么。")
+        .Required(true));
 ```
 
 > 追加的参数不会出现在工具方法签名上。源生成器 handler 不提取它，值留在 `ToolExecuteContext.Arguments` 中，

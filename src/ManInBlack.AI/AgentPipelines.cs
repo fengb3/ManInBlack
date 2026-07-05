@@ -13,7 +13,7 @@ public static class AgentPipelineBuilderExtensions
 
     /// <summary>
     /// 默认管道，支持在 <see cref="ToolsMiddleware"/> 和 <see cref="UseSimple"/> 之间插入自定义中间件。
-    /// 典型用法：<c>UseDefault(b =&gt; b.Use(new ToolIntentSchemaMiddleware()))</c>。
+    /// 典型用法：<c>UseDefault(b =&gt; b.Use&lt;ToolExtraParameterMiddleware&gt;())</c>。
     /// </summary>
     /// <param name="beforeSimple">插入点：此时 ToolsMiddleware 已注册、UseSimple 尚未调用。</param>
     public static AgentPipelineBuilder UseDefault(

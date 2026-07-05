@@ -282,6 +282,33 @@ public ValidateOptionsResult Validate(string? name, ManInBlackSettings options)
 
 ---
 
+## ToolExtraParameter 配置
+
+运行时为每个工具的 JSON Schema 追加一个额外参数,让 LLM 调用工具时说明意图,供 UI/日志展示。
+需配合在管道中注册 `ToolExtraParameterMiddleware`(位于 `ToolsMiddleware` 之后)。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `ParamName` | string | `"reason"` | 追加的参数名 |
+| `ParamDescription` | string | `"Briefly explain what you intend to accomplish by calling this tool."` | 参数描述(LLM 可见) |
+| `Required` | bool | `false` | 是否在 schema 的 `required` 中标记 |
+
+**JSON 示例:**
+
+```json
+"ToolExtraParameter": {
+  "ParamName": "purpose",
+  "ParamDescription": "用一句话讲述你调用这个工具是为了做什么。",
+  "Required": true
+}
+```
+
+**代码示例:** `AddManInBlack().UseConfiguration(cfg).AddToolExtraParameter(p => p.ParamName("purpose").Required(true))`。
+
+> 在 `UseConfiguration`/`UseJson` 之后调用 `AddToolExtraParameter` 时,代码值覆盖 JSON。
+
+---
+
 ## 添加新配置字段
 
 1. 在 `ManInBlackSettings` 中添加属性（带合理默认值）：
