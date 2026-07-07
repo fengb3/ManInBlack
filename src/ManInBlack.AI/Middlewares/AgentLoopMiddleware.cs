@@ -76,7 +76,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                 context.Messages.Add(new ChatMessage(ChatRole.Assistant, assistantContents));
 
             // ── AfterLlmCall：LLM 响应流结束后触发 ──
-            await bus.PublishAsync(key, new AfterLlmCallEvent
+            await bus.PublishAsync(EventBus.HookKey(key), new AfterLlmCallEvent
             {
                 AgentId = key,
                 SystemPrompt = context.SystemPrompt,
@@ -127,7 +127,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             context.Messages.Add(new ChatMessage(ChatRole.Tool, toolResults));
 
             // ── AllToolsCompleted：本批次所有工具执行完毕后触发 ──
-            await bus.PublishAsync(key, new AllToolsCompletedEvent
+            await bus.PublishAsync(EventBus.HookKey(key), new AllToolsCompletedEvent
             {
                 AgentId = key,
             }, ct);

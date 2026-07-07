@@ -219,12 +219,12 @@ public class AgentLoopMiddlewareTests
 
         var afterLlmCallCount = 0;
         var allToolsCompletedCount = 0;
-        bus.Subscribe<AfterLlmCallEvent>("test-agent", (evt, ct) =>
+        bus.Subscribe<AfterLlmCallEvent>(EventBus.HookKey("test-agent"), (evt, ct) =>
         {
             afterLlmCallCount++;
             return Task.CompletedTask;
         });
-        bus.Subscribe<AllToolsCompletedEvent>("test-agent", (evt, ct) =>
+        bus.Subscribe<AllToolsCompletedEvent>(EventBus.HookKey("test-agent"), (evt, ct) =>
         {
             allToolsCompletedCount++;
             return Task.CompletedTask;
