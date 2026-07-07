@@ -161,4 +161,15 @@ public class EventBusTests
         Assert.Single(received);
         Assert.Equal("hello", received[0].Message);
     }
+
+    [Fact]
+    public async Task PublishAsync_HandlerThrows_OperationCanceledException_Propagates()
+    {
+        // OCE 代表协作式取消,不应被错误隔离吞掉 —— 必须向上抛给调用方
+        using var sub = _bus.Subscribe<TestEvent>("key1",
+            (_, _) => throw new OperationCanceledException("cancelled"));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            _bus.PublishAsync("key1", new TestEvent("hi")));
+    }
 }

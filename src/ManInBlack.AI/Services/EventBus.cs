@@ -8,7 +8,7 @@ namespace ManInBlack.AI.Services;
 /// <summary>
 /// 全局事件总线，按 key 分发事件给对应订阅者。
 /// <para>hook 通道使用 <see cref="HookKey"/>（"{agentId}::hook"），观察者通道使用 AgentId 原值，两条 lane 互不相见。</para>
-/// <para>单个 handler 抛错只记日志，不影响其他 handler、不向上抛。</para>
+/// <para>单个 handler 抛错只记日志，不影响其他 handler、不向上抛；但 <see cref="OperationCanceledException"/> 代表协作式取消，会向上抛给调用方，不被吞。</para>
 /// </summary>
 [ServiceRegister.Singleton]
 public class EventBus
@@ -35,7 +35,7 @@ public class EventBus
     }
 
     /// <summary>
-    /// 按 key 广播事件给对应订阅者（单 handler 抛错被隔离，只记日志）
+    /// 按 key 广播事件给对应订阅者（单 handler 抛错被隔离，只记日志；OperationCanceledException 例外，向上抛）
     /// </summary>
     public Task PublishAsync<TEvent>(string key, TEvent evt, CancellationToken cancellationToken = default)
     {
@@ -85,7 +85,7 @@ public static class EventBus<TEvent>
         {
             await handler(evt, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "EventBus handler 抛错（事件类型 {EventType}, key {Key}），已隔离，不影响其他订阅者",
                 typeof(TEvent).Name, key);
