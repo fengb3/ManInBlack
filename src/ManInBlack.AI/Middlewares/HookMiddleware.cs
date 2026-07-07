@@ -39,7 +39,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         if (!string.IsNullOrEmpty(context.AgentName))  props["AgentName"]  = context.AgentName;
 
         // ── 订阅全部生命周期事件 ──
-        subs.Add(bus.Subscribe<BeforeLlmCallEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<BeforeLlmCallEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -58,7 +58,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             }
         }));
 
-        subs.Add(bus.Subscribe<AfterLlmCallEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<AfterLlmCallEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -71,7 +71,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             await hookExecutor.ExecuteAsync(HookPoint.AfterLlmCall, hookCtx, ct);
         }));
 
-        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -90,7 +90,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             }
         }));
 
-        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -106,7 +106,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             await hookExecutor.ExecuteAsync(HookPoint.AfterToolExecute, hookCtx, ct);
         }));
 
-        subs.Add(bus.Subscribe<AllToolsCompletedEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<AllToolsCompletedEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -117,7 +117,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             await hookExecutor.ExecuteAsync(HookPoint.AllToolsCompleted, hookCtx, ct);
         }));
 
-        subs.Add(bus.Subscribe<AgentCompletedEvent>(key, async (evt, ct) =>
+        subs.Add(bus.Subscribe<AgentCompletedEvent>(EventBus.HookKey(key), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -137,7 +137,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             SystemPrompt = context.SystemPrompt,
             UserInput = context.UserInput,
         };
-        await bus.PublishAsync(key, beforeEvt, ct);
+        await bus.PublishAsync(EventBus.HookKey(key), beforeEvt, ct);
 
         if (beforeEvt.InjectedTexts.Count > 0
             && (string.IsNullOrEmpty(beforeEvt.InjectTarget)
@@ -175,7 +175,7 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
         if (!hasFunctionCalls)
         {
             logger.LogDebug("[HookMiddleware] AgentCompleted 触发，AgentId={AgentId}", context.AgentId);
-            await bus.PublishAsync(key, new AgentCompletedEvent
+            await bus.PublishAsync(EventBus.HookKey(key), new AgentCompletedEvent
             {
                 AgentId = key,
                 SystemPrompt = context.SystemPrompt,
