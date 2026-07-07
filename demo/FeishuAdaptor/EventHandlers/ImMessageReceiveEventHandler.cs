@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Concurrent;
+using System.Text.Json;
 using FeishuAdaptor.FeishuCard;
 using FeishuNetSdk;
 using FeishuNetSdk.Im.Events;
@@ -25,6 +26,14 @@ public partial class ImMessageReceiveEventHandler(
         if (input.Event?.Message?.ChatType != "p2p")
             return Task.CompletedTask;
 
+        // 飞书在 ACK 超时/丢失时会用相同 eventId 重推事件(约 15~30s 后)。
+        // 对已见 eventId 去重,避免同一消息被处理两次 / 回复两遍。
+        if (IsDuplicateFeishuEvent(input.EventId))
+        {
+            logger.LogInformation("跳过重复的飞书事件(重推): {eventId}", input.EventId);
+            return Task.CompletedTask;
+        }
+
         LogMessageReceived(logger, input.EventId, input.Event.Message.MessageType);
 
         _ = Task.Run(async () => await agentLauncher.LaunchAsync(input))
@@ -36,6 +45,26 @@ public partial class ImMessageReceiveEventHandler(
                 }
             });
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 飞书事件去重:飞书对未及时 ACK 的事件会用相同 eventId 重推。
+    /// 进程级内存缓存记录已见 eventId,窗口内重复到达视为重推并跳过。
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, long> _seenFeishuEventIds = new();
+
+    private static bool IsDuplicateFeishuEvent(string eventId)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        // 惰性清理:条目过多时移除超过 5 分钟的旧 eventId,限制内存占用。
+        if (_seenFeishuEventIds.Count > 256)
+        {
+            var cutoff = now - TimeSpan.FromMinutes(5).Ticks;
+            foreach (var kv in _seenFeishuEventIds)
+                if (kv.Value < cutoff)
+                    _seenFeishuEventIds.TryRemove(kv.Key, out _);
+        }
+        return !_seenFeishuEventIds.TryAdd(eventId, now);
     }
 
     [LoggerMessage(
