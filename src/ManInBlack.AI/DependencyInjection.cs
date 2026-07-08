@@ -64,9 +64,18 @@ public static class DependencyInjection
             services.AddScoped<AgentContext>();
             services.AddSingleton<AgentFactory>();
 
-            services.AddHttpClient(string.Empty)
+            // LLM IChatClient 专用命名 HttpClient(ManInBlackHttpClients.ChatClient):
+            // - 移除 host(AddServiceDefaults)注入的默认标准 resilience(每次尝试 30s 超时 + 自动重试)。
+            //   它会砍断推理模型首字节>30s 的流式请求(TimeoutRejectedException),且其重试会与应用层
+            //   RetryMiddleware 叠加,放大延迟与计费。LLM 的重试已由 RetryMiddleware 统一负责。
+            // - 30 分钟兜底超时:防极端静默挂死;正常流式时长由应用层 CancellationToken 控制。
+            //   (HttpClient.Timeout 会覆盖整条流式生命周期,故需远大于 Polly 默认的 30s。)
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers 为评估期 API,语义稳定
+            services.AddHttpClient(ManInBlackHttpClients.ChatClient, c => c.Timeout = TimeSpan.FromMinutes(30))
+                .RemoveAllResilienceHandlers()
                 .ConfigurePrimaryHttpMessageHandler(() =>
                     new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
+#pragma warning restore EXTEXP0001
 
             services.AddScoped<IChatClient>(sp =>
             {

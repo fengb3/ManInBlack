@@ -35,7 +35,7 @@ public static class ChatClientProviderExtensions
 {
     public static IChatClient CreateChatClient(IHttpClientFactory httpClientFactory, ModelChoice modelChoice)
     {
-        var httpClient = httpClientFactory.CreateClient();
+        var httpClient = httpClientFactory.CreateClient(ManInBlackHttpClients.ChatClient);
         var baseUrl = modelChoice.GetEffectiveBaseUrl();
         var baseAddress = baseUrl.EndsWith('/')
             ? new Uri(baseUrl)

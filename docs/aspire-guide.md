@@ -29,6 +29,15 @@ dotnet run --project demo/AppHost
 - 前端经 `AddViteApp` 拉起;AppHost 用 `.WithEnvironment("VITE_API_BASE_URL", dashboard.GetEndpoint("http"))` 把后端地址喂给 `vite.config.ts` 的 proxy。
 - 三者数据流不变:飞书写 `~/.man-in-black/maninblack.db`,Dashboard 以 `Mode=ReadOnly` 读(WAL 下并发安全)。
 
+## 陷阱:`AddServiceDefaults` 的标准 resilience 会套住 LLM HttpClient
+
+`AddServiceDefaults()`(`AppHost.ServiceDefaults/Extensions.cs`)默认对所有 HttpClient 调 `AddStandardResilienceHandler()`,其默认**每次尝试超时 30s** + 3 次指数退避重试。若 LLM 的 HttpClient 也被套上,后果:
+
+- 推理模型首字节延迟 >30s 时,`HttpClient.SendAsync` 在等待响应头阶段被 Polly 砍断 → `Polly.Timeout.TimeoutRejectedException`,飞书侧表现为 `error when launch agent`。
+- Polly 的重试与应用层 `RetryMiddleware`(3 次)叠加,最多重复请求 9 次,放大延迟与 LLM 计费。
+
+**已在主库隔离(各 demo 无需处理)**:LLM `IChatClient` 走专属命名 HttpClient `ManInBlackHttpClients.ChatClient`(`"ManInBlack.Chat"`)。`AddManInBlack()` 注册时即 `RemoveAllResilienceHandlers()` 移除全局注入的标准 resilience,并设 30 分钟兜底超时;LLM 重试由 `RetryMiddleware` 统一负责。OpenTelemetry HTTP 观测不受影响(`AddHttpClientInstrumentation` hook 传输层,与 client 命名/resilience 无关)。详见 [Provider 配置指南 · LLM HttpClient](provider-guide.md#llm-httpclient)。
+
 ## 不走 Aspire
 
 老流程仍完全可用:

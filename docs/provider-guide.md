@@ -118,6 +118,25 @@ services.AddManInBlack(opt =>
 
 ---
 
+## LLM HttpClient
+
+LLM `IChatClient` 走**专属命名 HttpClient** `ManInBlackHttpClients.ChatClient`(`"ManInBlack.Chat"`),在 `AddManInBlack()` 中注册,独立于其他用途(如 GitHub token、飞书 SDK)的 HttpClient。
+
+```csharp
+services.AddHttpClient(ManInBlackHttpClients.ChatClient, c => c.Timeout = TimeSpan.FromMinutes(30))
+    .RemoveAllResilienceHandlers()   // 移除 host 注入的标准 resilience(默认 30s/次)
+    .ConfigurePrimaryHttpMessageHandler(() =>
+        new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
+```
+
+设计要点:
+
+- **移除标准 resilience**:Aspire `AddServiceDefaults` 等会经 `ConfigureHttpClientDefaults` 给所有 HttpClient 套上 `AddStandardResilienceHandler`(默认每次尝试 30s 超时 + 3 次重试)。它会砍断推理模型首字节 >30s 的流式请求,且与应用层 `RetryMiddleware` 叠加重复请求。LLM 的重试统一由 `RetryMiddleware` 负责,故主库注册时移除。
+- **30 分钟兜底超时**:`HttpClient.Timeout` 覆盖整条流式生命周期(含输出阶段),需远大于 Polly 默认的 30s;正常流式时长由应用层 `CancellationToken` 控制,30 分钟仅防极端静默挂死。
+- **OTel 观测不受影响**:`AddHttpClientInstrumentation` hook 的是 HttpClient 传输层(`DiagnosticSource`),与 client 命名/resilience 无关,LLM 请求照常产生 span/metric。span 上不会自动标注 client name;若需在 Dashboard 区分 LLM 调用,可在该命名 client 上额外挂 `DelegatingHandler` 给 `Activity.Current` 打 tag(如 `mib.chat_client = "ManInBlack.Chat"`)。
+
+> `RemoveAllResilienceHandlers` 为评估期 API(`EXTEXP0001`),语义稳定,已在注册处局部 `#pragma` 抑制。
+
 ## 按名称获取 ModelChoice
 
 通过 `IOptions<ManInBlackSettings>` 获取非默认的 ModelChoice：
