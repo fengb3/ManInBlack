@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 using FeishuAdaptor.FeishuCard.Cards;
 using ManInBlack.AI.Abstraction.Attributes;
@@ -9,7 +10,7 @@ namespace FeishuAdaptor.FeishuCard.CardViews;
 /// <summary>
 /// 合并卡片 — 把一次 Agent 回复中连续的「推理 + 工具调用」合并进同一张流式卡。
 /// <para>所有小块（推理折叠面板、工具折叠面板）都装进一个「大折叠面板」:生成过程中大面板展开(标题随机,营造工作中感),
-/// turn 结束时全量重建为大面板折叠 + 流式关闭。</para>
+/// turn 结束时局部更新大面板为折叠 + 关闭流式。</para>
 /// <para>并发安全：<see cref="EventBus"/> 回调并发进入,所有状态与飞书 API 调用都在单消费者线程串行执行。</para>
 /// </summary>
 [ServiceRegister.Transient]
@@ -32,18 +33,22 @@ public class MergeCardView : CardViewBase
     );
     private readonly CancellationTokenSource _cts = new();
     private Task? _consumer;
+    private int _disposed; // Dispose 幂等守卫(实例会被 DI scope 与 FeishuCardSession 各 dispose 一次)
 
     // ─────────────── 消费者线程独占状态（只由 ConsumeAsync 访问）───────────────
     private readonly List<ReasoningBlockState> _reasoningBlocks = new();
     private int _activeReasoningIndex = -1;
     private readonly Dictionary<string, ToolBlockState> _tools = new();
-    private readonly List<string> _toolOrder = new(); // callId 顺序,用于全量重建
     private readonly List<AppendItem> _pendingAppend = new();
     private readonly Dictionary<string, ContentItem> _pendingContent = new();
     private readonly Dictionary<string, ReplaceItem> _pendingReplace = new();
 
     private static readonly string[] WorkTitles =
-        ["🧠 思考中...", "🔍 分析中...", "⚙️ 处理中...", "✨ 整理思路...", "🤔 琢磨中...", "🛠️ 工作中..."];
+        ["🤯 绞尽脑汁中...", "🔥 燃烧脑细胞...", "🫠 CPU 冒烟了...", "🧠 搜肠刮肚...", "⚡ 算力全开...", "🛠️ 敲敲打打..."];
+
+    /// <summary>turn 收尾大面板的随机标题(戏精卖力完成态,与 <see cref="WorkTitles"/> 呼应)。</summary>
+    private static readonly string[] DoneTitles =
+        ["😮‍💨 长舒一口气", "😎 拿下!", "🎉 搞定!", "✌️ 我真棒!", "🫠 累但完事了", "✅ 交差!"];
 
     public MergeCardView(CardService cardService, ILogger<MergeCardView> logger)
     {
@@ -58,7 +63,7 @@ public class MergeCardView : CardViewBase
     {
         _rootPanelElementId = NextElementId();
         _title = WorkTitles[Random.Shared.Next(WorkTitles.Length)];
-        _cardId = await _cardService.CreateAsync(BuildFullCard(expanded: true, streamingDone: false), ct);
+        _cardId = await _cardService.CreateAsync(BuildFullCard(), ct);
         _consumer = Task.Run(ConsumeAsync);
     }
 
@@ -82,7 +87,7 @@ public class MergeCardView : CardViewBase
     public void EnqueueUpdateToolResult(string callId, string result, bool isError) =>
         Write(new UpdateToolResultOp(callId, result, isError));
 
-    /// <summary>turn 结束:全量重建(大面板折叠 + 流式关闭),等待消费者处理完成。</summary>
+    /// <summary>turn 结束:局部更新大面板为折叠 + 关闭流式,等待消费者处理完成。</summary>
     public override async Task CloseStreamingAsync(CancellationToken ct = default)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -94,6 +99,10 @@ public class MergeCardView : CardViewBase
     /// <inheritdoc />
     public override void Dispose()
     {
+        // 幂等守卫:MergeCardView 是 tracked transient,会被 DI scope 和 FeishuCardSession 各 dispose 一次,
+        // 第二次进来若再 _cts.Cancel() 会抛 ObjectDisposedException。
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
         _channel.Writer.TryComplete();
         _cts.Cancel();
         try { _consumer?.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult(); }
@@ -125,11 +134,23 @@ public class MergeCardView : CardViewBase
                 {
                     // 局部更新收尾:只折叠根面板 + 改收尾标题/配色(小块内容流式时已更新,无需全量重传)。
                     // 实测「更新组件属性」接口可改 expanded 与 header(2026-07-10 验证),故弃用 FullUpdate。
-                    await _cardService.PartialUpdateElementAsync(
-                        CardId, _rootPanelElementId!, BuildRootPanelClosePartial(), GetNextSequence(), _cts.Token);
-                    // 显式退出流式模式:settings patch 确保飞书侧真正结束流式(否则卡片可能停留在"进行中/展开"状态)。
-                    await _cardService.CloseStreamingAsync(CardId, GetNextSequence(), _cts.Token);
-                    closeOp.Tcs.TrySetResult();
+                    // try/finally 保证 tcs 一定释放:收尾 API 失败时不能让 CloseStreamingAsync 永久挂起
+                    // (它被 FeishuCardSession.Dispose 同步 await,挂起会卡死整条消息处理)。
+                    try
+                    {
+                        await _cardService.PartialUpdateElementAsync(
+                            CardId, _rootPanelElementId!, BuildRootPanelClosePartial(), GetNextSequence(), _cts.Token);
+                        // 显式退出流式模式:settings patch 确保飞书侧真正结束流式(否则卡片可能停留在"进行中/展开"状态)。
+                        await _cardService.CloseStreamingAsync(CardId, GetNextSequence(), _cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "MergeCardView 收尾折叠失败 CardId={CardId}", _cardId);
+                    }
+                    finally
+                    {
+                        closeOp.Tcs.TrySetResult();
+                    }
                     return;
                 }
             }
@@ -146,40 +167,39 @@ public class MergeCardView : CardViewBase
         switch (op)
         {
             case AppendReasoningOp:
-            {
-                var markdownId = NextElementId();
-                _reasoningBlocks.Add(new ReasoningBlockState(markdownId));
-                _activeReasoningIndex = _reasoningBlocks.Count - 1;
-                _pendingAppend.Add(new AppendItem(GetNextSequence(), _rootPanelElementId!, BuildReasoningPanel(markdownId, "")));
-                break;
-            }
+                {
+                    var markdownId = NextElementId();
+                    _reasoningBlocks.Add(new ReasoningBlockState(markdownId));
+                    _activeReasoningIndex = _reasoningBlocks.Count - 1;
+                    _pendingAppend.Add(new AppendItem(GetNextSequence(), _rootPanelElementId!, BuildReasoningPanel(markdownId, "")));
+                    break;
+                }
             case UpdateReasoningOp ur when _activeReasoningIndex >= 0:
-            {
-                var block = _reasoningBlocks[_activeReasoningIndex];
-                block.Content.Append(ur.Text);
-                _pendingContent[block.ElementId] = new ContentItem(GetNextSequence(), block.ElementId, block.Content.ToString());
-                break;
-            }
+                {
+                    var block = _reasoningBlocks[_activeReasoningIndex];
+                    block.Content.Append(ur.Text);
+                    _pendingContent[block.ElementId] = new ContentItem(GetNextSequence(), block.ElementId, block.Content.ToString());
+                    break;
+                }
             case AppendToolOp at:
-            {
-                _activeReasoningIndex = -1; // 工具块出现,当前推理块结束
-                var panelId = NextElementId();
-                _tools[at.CallId] = new ToolBlockState(panelId, at.ToolName, at.Args, at.Description);
-                _toolOrder.Add(at.CallId);
-                _pendingAppend.Add(new AppendItem(
-                    GetNextSequence(),
-                    _rootPanelElementId!,
-                    BuildToolPanel(panelId, at.ToolName, at.Args, at.Description, "⏳ 执行中...", isError: false, isRunning: true)));
-                break;
-            }
+                {
+                    _activeReasoningIndex = -1; // 工具块出现,当前推理块结束
+                    var panelId = NextElementId();
+                    _tools[at.CallId] = new ToolBlockState(panelId, at.ToolName, at.Args, at.Description);
+                    _pendingAppend.Add(new AppendItem(
+                        GetNextSequence(),
+                        _rootPanelElementId!,
+                        BuildToolPanel(panelId, at.ToolName, at.Args, at.Description, "⏳ 执行中...", isError: false, isRunning: true)));
+                    break;
+                }
             case UpdateToolResultOp utr when _tools.TryGetValue(utr.CallId, out var tb):
-            {
-                tb.Result = utr.Result;
-                tb.IsError = utr.IsError;
-                var panel = BuildToolPanel(tb.PanelElementId, tb.ToolName, tb.Args, tb.Description, utr.Result, utr.IsError, isRunning: false);
-                _pendingReplace[tb.PanelElementId] = new ReplaceItem(GetNextSequence(), tb.PanelElementId, panel);
-                break;
-            }
+                {
+                    tb.Result = utr.Result;
+                    tb.IsError = utr.IsError;
+                    var panel = BuildToolPanel(tb.PanelElementId, tb.ToolName, tb.Args, tb.Description, utr.Result, utr.IsError, isRunning: false);
+                    _pendingReplace[tb.PanelElementId] = new ReplaceItem(GetNextSequence(), tb.PanelElementId, panel);
+                    break;
+                }
         }
     }
 
@@ -209,44 +229,50 @@ public class MergeCardView : CardViewBase
 
     // ─────────────── 卡片构建 ───────────────
 
-    /// <summary>turn 收尾局部更新根面板的 partial_element JSON:折叠 + 收尾标题「✅ 思考与工具调用」+ 绿色配色。</summary>
+    /// <summary>turn 收尾局部更新根面板的 partial_element JSON:折叠 + 随机收尾标题 + 绿色配色。</summary>
     /// <remarks>header 为嵌套对象,patch 时整体覆盖,故 icon 等字段需一并带上以免丢失。</remarks>
-    private static string BuildRootPanelClosePartial() =>
-        """{"expanded":false,"header":{"title":{"tag":"plain_text","content":"✅ 思考与工具调用"},"background_color":"green-100","icon":{"tag":"standard_icon","token":"down-bold_outlined"},"icon_position":"right","icon_expanded_angle":-180}}""";
-
-    /// <summary>全量重建整张卡:大面板(可折叠)+ 所有小块(按生成顺序)的最新状态。</summary>
-    private Card BuildFullCard(bool expanded, bool streamingDone)
+    private static string BuildRootPanelClosePartial()
     {
-        var rootPanel = new CollapsiblePanelElement
+        var title = DoneTitles[Random.Shared.Next(DoneTitles.Length)];
+        // 匿名对象序列化:snake_case + 忽略 null,且顶层不带 tag(满足 patch partial_element 不可改 tag 的约束)。
+        var partial = new
         {
-            ElementId = _rootPanelElementId!,
-            Expanded = expanded,
-            Header = new CollapsiblePanelHeader
+            Expanded = false,
+            Header = new
             {
-                Title = new TextElement { Content = streamingDone ? "✅ 思考与工具调用" : _title },
-                Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
-                BackgroundColor = streamingDone ? "green-100" : "grey-100",
+                Title = new { Tag = "plain_text", Content = title },
+                BackgroundColor = "green-100",
+                Icon = new { Tag = "standard_icon", Token = "down-bold_outlined" },
                 IconPosition = "right",
                 IconExpandedAngle = -180,
             },
         };
+        return JsonSerializer.Serialize(partial, CardJsonSerializerOptions.Options);
+    }
 
-        foreach (var rb in _reasoningBlocks)
-            rootPanel.Elements.Add(BuildReasoningPanel(rb.ElementId, rb.Content.ToString()));
-        foreach (var callId in _toolOrder)
+    /// <summary>创建初始卡片:大面板展开 + 流式开启 + 随机工作中标题。小块由消费者流式追加,不在创建时构建。</summary>
+    private Card BuildFullCard()
+    {
+        var rootPanel = new CollapsiblePanelElement
         {
-            var tb = _tools[callId];
-            rootPanel.Elements.Add(BuildToolPanel(
-                tb.PanelElementId, tb.ToolName, tb.Args, tb.Description,
-                tb.Result ?? "⏳ 执行中...", tb.IsError, isRunning: tb.Result is null));
-        }
+            ElementId = _rootPanelElementId!,
+            Expanded = true,
+            Header = new CollapsiblePanelHeader
+            {
+                Title = new TextElement { Content = _title },
+                Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
+                BackgroundColor = "grey-100",
+                IconPosition = "right",
+                IconExpandedAngle = -180,
+            },
+        };
 
         return new Card
         {
             Schema = "2.0",
             Config = new CardConfig
             {
-                StreamingMode = !streamingDone, // 生成中 true / 完成 false
+                StreamingMode = true,
                 EnableForward = true,
                 EnableForwardInteraction = true,
             },
@@ -260,7 +286,7 @@ public class MergeCardView : CardViewBase
         Elements = { new MarkdownElement { ElementId = markdownElementId, Content = content } },
         Header = new CollapsiblePanelHeader
         {
-            Title = new TextElement { Content = "🤔 琢磨琢磨" },
+            Title = new TextElement { Content = WorkTitles[Random.Shared.Next(WorkTitles.Length)] },
             Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
             BackgroundColor = "lime-300",
             IconPosition = "right",

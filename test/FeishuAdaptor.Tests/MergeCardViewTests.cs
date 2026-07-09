@@ -207,7 +207,7 @@ public class MergeCardViewTests : IAsyncLifetime
             CardId, Arg.Any<string>(),
             Arg.Is<PatchCardkitV1CardsByCardIdElementsByElementIdBodyDto>(dto =>
                 dto.PartialElement.Contains("\"expanded\":false") &&
-                dto.PartialElement.Contains("✅ 思考与工具调用")),
+                dto.PartialElement.Contains("\"header\"")),
             Arg.Any<CancellationToken>());
 
         // 确认不再走全量重建
@@ -265,5 +265,18 @@ public class MergeCardViewTests : IAsyncLifetime
         for (var i = 1; i < sequences.Count; i++)
             Assert.True(sequences[i] > sequences[i - 1],
                 $"sequence 应单调递增：seq[{i - 1}]={sequences[i - 1]} seq[{i}]={sequences[i]}");
+    }
+
+    [Fact]
+    public void Dispose_多次调用应幂等不抛()
+    {
+        // MergeCardView 是 tracked transient,会被 DI scope 与 FeishuCardSession 各 dispose 一次。
+        // 第二次进来不应抛 ObjectDisposedException(此前 _cts.Cancel() 在已释放的 CTS 上会抛)。
+        _sut.Dispose();
+        try { _sut.Dispose(); }
+        catch (Exception ex)
+        {
+            Assert.Fail($"第二次 Dispose 不应抛异常,实际抛:{ex.GetType().Name}: {ex.Message}");
+        }
     }
 }
