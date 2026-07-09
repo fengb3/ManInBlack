@@ -123,12 +123,11 @@ public class MergeCardView : CardViewBase
 
                 if (closeOp is not null)
                 {
-                    // 全量重建:大面板 expanded=false + 所有小块定稿。
-                    // 用 FullUpdate 而非 PartialUpdate,因为 patch 接口不支持改 expanded。
-                    var card = BuildFullCard(expanded: false, streamingDone: true);
-                    await _cardService.FullUpdateAsync(CardId, card, GetNextSequence(), _cts.Token);
-                    // 显式退出流式模式:FullUpdate 里带 streaming_mode:false 不一定能把"已进入流式"的卡切回,
-                    // 需追加 settings patch 确保飞书侧真正结束流式(否则卡片可能停留在"进行中/展开"状态)。
+                    // 局部更新收尾:只折叠根面板 + 改收尾标题/配色(小块内容流式时已更新,无需全量重传)。
+                    // 实测「更新组件属性」接口可改 expanded 与 header(2026-07-10 验证),故弃用 FullUpdate。
+                    await _cardService.PartialUpdateElementAsync(
+                        CardId, _rootPanelElementId!, BuildRootPanelClosePartial(), GetNextSequence(), _cts.Token);
+                    // 显式退出流式模式:settings patch 确保飞书侧真正结束流式(否则卡片可能停留在"进行中/展开"状态)。
                     await _cardService.CloseStreamingAsync(CardId, GetNextSequence(), _cts.Token);
                     closeOp.Tcs.TrySetResult();
                     return;
@@ -209,6 +208,11 @@ public class MergeCardView : CardViewBase
     }
 
     // ─────────────── 卡片构建 ───────────────
+
+    /// <summary>turn 收尾局部更新根面板的 partial_element JSON:折叠 + 收尾标题「✅ 思考与工具调用」+ 绿色配色。</summary>
+    /// <remarks>header 为嵌套对象,patch 时整体覆盖,故 icon 等字段需一并带上以免丢失。</remarks>
+    private static string BuildRootPanelClosePartial() =>
+        """{"expanded":false,"header":{"title":{"tag":"plain_text","content":"✅ 思考与工具调用"},"background_color":"green-100","icon":{"tag":"standard_icon","token":"down-bold_outlined"},"icon_position":"right","icon_expanded_angle":-180}}""";
 
     /// <summary>全量重建整张卡:大面板(可折叠)+ 所有小块(按生成顺序)的最新状态。</summary>
     private Card BuildFullCard(bool expanded, bool streamingDone)

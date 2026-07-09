@@ -195,20 +195,24 @@ public class MergeCardViewTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CloseStreaming_应全量重建并折叠大面板()
+    public async Task CloseStreaming_应局部更新折叠大面板()
     {
         _sut.EnqueueAppendReasoning();
         _sut.EnqueueUpdateReasoning("done");
 
         await _sut.CloseStreamingAsync();
 
-        // turn 结束走 FullUpdate:大面板 expanded=false + streaming_mode=false
-        await _api.Received(1).PutCardkitV1CardsByCardIdAsync(
-            CardId,
-            Arg.Is<PutCardkitV1CardsByCardIdBodyDto>(dto =>
-                dto.Card.Data.Contains("\"expanded\":false") &&
-                dto.Card.Data.Contains("\"streaming_mode\":false")),
+        // turn 结束走局部更新(更新组件属性):partial_element 含 expanded:false + 收尾标题,不再全量重建
+        await _api.Received(1).PatchCardkitV1CardsByCardIdElementsByElementIdAsync(
+            CardId, Arg.Any<string>(),
+            Arg.Is<PatchCardkitV1CardsByCardIdElementsByElementIdBodyDto>(dto =>
+                dto.PartialElement.Contains("\"expanded\":false") &&
+                dto.PartialElement.Contains("✅ 思考与工具调用")),
             Arg.Any<CancellationToken>());
+
+        // 确认不再走全量重建
+        await _api.DidNotReceive().PutCardkitV1CardsByCardIdAsync(
+            CardId, Arg.Any<PutCardkitV1CardsByCardIdBodyDto>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -219,8 +223,8 @@ public class MergeCardViewTests : IAsyncLifetime
 
         await _sut.CloseStreamingAsync();
 
-        // FullUpdate 里带 streaming_mode:false 不一定能把"已进入流式"的卡切回非流式,
-        // 需追加 settings patch(PatchCardkitV1CardsByCardIdSettingsAsync)确保飞书侧真正结束流式。
+        // 局部更新只改组件属性,不会动 config.streaming_mode,故需追加 settings patch
+        // (PatchCardkitV1CardsByCardIdSettingsAsync)确保飞书侧真正结束流式。
         // (settings JSON 是 CardService 里硬编码的字面量,冒号后带空格。)
         await _api.Received(1).PatchCardkitV1CardsByCardIdSettingsAsync(
             CardId,
@@ -251,6 +255,7 @@ public class MergeCardViewTests : IAsyncLifetime
                 else if (arg is PutCardkitV1CardsByCardIdElementsByElementIdContentBodyDto d2) sequences.Add(d2.Sequence);
                 else if (arg is PutCardkitV1CardsByCardIdElementsByElementIdBodyDto d3) sequences.Add(d3.Sequence);
                 else if (arg is PatchCardkitV1CardsByCardIdSettingsBodyDto d4) sequences.Add(d4.Sequence);
+                else if (arg is PatchCardkitV1CardsByCardIdElementsByElementIdBodyDto d6) sequences.Add(d6.Sequence);
                 else if (arg is PutCardkitV1CardsByCardIdBodyDto d5) sequences.Add(d5.Sequence);
             }
         }
