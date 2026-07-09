@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using FeishuAdaptor.FeishuCard.Cards;
 using ManInBlack.AI.Abstraction.Attributes;
-using ManInBlack.AI.Tools;
 
 namespace FeishuAdaptor.FeishuCard.CardViews;
 
@@ -96,40 +95,6 @@ public partial class ToolExecutionCardView(
     private const string ArgsMarkdownElementId = "toolArgs";
     private const string ResultMarkdownElementId = "toolResult";
 
-    /// <summary>
-    /// 根据工具方法名获取中文显示名，未映射时返回原始名称。
-    /// 本地工具精确匹配；MCP 工具（{server}__{tool}，server 名可变）按工具名后缀模糊匹配。
-    /// </summary>
-    private static string GetToolDisplayName(string? toolName) => toolName switch
-    {
-        // CommandLineTools
-        nameof(CommandLineTools.RunBash) => "💻 执行命令",
-        nameof(CommandLineTools.GetBackgroundTaskResult) => "📥 获取后台任务结果",
-        nameof(CommandLineTools.KillBackgroundTask) => "🛑 终止后台任务",
-        // FileTools
-        nameof(FileTools.Read) => "📖 读取文件",
-        nameof(FileTools.Write) => "✍️ 写入文件",
-        nameof(FileTools.Edit) => "📝 更新文件",
-        nameof(FileTools.Glob) => "🔎 搜索文件",
-        nameof(FileTools.Grep) => "🔍 搜索内容",
-        // SkillTools
-        nameof(SkillTools.LoadSkill) => "🧠 加载技能",
-        // MCP 工具按工具名后缀模糊匹配（server 名可变，见 FuzzyMcpDisplayName）
-        _ => FuzzyMcpDisplayName(toolName)
-    };
-
-    /// <summary>
-    /// MCP 工具显示名模糊匹配：server 名可变，按工具名后缀（search/reader/fetch）归类。
-    /// </summary>
-    private static string FuzzyMcpDisplayName(string? toolName)
-    {
-        if (string.IsNullOrEmpty(toolName)) return "未知工具";
-        var lower = toolName.ToLowerInvariant();
-        if (lower.Contains("search")) return "🌐 联网搜索";
-        if (lower.Contains("reader") || lower.Contains("fetch")) return "📄 网页读取";
-        return toolName!;
-    }
-
     protected override void Define()
     {
         Card.Config!.StreamingMode = false;
@@ -171,7 +136,7 @@ public partial class ToolExecutionCardView(
         ViewModel.Arguments = arguments;
         ViewModel.Description = description;
 
-        var displayName = GetToolDisplayName(toolName);
+        var displayName = ToolDisplayNames.Get(toolName);
         if (!string.IsNullOrWhiteSpace(description))
         {
             displayName = $"{displayName} - {description}";
@@ -214,7 +179,7 @@ public partial class ToolExecutionCardView(
         CancellationToken ct = default
     )
     {
-        var displayName = GetToolDisplayName(ViewModel.ToolName);
+        var displayName = ToolDisplayNames.Get(ViewModel.ToolName);
         if (!string.IsNullOrWhiteSpace(ViewModel.Description))
         {
             displayName = $"{displayName} - {ViewModel.Description}";

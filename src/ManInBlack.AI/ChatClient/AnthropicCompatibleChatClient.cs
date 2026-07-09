@@ -87,6 +87,11 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
 
             var type = node["type"]?.GetValue<string>();
 
+            // [临时诊断] 打印每个 SSE event，确认 thinking 块是否出现在原始流（诊断后删除）
+            var diagSub = node["delta"]?["type"]?.GetValue<string>()
+                ?? node["content_block"]?["type"]?.GetValue<string>();
+            Console.WriteLine($"[Anthropic-SSE] type={type} sub={diagSub}");
+
             // 文本增量
             if (type == "content_block_delta")
             {

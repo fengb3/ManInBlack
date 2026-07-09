@@ -202,6 +202,22 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     }
 
     /// <summary>
+    /// 新增组件(重载)— 接受强类型 <see cref="CardElement"/> 列表，内部按卡片序列化约定转为 JSON。
+    /// </summary>
+    public Task AddElementsAsync(
+        string cardId,
+        string type,
+        string? targetElementId,
+        IEnumerable<CardElement> elements,
+        int sequence,
+        CancellationToken ct = default
+    )
+    {
+        var json = JsonSerializer.Serialize(elements, CardJsonSerializerOptions.Options);
+        return AddElementsAsync(cardId, type, targetElementId, json, sequence, ct);
+    }
+
+    /// <summary>
     /// 更新组件属性 — 局部更新指定组件的部分属性，不支持修改 tag 属性。
     /// </summary>
     /// <param name="partialElement">要更新的属性 JSON 字符串</param>
