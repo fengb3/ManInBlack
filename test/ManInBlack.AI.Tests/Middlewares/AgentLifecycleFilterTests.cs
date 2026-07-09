@@ -23,7 +23,7 @@ public class AgentLifecycleFilterTests
         var fake = new FakeHookExecutor();
         var subs = new List<IDisposable>();
 
-        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -42,7 +42,7 @@ public class AgentLifecycleFilterTests
             }
         }));
 
-        subs.Add(bus.Subscribe<AfterToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -125,7 +125,7 @@ public class AgentLifecycleFilterTests
         {
             Result = new HookResult { IsBlocked = true, BlockReason = "禁止访问" }
         };
-        var sub = bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        var sub = bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -180,7 +180,7 @@ public class AgentLifecycleFilterTests
         {
             Result = new HookResult { IsBlocked = true, BlockReason = "权限不足" }
         };
-        var sub = bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        var sub = bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -231,7 +231,7 @@ public class AgentLifecycleFilterTests
         {
             Result = new HookResult { IsBlocked = false }
         };
-        var sub = bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        var sub = bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -241,7 +241,7 @@ public class AgentLifecycleFilterTests
             };
             await fake.ExecuteAsync(HookPoint.BeforeToolExecute, hookCtx, ct);
         });
-        sub = bus.Subscribe<AfterToolExecuteEvent>("test-agent", async (evt, ct) =>
+        sub = bus.Subscribe<AfterToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -289,7 +289,7 @@ public class AgentLifecycleFilterTests
 
         var fake = new FakeHookExecutor();
         var subs = new List<IDisposable>();
-        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -300,7 +300,7 @@ public class AgentLifecycleFilterTests
             };
             await fake.ExecuteAsync(HookPoint.BeforeToolExecute, hookCtx, ct);
         }));
-        subs.Add(bus.Subscribe<AfterToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -356,7 +356,7 @@ public class AgentLifecycleFilterTests
 
         var fake = new FakeHookExecutor();
         var subs = new List<IDisposable>();
-        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -366,7 +366,7 @@ public class AgentLifecycleFilterTests
             };
             await fake.ExecuteAsync(HookPoint.BeforeToolExecute, hookCtx, ct);
         }));
-        subs.Add(bus.Subscribe<AfterToolExecuteEvent>("test-agent", async (evt, ct) =>
+        subs.Add(bus.Subscribe<AfterToolExecuteEvent>(EventBus.HookKey("test-agent"), async (evt, ct) =>
         {
             var hookCtx = new HookContext
             {
@@ -402,5 +402,78 @@ public class AgentLifecycleFilterTests
         Assert.Equal("工具执行失败", afterHook.Context.Error);
 
         foreach (var sub in subs) sub.Dispose();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BeforeTool_ObserverLane_ReceivesEvent()
+    {
+        var bus = new EventBus();
+        var agentCtx = new AgentContext(
+            new ServiceCollection().AddSingleton<EventBus>(bus).BuildServiceProvider())
+        { AgentId = "test-agent" };
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton<EventBus>(bus)
+            .AddSingleton(agentCtx)
+            .BuildServiceProvider();
+
+        var observerReceived = new List<BeforeToolExecuteEvent>();
+        // 观察者订阅在 agentId（观察者 lane）
+        using var obs = bus.Subscribe<BeforeToolExecuteEvent>("test-agent",
+            (evt, _) => { observerReceived.Add(evt); return Task.CompletedTask; });
+
+        var filter = new AgentLifecycleFilter(bus, NullLogger<AgentLifecycleFilter>.Instance);
+        var ctx = new ToolExecuteContext(serviceProvider)
+        {
+            ToolName = "ObserverTool",
+            CallId = "call-obs",
+        };
+        Task Next(ToolExecuteContext c) => Task.CompletedTask;
+
+        await filter.ExecuteAsync(ctx, Next);
+
+        Assert.Single(observerReceived);
+        Assert.Equal("ObserverTool", observerReceived[0].ToolName);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BeforeTool_ObserverSeesBlockedState_FromHookLane()
+    {
+        // 锁定顺序硬约束（spec §4.3）：hook lane 必须先于 observer lane，
+        // 否则观察者会看到 IsBlocked=false。此测试在「observer 先于 hook」的错误顺序下会失败。
+        var bus = new EventBus();
+        var agentCtx = new AgentContext(
+            new ServiceCollection().AddSingleton<EventBus>(bus).BuildServiceProvider())
+        { AgentId = "test-agent" };
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton<EventBus>(bus)
+            .AddSingleton(agentCtx)
+            .BuildServiceProvider();
+
+        // 模拟阻断 hook，订阅在 hook lane
+        using var hookSub = bus.Subscribe<BeforeToolExecuteEvent>(EventBus.HookKey("test-agent"),
+            (evt, _) => { evt.IsBlocked = true; evt.BlockReason = "hook 阻断"; return Task.CompletedTask; });
+
+        // 观察者订阅在 agentId（观察者 lane）；捕获「观察者运行那一刻」看到的 IsBlocked 快照，
+        // 而非事后读引用（事件是共享可变对象，事后读无法区分顺序）
+        var observerSeenBlocked = new List<bool>();
+        using var obs = bus.Subscribe<BeforeToolExecuteEvent>("test-agent",
+            (evt, _) => { observerSeenBlocked.Add(evt.IsBlocked); return Task.CompletedTask; });
+
+        var filter = new AgentLifecycleFilter(bus, NullLogger<AgentLifecycleFilter>.Instance);
+        var ctx = new ToolExecuteContext(serviceProvider)
+        {
+            ToolName = "BlockedTool",
+            CallId = "call-blocked-obs",
+        };
+        var nextCalled = false;
+        Task Next(ToolExecuteContext c) { nextCalled = true; return Task.CompletedTask; }
+
+        await filter.ExecuteAsync(ctx, Next);
+
+        // 观察者运行那一刻即看到 IsBlocked=true（证明 hook lane 在 observer lane 之前完成）
+        Assert.Single(observerSeenBlocked);
+        Assert.True(observerSeenBlocked[0]);
+        // 工具被阻断，next 未调用
+        Assert.False(nextCalled);
     }
 }

@@ -46,6 +46,9 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
             ArgumentsJson = argsJson
         };
 
+        var hookKey = EventBus.HookKey(key);
+        // hook lane 先跑（await），读 IsBlocked；再 observer lane，让观察者看到带 IsBlocked 的事件
+        await eventBus.PublishAsync(hookKey, beforeEvt, default);
         await eventBus.PublishAsync(key, beforeEvt, default);
 
         if (beforeEvt.IsBlocked)
@@ -68,8 +71,8 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
             context.Error = ex;
         }
 
-        // ── AfterToolExecute 事件 ──
-        await eventBus.PublishAsync(key, new AfterToolExecuteEvent
+        // ── AfterToolExecute 事件（hook lane + observer lane）──
+        var afterEvt = new AfterToolExecuteEvent
         {
             AgentId = key,
             ToolName = context.ToolName,
@@ -77,6 +80,8 @@ public class AgentLifecycleFilter(EventBus eventBus, ILogger<AgentLifecycleFilte
             ArgumentsJson = argsJson,
             ResultJson = context.Result?.ToString(),
             Error = context.Error?.Message,
-        }, default);
+        };
+        await eventBus.PublishAsync(hookKey, afterEvt, default);
+        await eventBus.PublishAsync(key, afterEvt, default);
     }
 }

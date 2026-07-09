@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ManInBlack.AI.Abstraction.Hooks;
 using ManInBlack.AI.Abstraction.Middleware;
+using ManInBlack.AI.Events;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.Tests.Helpers;
@@ -180,5 +181,31 @@ public class HookMiddlewareTests
 
         // Assert: 空 InjectedText 不应修改 SystemPrompt
         Assert.Equal("原始提示词", ctx.SystemPrompt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BeforeLlmCall_DoesNotReachObserverLane()
+    {
+        var observerReceived = new List<BeforeLlmCallEvent>();
+        var bus = new EventBus();
+        using var obs = bus.Subscribe<BeforeLlmCallEvent>("agent-obs",
+            (evt, _) => { observerReceived.Add(evt); return Task.CompletedTask; });
+
+        var fakeExecutor = new FakeHookExecutor();
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "agent-obs",
+            SystemPrompt = "s",
+            UserInput = "u",
+        };
+
+        _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)
+            .ToListAsync();
+
+        // hook 走 ::hook lane，观察者 lane（agentId）不应收到 BeforeLlmCall
+        Assert.Empty(observerReceived);
+        // 但 BeforeLlmCall hook 仍触发
+        Assert.Contains(fakeExecutor.ExecutedHooks, h => h.Point == HookPoint.BeforeLlmCall);
     }
 }

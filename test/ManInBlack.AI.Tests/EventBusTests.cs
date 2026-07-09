@@ -117,4 +117,59 @@ public class EventBusTests
         await _bus.PublishAsync("key1", 42);
         Assert.Single(intReceived);
     }
+
+    [Fact]
+    public void HookKey_Appends_Suffix()
+    {
+        Assert.Equal("agent-1::hook", EventBus.HookKey("agent-1"));
+    }
+
+    [Fact]
+    public async Task HookKey_Isolates_Hook_Lane_From_Observer_Lane()
+    {
+        var hookReceived = new List<TestEvent>();
+        var observerReceived = new List<TestEvent>();
+        var agentId = "agent-x";
+
+        using var h = _bus.Subscribe<TestEvent>(EventBus.HookKey(agentId),
+            (e, _) => { hookReceived.Add(e); return Task.CompletedTask; });
+        using var o = _bus.Subscribe<TestEvent>(agentId,
+            (e, _) => { observerReceived.Add(e); return Task.CompletedTask; });
+
+        await _bus.PublishAsync(EventBus.HookKey(agentId), new TestEvent("to-hook"));
+        await _bus.PublishAsync(agentId, new TestEvent("to-observer"));
+
+        Assert.Single(hookReceived);
+        Assert.Equal("to-hook", hookReceived[0].Message);
+        Assert.Single(observerReceived);
+        Assert.Equal("to-observer", observerReceived[0].Message);
+    }
+
+    [Fact]
+    public async Task PublishAsync_HandlerThrows_DoesNotThrow_And_OthersStillRun()
+    {
+        var received = new List<TestEvent>();
+        using var sub1 = _bus.Subscribe<TestEvent>("key1",
+            (e, _) => { received.Add(e); return Task.CompletedTask; });
+        using var sub2 = _bus.Subscribe<TestEvent>("key1",
+            (_, _) => throw new InvalidOperationException("boom"));
+
+        // 不应抛异常
+        await _bus.PublishAsync("key1", new TestEvent("hello"));
+
+        // 抛错的 handler 不影响其他 handler
+        Assert.Single(received);
+        Assert.Equal("hello", received[0].Message);
+    }
+
+    [Fact]
+    public async Task PublishAsync_HandlerThrows_OperationCanceledException_Propagates()
+    {
+        // OCE 代表协作式取消,不应被错误隔离吞掉 —— 必须向上抛给调用方
+        using var sub = _bus.Subscribe<TestEvent>("key1",
+            (_, _) => throw new OperationCanceledException("cancelled"));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            _bus.PublishAsync("key1", new TestEvent("hi")));
+    }
 }
