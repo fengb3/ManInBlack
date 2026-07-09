@@ -151,37 +151,29 @@ public class HookMiddleware(IHookExecutor hookExecutor, ILogger<HookMiddleware> 
             logger.LogDebug("[HookMiddleware] SystemPrompt 已注入文本，长度={Length}", injected.Length);
         }
 
-        // ── 流式转发内部管道输出，同时检测 FunctionCallContent ──
-        var hasFunctionCalls = false;
-
+        // ── 流式转发内部管道输出 ──
+        // next() = 整个 AgentLoopMiddleware 循环;仅当最后一轮无 function call(循环正常退出)时才返回。
+        // 取消(OperationCanceledException)或异常会从 await foreach 抛出,不会走到下方发布,
+        // 故"next() 正常返回"即等价于"Agent 正常完成"。
         await foreach (var update in next().WithCancellation(ct))
         {
-            if (!hasFunctionCalls)
-            {
-                foreach (var content in update.Contents)
-                {
-                    if (content is FunctionCallContent)
-                    {
-                        hasFunctionCalls = true;
-                        break;
-                    }
-                }
-            }
-
             yield return update;
         }
 
-        // ── AgentCompleted：当无 function call 时发布事件 ──
-        if (!hasFunctionCalls)
+        // ── AgentCompleted：Agent 循环正常结束时发布 ──
+        // 双发到 hook lane(用户钩子)与 observer lane(UI 观察者,如 FeishuCardSession),
+        // 与 AgentLifecycleFilter 对工具事件的双发模式保持一致。
+        // (历史 bug:此前用 hasFunctionCalls 跨所有轮累加做 gate,导致任何用过工具的会话都不发,
+        //  且只发 hook lane、观察者 lane 收不到。)
+        logger.LogDebug("[HookMiddleware] AgentCompleted 触发，AgentId={AgentId}", context.AgentId);
+        var completedEvt = new AgentCompletedEvent
         {
-            logger.LogDebug("[HookMiddleware] AgentCompleted 触发，AgentId={AgentId}", context.AgentId);
-            await bus.PublishAsync(EventBus.HookKey(key), new AgentCompletedEvent
-            {
-                AgentId = key,
-                SystemPrompt = context.SystemPrompt,
-                UserInput = context.UserInput,
-            }, ct);
-        }
+            AgentId = key,
+            SystemPrompt = context.SystemPrompt,
+            UserInput = context.UserInput,
+        };
+        await bus.PublishAsync(EventBus.HookKey(key), completedEvt, ct);
+        await bus.PublishAsync(key, completedEvt, ct);
 
         // ── 清理订阅 ──
         foreach (var sub in subs) sub.Dispose();

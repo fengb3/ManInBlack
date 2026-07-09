@@ -131,9 +131,10 @@ public class HookMiddlewareTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithFunctionCalls_ShouldNotFireAgentCompleted()
+    public async Task HandleAsync_WithFunctionCalls_ShouldFireAgentCompleted()
     {
-        // Arrange
+        // 即便会话调用过工具,只要内部循环正常结束(next() 返回),AgentCompleted 就应触发。
+        // 历史 bug:hasFunctionCalls 跨所有轮累加、置位后不复位,导致任何用过工具的会话都不发 AgentCompleted。
         var fakeExecutor = new FakeHookExecutor();
         var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
         var ctx = new AgentContext(BuildSp())
@@ -155,8 +156,67 @@ public class HookMiddlewareTests
         _ = await middleware.HandleAsync(ctx, () => TestHelpers.AsyncSeq(updates), CancellationToken.None)
             .ToListAsync();
 
-        // Assert: AgentCompleted 钩子不应被触发
-        Assert.DoesNotContain(fakeExecutor.ExecutedHooks, h => h.Point == HookPoint.AgentCompleted);
+        // Assert: AgentCompleted 钩子应被触发
+        Assert.Contains(fakeExecutor.ExecutedHooks, h => h.Point == HookPoint.AgentCompleted);
+        var completedHook = fakeExecutor.ExecutedHooks.Single(h => h.Point == HookPoint.AgentCompleted);
+        Assert.Equal("agent-5", completedHook.Context.AgentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AgentCompleted_ShouldPublishToObserverLane()
+    {
+        // 观察者 lane(plain agentId)应收到 AgentCompletedEvent,与工具事件双发模式一致,
+        // 供 FeishuCardSession 等 UI 观察者在 turn 结束时收尾折叠卡片。
+        var observerReceived = new List<AgentCompletedEvent>();
+        var bus = new EventBus();
+        using var obs = bus.Subscribe<AgentCompletedEvent>("agent-obs",
+            (evt, _) => { observerReceived.Add(evt); return Task.CompletedTask; });
+
+        var fakeExecutor = new FakeHookExecutor();
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "agent-obs",
+            SystemPrompt = "s",
+            UserInput = "u",
+        };
+
+        _ = await middleware.HandleAsync(ctx, () => TestHelpers.EmptyStream, CancellationToken.None)
+            .ToListAsync();
+
+        Assert.Single(observerReceived);
+        Assert.Equal("agent-obs", observerReceived[0].AgentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Cancelled_ShouldNotPublishAgentCompleted()
+    {
+        // 取消时 next() 抛 OperationCanceledException → post-loop 发布不执行,
+        // 两条 lane 都不应收到 AgentCompletedEvent("always publish" 改动不能在取消时误发)。
+        var hookReceived = new List<AgentCompletedEvent>();
+        var observerReceived = new List<AgentCompletedEvent>();
+        var bus = new EventBus();
+        using var hookSub = bus.Subscribe<AgentCompletedEvent>(EventBus.HookKey("agent-cancel"),
+            (evt, _) => { hookReceived.Add(evt); return Task.CompletedTask; });
+        using var obsSub = bus.Subscribe<AgentCompletedEvent>("agent-cancel",
+            (evt, _) => { observerReceived.Add(evt); return Task.CompletedTask; });
+
+        var fakeExecutor = new FakeHookExecutor();
+        var middleware = new HookMiddleware(fakeExecutor, NullLogger<HookMiddleware>.Instance);
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "agent-cancel",
+            SystemPrompt = "s",
+            UserInput = "u",
+        };
+
+        var stream = TestHelpers.ThrowOnMoveNext<ChatResponseUpdate>(new OperationCanceledException());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await middleware.HandleAsync(ctx, () => stream, CancellationToken.None).ToListAsync());
+
+        Assert.Empty(hookReceived);
+        Assert.Empty(observerReceived);
     }
 
     [Fact]

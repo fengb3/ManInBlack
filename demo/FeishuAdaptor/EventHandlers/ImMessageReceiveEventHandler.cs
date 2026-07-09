@@ -99,6 +99,7 @@ public class AgentLauncher(
             input.Event.Message?.Content
         );
 
+        FeishuCardSession? cardSession = null;
         try
         {
             string userLlmInput;
@@ -106,8 +107,6 @@ public class AgentLauncher(
             {
                 userLlmInput = await HandleMessage(messageScope.ServiceProvider, input, cts.Token);
             }
-
-            FeishuCardSession? cardSession = null;
 
             var updates = factory.RunAsync(
                 "feishu-agent",
@@ -136,8 +135,6 @@ public class AgentLauncher(
             );
 
             await foreach (var _ in updates) { }
-
-            cardSession?.Dispose();
         }
         catch (OperationCanceledException)
         {
@@ -154,6 +151,9 @@ public class AgentLauncher(
         }
         finally
         {
+            // 收尾关闭卡片(折叠合并卡 + 关闭残留 text 卡)。放 finally 以保证取消
+            // (OperationCanceledException) 时也能折叠——AgentCompletedEvent 路径在取消时不触发。
+            cardSession?.Dispose();
             factory.Release(userId, cts);
             logger.LogInformation("Finished processing message from user {userId}", userId);
         }

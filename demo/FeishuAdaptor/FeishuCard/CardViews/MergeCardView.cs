@@ -123,10 +123,13 @@ public class MergeCardView : CardViewBase
 
                 if (closeOp is not null)
                 {
-                    // 全量重建:大面板 expanded=false + streaming_mode=false + 所有小块定稿。
+                    // 全量重建:大面板 expanded=false + 所有小块定稿。
                     // 用 FullUpdate 而非 PartialUpdate,因为 patch 接口不支持改 expanded。
                     var card = BuildFullCard(expanded: false, streamingDone: true);
                     await _cardService.FullUpdateAsync(CardId, card, GetNextSequence(), _cts.Token);
+                    // 显式退出流式模式:FullUpdate 里带 streaming_mode:false 不一定能把"已进入流式"的卡切回,
+                    // 需追加 settings patch 确保飞书侧真正结束流式(否则卡片可能停留在"进行中/展开"状态)。
+                    await _cardService.CloseStreamingAsync(CardId, GetNextSequence(), _cts.Token);
                     closeOp.Tcs.TrySetResult();
                     return;
                 }

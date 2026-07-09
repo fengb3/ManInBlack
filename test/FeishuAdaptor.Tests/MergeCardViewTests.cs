@@ -212,6 +212,25 @@ public class MergeCardViewTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CloseStreaming_应额外调用settings_patch退出流式()
+    {
+        _sut.EnqueueAppendReasoning();
+        _sut.EnqueueUpdateReasoning("done");
+
+        await _sut.CloseStreamingAsync();
+
+        // FullUpdate 里带 streaming_mode:false 不一定能把"已进入流式"的卡切回非流式,
+        // 需追加 settings patch(PatchCardkitV1CardsByCardIdSettingsAsync)确保飞书侧真正结束流式。
+        // (settings JSON 是 CardService 里硬编码的字面量,冒号后带空格。)
+        await _api.Received(1).PatchCardkitV1CardsByCardIdSettingsAsync(
+            CardId,
+            Arg.Is<PatchCardkitV1CardsByCardIdSettingsBodyDto>(dto =>
+                dto.Settings.Contains("\"streaming_mode\": false") &&
+                dto.Sequence > 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task 多个op的sequence应单调递增发送()
     {
         _sut.EnqueueAppendReasoning();
