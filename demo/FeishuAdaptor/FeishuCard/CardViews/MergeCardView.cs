@@ -43,12 +43,23 @@ public class MergeCardView : CardViewBase
     private readonly Dictionary<string, ContentItem> _pendingContent = new();
     private readonly Dictionary<string, ReplaceItem> _pendingReplace = new();
 
+    /// <summary>生成过程中大面板的随机标题(戏精卖力工作中态,梗感拉满)。</summary>
     private static readonly string[] WorkTitles =
-        ["🤯 绞尽脑汁中...", "🔥 燃烧脑细胞...", "🫠 CPU 冒烟了...", "🧠 搜肠刮肚...", "⚡ 算力全开...", "🛠️ 敲敲打打..."];
+    [
+        "🤯 绞尽脑汁中...", "🔥 燃烧脑细胞...", "🫠 CPU 冒烟了...", "🧠 搜肠刮肚...",
+        "⚡ 算力全开...", "🛠️ 敲敲打打...", "🐮 牛马打工中...", "🥵 满头大汗...",
+        "💪 肝帝附体...", "🏃 拼了老命...", "🧑‍💻 猛敲键盘...", "🤔 让我想想...",
+        "🔨 锤炼答案中...", "🐔 卷起来了...", "🥋 硬控思考...", "💭 让子弹飞...",
+    ];
 
     /// <summary>turn 收尾大面板的随机标题(戏精卖力完成态,与 <see cref="WorkTitles"/> 呼应)。</summary>
     private static readonly string[] DoneTitles =
-        ["😮‍💨 长舒一口气", "😎 拿下!", "🎉 搞定!", "✌️ 我真棒!", "🫠 累但完事了", "✅ 交差!"];
+    [
+        "😮‍💨 长舒一口气", "😎 拿下!", "🎉 搞定!", "✌️ 我真棒!",
+        "🫠 累但完事了", "✅ 交差!", "🤙 拿捏了!", "🎊 芜湖起飞~",
+        "🏆 yyds!", "😎 游刃有余", "🎈 收工!", "😮‍💨 终于搞完",
+        "🥂 敬自己一杯", "💪 轻松拿下", "✨ 魔法完成", "🫡 完美谢幕",
+    ];
 
     public MergeCardView(CardService cardService, ILogger<MergeCardView> logger)
     {
@@ -286,7 +297,7 @@ public class MergeCardView : CardViewBase
         Elements = { new MarkdownElement { ElementId = markdownElementId, Content = content } },
         Header = new CollapsiblePanelHeader
         {
-            Title = new TextElement { Content = WorkTitles[Random.Shared.Next(WorkTitles.Length)] },
+            Title = new TextElement { Content = "🤔 琢磨琢磨" },
             Icon = new CollapsiblePanelIcon { Token = "down-bold_outlined" },
             BackgroundColor = "lime-300",
             IconPosition = "right",
