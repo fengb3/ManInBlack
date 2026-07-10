@@ -81,6 +81,10 @@ public class CardUpdateScheduler : IAsyncDisposable
         {
             await _limiter.StreamingUpdateText.WaitForSlotAsync(ct);
 
+            _logger.LogDebug("📤 [StreamUpdate] PUT https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements/{ElementId}/content (seq={Seq}, len={Len})\nContent: {Content}",
+                item.Key.CardId, item.Key.ElementId, item.Update.Sequence, item.Update.Content.Length,
+                item.Update.Content.Length > 300 ? item.Update.Content[..300] + "..." : item.Update.Content);
+
             await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
                 item.Key.CardId,
                 item.Key.ElementId,
@@ -179,6 +183,10 @@ public class CardUpdateScheduler : IAsyncDisposable
                 try
                 {
                     await _limiter.StreamingUpdateText.WaitForSlotAsync(_cts.Token);
+
+                    _logger.LogDebug("📤 [StreamUpdate] PUT https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements/{ElementId}/content (seq={Seq}, len={Len})\nContent: {Content}",
+                        item.Key.CardId, item.Key.ElementId, item.Update.Sequence, item.Update.Content.Length,
+                        item.Update.Content.Length > 300 ? item.Update.Content[..300] + "..." : item.Update.Content);
 
                     await _api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
                         item.Key.CardId,

@@ -5,11 +5,12 @@ using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using FeishuNetSdk.Im;
 using ManInBlack.AI.Abstraction.Attributes;
+using Microsoft.Extensions.Logging;
 
 namespace FeishuAdaptor.FeishuCard;
 
 [ServiceRegister.Scoped]
-public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
+public class CardService(IFeishuTenantApi api, CardApiLimiter limiter, ILogger<CardService> logger)
 {
     /// <summary>
     /// 创建卡片实体并获取卡片ID, 卡片ID 用于后续更新卡片
@@ -18,13 +19,17 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     {
         await limiter.CreateCard.WaitForSlotAsync(ct);
 
+        var cardJson = card.ToJson();
+        logger.LogInformation("📤 [CreateCard] POST https://open.feishu.cn/open-apis/cardkit/v1/cards\nJSON:\n{Json}", cardJson);
+
         var result = await api.PostCardkitV1CardsAsync(
-            new PostCardkitV1CardsBodyDto { Type = "card_json", Data = card.ToJson() },
+            new PostCardkitV1CardsBodyDto { Type = "card_json", Data = cardJson },
             ct
         );
 
         result.ThrowIfFeishuResponseNotSuccess();
 
+        logger.LogInformation("✅ [CreateCard] CardId={CardId}", result.Data!.CardId);
         return result.Data!.CardId;
     }
 
@@ -40,6 +45,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
         var msgContent = JsonSerializer.Serialize(
             new { type = "card", data = new { card_id = cardId } }
         );
+
+        logger.LogInformation("📤 [SendMessage] POST https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type={Type} (receiveId={Id})\nContent:\n{Json}",
+            receiveIdType, receiveId, msgContent);
 
         var result = await api.PostImV1MessagesAsync(
             receiveIdType,
@@ -67,6 +75,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     )
     {
         await limiter.StreamingUpdateText.WaitForSlotAsync(ct);
+
+        logger.LogDebug("📤 [StreamUpdate] PUT https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements/{ElementId}/content (seq={Seq}, len={Len})\nContent: {Content}",
+            cardId, elementId, sequence, newContent.Length, newContent.Length > 300 ? newContent[..300] + "..." : newContent);
 
         var response = await api.PutCardkitV1CardsByCardIdElementsByElementIdContentAsync(
             cardId,
@@ -100,6 +111,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
             CardJsonSerializerOptions.Options
         );
 
+        logger.LogInformation("📤 [ReplaceElement] PUT https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements/{ElementId} (seq={Seq})\nJSON:\n{Json}",
+            cardId, elementId, sequence, elementJson);
+
         var response = await api.PutCardkitV1CardsByCardIdElementsByElementIdAsync(
             cardId,
             elementId,
@@ -125,6 +139,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     )
     {
         await limiter.FullUpdate.WaitForSlotAsync(ct);
+
+        logger.LogInformation("📤 [FullUpdate] PUT https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId} (seq={Seq})\nJSON:\n{Json}",
+            cardId, sequence, card.ToJson());
 
         var response = await api.PutCardkitV1CardsByCardIdAsync(
             cardId,
@@ -156,6 +173,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     {
         await limiter.BatchUpdate.WaitForSlotAsync(ct);
 
+        logger.LogInformation("📤 [BatchUpdate] POST https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/batch_update (seq={Seq})\nActions:\n{Json}",
+            cardId, sequence, actions);
+
         var response = await api.PostCardkitV1CardsByCardIdBatchUpdateAsync(
             cardId,
             new PostCardkitV1CardsByCardIdBatchUpdateBodyDto
@@ -185,6 +205,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     )
     {
         await limiter.AddElements.WaitForSlotAsync(ct);
+
+        logger.LogInformation("📤 [AddElements] POST https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements (type={Type}, target={Target}, seq={Seq})\nJSON:\n{Json}",
+            cardId, type, targetElementId, sequence, elements);
 
         var response = await api.PostCardkitV1CardsByCardIdElementsAsync(
             cardId,
@@ -230,6 +253,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
     )
     {
         await limiter.PartialUpdateElement.WaitForSlotAsync(ct);
+
+        logger.LogInformation("📤 [PartialUpdate] PATCH https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/elements/{ElementId} (seq={Seq})\nJSON:\n{Json}",
+            cardId, elementId, sequence, partialElement);
 
         var response = await api.PatchCardkitV1CardsByCardIdElementsByElementIdAsync(
             cardId,
@@ -278,6 +304,9 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter)
         await limiter.UpdateSettings.WaitForSlotAsync(ct);
 
         var settingsJson = """{"config":{"streaming_mode": false}}""";
+
+        logger.LogInformation("📤 [CloseStreaming] PATCH https://open.feishu.cn/open-apis/cardkit/v1/cards/{CardId}/settings (seq={Seq})\nJSON:\n{Json}",
+            cardId, sequence, settingsJson);
 
         var response = await api.PatchCardkitV1CardsByCardIdSettingsAsync(
             cardId,
