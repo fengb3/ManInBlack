@@ -96,3 +96,15 @@ public record SubAgentCompletedEvent
     public string? Result { get; init; }
     public string? Error { get; init; }
 }
+
+/// <summary>
+/// 命令执行后事件(纯通知):命令名、参数、是否成功。
+/// </summary>
+public record CommandExecutedEvent
+{
+    public string AgentId { get; init; } = string.Empty;
+    public string CommandName { get; init; } = string.Empty;
+    public IReadOnlyList<string> Args { get; init; } = [];
+    public bool Succeeded { get; init; } = true;
+    public string? Error { get; init; }
+}

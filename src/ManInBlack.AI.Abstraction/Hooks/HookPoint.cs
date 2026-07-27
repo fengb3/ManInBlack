@@ -22,4 +22,7 @@ public enum HookPoint
 
     /// <summary>Agent 循环结束（最终响应前）</summary>
     AgentCompleted,
+
+    /// <summary>斜杠命令执行后(可记录命令名/参数/成功与否)</summary>
+    AfterCommand,
 }
