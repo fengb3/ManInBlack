@@ -22,7 +22,7 @@ builder.AddDockerComposeEnvironment("prod");
 **注意(13.4.6 实测):**
 
 - `AddProject` 返回 `ProjectResource`,`WithBindMount` 等 API 要 `ContainerResource`,直接调会 CS0311。
-- **但** 容器级配置(卷 / `HOME` / 端口 / `cap_add` / `security_opt` / healthcheck)可全部在 `ConfigureComposeFile` 回调里写进代码——`Service` 模型是完整 compose schema,这些字段都有。本项目就采用此方式(见 `ConfigureProdCompose`),生成 compose 直接生产可用,不再手改。
+- **但** 容器级配置(卷 / `HOME` / 端口 / `cap_add` / `security_opt` / healthcheck / **网络模式**)可全部在 `ConfigureComposeFile` 回调里写进代码——`Service` 模型是完整 compose schema(`NetworkMode`/`Networks`/`Expose` 等也有),这些字段都有。本项目就采用此方式(见 `ConfigureProdCompose`,feishu 容器即用 `NetworkMode="host"` 让 Agent 用内网 IP 访问同机其他容器——bridge 默认隔离会超时;详见 [aspire-guide](aspire-guide.md)),生成 compose 直接生产可用,不再手改。
 - 各项目必须 `.PublishAsDockerFile(c => c.WithDockerfile(...))` 指定自带 Dockerfile,否则 `aspire do prepare-prod` 会走 .NET SDK 默认容器发布(裸 `aspnet:10.0` 基座,没 node/python/bwrap,且 build 失败)。
 
 ## 2. Dockerfile

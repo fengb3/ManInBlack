@@ -54,9 +54,10 @@ cd demo/Dashboard/client && npm run dev            # Vite(:5173,proxy 回落 :50
 
 ### 原理(全在 `demo/AppHost/Program.cs`)
 
-- `AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)`:把所有容器级配置(`user` / `HOME` / bind mount / `cap_add` / `security_opt` / loopback 端口 / healthcheck)在代码里写死。`Service` 模型是完整 compose schema(`CapAdd`/`SecurityOpt`/`Volumes`/`Ports`/`Healthcheck`/`Environment` 都能设),生成的 compose 直接生产可用。
+- `AddDockerComposeEnvironment("prod").WithDashboard(false).ConfigureComposeFile(...)`:把所有容器级配置(`user` / `HOME` / bind mount / `cap_add` / `security_opt` / loopback 端口 / healthcheck)在代码里写死。`Service` 模型是完整 compose schema(`CapAdd`/`SecurityOpt`/`Volumes`/`Ports`/`Healthcheck`/`Environment`/`NetworkMode`/`Networks` 都能设),生成的 compose 直接生产可用。
 - 各项目 `.PublishAsDockerFile(c => c.WithDockerfile("../..", "demo/<X>/Dockerfile", null))`:让发布时用项目自带的 Dockerfile build(含 node/python/bubblewrap 等运行时依赖),而非 .NET SDK 默认的容器发布(那个基座没这些依赖,build 也会失败)。
-- 飞书走 WebSocket 主动连飞书服务器,**无任何入站端口**(只有容器内部 expose + 容器内 healthcheck);Dashboard 仅绑 `127.0.0.1:5080`,公网不可达,经 SSH 隧道访问。
+- feishu 容器走 **host 网络模式**(`network_mode: host`):Agent 用内网 IP 访问同机其他容器/宿主机进程时,Aspire 默认的 bridge 网络会让跨网络流量超时(被丢弃);host 模式共享宿主网络栈后,宿主机能路由到本机所有 docker 网桥,故可直接通达。飞书 webhook 回调打宿主 `11411`(host 模式下容器直接监听宿主 `11411`,无端口映射)。Dashboard 仍走默认 bridge,仅绑 `127.0.0.1:5080`,公网不可达,经 SSH 隧道访问。
+  - **坑**:`network_mode` 与 `networks` 互斥,Aspire 默认给每个 service 注入 `networks: [aspire]`,不清掉会让 host 模式失效。代码里必须 `feishu.Networks = null!`(并 `feishu.Expose = null!` 清掉默认注入的 `expose: 8080`)。生成后校验 feishu 段有 `network_mode: host` 且**无** `networks:` 键。
 
 ### 三步发布
 

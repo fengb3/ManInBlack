@@ -15,7 +15,7 @@ public class ContextCompressMiddleware : AgentMiddleware
     {
         // 对上下文中的tool结果进行压缩, 保留 近10个 Tool 结果, 旧的用 [old tool result has been compressed] 代替
 
-        int keeped  = 10;
+        const int keeped  = 10;
         int transed = 0;
         int compressed = 0;
 
