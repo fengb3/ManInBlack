@@ -131,7 +131,8 @@ public class AgentLauncher(
                         ctx.AgentId
                     );
                     cardSession.Subscribe();
-                }
+                },
+                cts.Token
             );
 
             await foreach (var _ in updates) { }
