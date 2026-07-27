@@ -13,13 +13,13 @@ namespace FeishuAdaptor.FeishuCard;
 /// <para>推理(reasoning)与工具调用合并进同一张流式卡(<see cref="MergeCardView"/>);
 /// 文本输出(text)单独成卡，并作为合并卡的边界 —— 出现 text 即封口当前合并卡，之后的 reasoning+工具开新卡。</para>
 /// </summary>
-public class FeishuCardSession : IDisposable
+public class FeishuCardSession(IServiceProvider sp, string userId, EventBus bus, string key) : IDisposable
 {
-    private readonly IServiceProvider _sp;
-    private readonly string _userId;
-    private readonly EventBus _bus;
-    private readonly string _key;
-    private readonly ILogger<FeishuCardSession>? _logger;
+    private readonly IServiceProvider _sp = sp;
+    private readonly string _userId = userId;
+    private readonly EventBus _bus = bus;
+    private readonly string _key = key;
+    private readonly ILogger<FeishuCardSession> _logger = sp.GetRequiredService<ILogger<FeishuCardSession>>();
     private readonly List<IDisposable> _subs = [];
 
     // 所有事件回调通过 _gate 串行化(EventBus 用 Task.WhenAll 并发分发，并行工具也会并发触发)。
@@ -28,7 +28,7 @@ public class FeishuCardSession : IDisposable
     // 父 Agent:合并卡(reasoning + 工具)
     private MergeCardView? _activeMergeCard;
     private readonly List<MergeCardView> _mergeCards = [];
-    private readonly Dictionary<string, MergeCardView> _toolCallToCard = new();
+    private readonly Dictionary<string, MergeCardView> _toolCallToCard = [];
     private bool _mergeSealed;
     private bool _hasActiveReasoning;
 
@@ -39,15 +39,6 @@ public class FeishuCardSession : IDisposable
     // 子 Agent 委托卡(维持现状)
     private DelegationCardView? _activeDelegationCard;
     private readonly List<IDisposable> _childSubs = [];
-
-    public FeishuCardSession(IServiceProvider sp, string userId, EventBus bus, string key)
-    {
-        _sp = sp;
-        _userId = userId;
-        _bus = bus;
-        _key = key;
-        _logger = sp.GetService<ILogger<FeishuCardSession>>();
-    }
 
     public void Subscribe()
     {
@@ -66,9 +57,9 @@ public class FeishuCardSession : IDisposable
         await _gate.WaitAsync(ct);
         try
         {
-            _logger?.LogInformation(
-                "[Card] ModelContent Kind={Kind} TextLen={TextLen} sealed={Sealed} hasOutput={HasOutput} hasReasoning={HasReasoning}",
-                evt.Kind, evt.Text?.Length ?? 0, _mergeSealed, _activeOutputCard is not null, _hasActiveReasoning);
+            // _logger?.LogDebug(
+            //     "[Card] ModelContent Kind={Kind} TextLen={TextLen} sealed={Sealed} hasOutput={HasOutput} hasReasoning={HasReasoning}",
+            //     evt.Kind, evt.Text?.Length ?? 0, _mergeSealed, _activeOutputCard is not null, _hasActiveReasoning);
             switch (evt.Kind)
             {
                 case ModelContentKind.Reasoning:
@@ -116,7 +107,7 @@ public class FeishuCardSession : IDisposable
         await _gate.WaitAsync(ct);
         try
         {
-            _logger?.LogInformation("[Card] BeforeTool Tool={Tool} CallId={CallId}", evt.ToolName, evt.CallId);
+            // _logger.LogInformation("[Card] BeforeTool Tool={Tool} CallId={CallId}", evt.ToolName, evt.CallId);
 
             // 任何工具开始都意味着上一段 text 结束 —— Completed 只在 turn 结束发(非每轮),
             // 无法分隔轮次,故在工具边界显式关闭 text 卡,确保工具后的 text 新开卡。
