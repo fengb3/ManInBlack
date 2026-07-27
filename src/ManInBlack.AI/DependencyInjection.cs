@@ -119,6 +119,7 @@ public static class DependencyInjection
                 return new ProcessShellExecutor();
             });
             services.AddToolHandlers();
+            services.AddSlashCommands();
 
             // MCP：单例 client 池（HostedService 启动时连接 server + 注册工具声明）+ 工具执行 provider
             services.AddSingleton<McpClientHostedService>();
