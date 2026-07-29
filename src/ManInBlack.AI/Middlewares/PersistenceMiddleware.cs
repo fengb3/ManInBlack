@@ -6,7 +6,6 @@ using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
-using ManInBlack.AI.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -64,32 +63,6 @@ public class ReadPersistenceMiddleware : AgentMiddleware
                 logger?.LogWarning(ex, "保存检查点失败: {SessionId}", context.SessionId);
             }
         });
-
-        // 重置对话 command
-        if (
-            UserInputCommandHelper.FetchCommand(
-                context.UserInput,
-                out var command,
-                out var parameters
-            )
-        )
-        {
-            // 如果是清除上下文的命令，直接清空持久化文件和上下文消息
-            if (command is "clear" or "reset" or "new")
-            {
-                var userStorage = context.ServiceProvider.GetRequiredService<IUserStorage>();
-                context.SessionId = await userStorage.CreateNewSessionIdAsync(context.ParentId);
-                context.Messages.Clear();
-                yield return new ChatResponseUpdate
-                {
-                    AuthorName = null,
-                    Role = ChatRole.Assistant,
-                    Contents = [new TextContent("已重置对话")],
-                    CreatedAt = DateTimeOffset.UtcNow,
-                };
-                yield break;
-            }
-        }
 
         var messages = await sessionStorage.LoadMessages(context.SessionId); // 从workspace 里获取的消息, 还不包含 system prompt 和 user input
 

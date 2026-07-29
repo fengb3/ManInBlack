@@ -11,8 +11,8 @@
 中间件管道采用 **洋葱模型**：请求从外层向内传递，响应从内层向外返回。每个中间件持有 `next` 委托，决定何时（以及是否）将控制权交给下一个中间件。
 
 ```
-EventPublishing → ReadPersistence → SavePersistence → Skill → Delegation → Profile → ContextCompress
-    ↓                                                                                    ↑
+EventPublishing → CommandMiddleware → ReadPersistence → SavePersistence → Skill → Delegation → Profile → ContextCompress
+    ↓                                                                                                                  ↑
 CommandLineTools → FileTools → Logging → Enrich → Hook → SystemPrompt → UserInput
     ↓                                                              ↑
 Retry → AgentLoop ← IChatClient
@@ -208,7 +208,7 @@ private class EnrichingCollection : Collection<ChatMessage>
 
 不调用 `next()`，直接 `yield return` 后 `yield break`。
 
-**示例 — 命令拦截**（参考 `ReadPersistenceMiddleware` 的 reset 命令处理）：
+**示例 — 命令拦截**（参考 `CommandMiddleware`：`/`-命令命中即 `yield break` 短路；命令用 `[SlashCommand]` 定义、由 `SlashCommandRegistry` 派发，见 `BuiltinCommands.New`）：
 
 ```csharp
 public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
@@ -368,26 +368,27 @@ builder.Services.AddManInBlack()
 | #   | 中间件                            | 职责                               |
 | --- | --------------------------------- | ---------------------------------- |
 | 1   | `EventPublishingMiddleware`       | 在最外层，用于 UI 监听 Agent 事件  |
-| 2   | `ReadPersistenceMiddleware`       | 加载历史消息，恢复状态快照，处理 reset 命令，注入 `SaveCheckpoint` 回调 |
-| 3   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息，session 结束时触发 `SessionEnd` 检查点 |
-| 4   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
-| 5   | `DelegationMiddleware`            | 注入子 Agent 委托工具和描述       |
-| 6   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
-| 7   | `ContextCompressMiddleware`       | 压缩旧的工具结果                   |
-| 8   | `CommandLineToolsMiddleware`      | 注入命令行工具声明（源生成器生成） |
-| 9   | `FileToolsMiddleware`             | 注入文件操作工具声明（源生成器生成）|
+| 2   | `CommandMiddleware`               | 拦截 `/`-命令：命中则短路（如 `/new`、`/help`），未知命令提示 `/help`；非命令透传；执行后发 `CommandExecutedEvent` 与 `AfterCommand` hook |
+| 3   | `ReadPersistenceMiddleware`       | 加载历史消息，恢复状态快照，注入 `SaveCheckpoint` 回调 |
+| 4   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息，session 结束时触发 `SessionEnd` 检查点 |
+| 5   | `SkillMiddleware`                 | 注入技能描述和工具声明             |
+| 6   | `DelegationMiddleware`            | 注入子 Agent 委托工具和描述       |
+| 7   | `AgentProfileMiddleware`          | 读取 Markdown 配置注入系统提示词   |
+| 8   | `ContextCompressMiddleware`       | 压缩旧的工具结果                   |
+| 9   | `CommandLineToolsMiddleware`      | 注入命令行工具声明（源生成器生成） |
+| 10  | `FileToolsMiddleware`             | 注入文件操作工具声明（源生成器生成）|
 
 **UseSimple() 内层：**
 
 | #   | 中间件                            | 职责                               |
 | --- | --------------------------------- | ---------------------------------- |
-| 10  | `LoggingMiddleware`               | 记录输入/输出日志                  |
-| 11  | `MessageEnrichMiddleware`         | 为消息补全 `CreatedAt` 元数据      |
-| 12  | `HookMiddleware`                  | 执行用户自定义钩子脚本             |
-| 13  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
-| 14  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
-| 15  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
-| 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点 |
+| 11  | `LoggingMiddleware`               | 记录输入/输出日志                  |
+| 12  | `MessageEnrichMiddleware`         | 为消息补全 `CreatedAt` 元数据      |
+| 13  | `HookMiddleware`                  | 执行用户自定义钩子脚本             |
+| 14  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
+| 15  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
+| 16  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
+| 17  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点 |
 
 ### 顺序规则
 

@@ -22,6 +22,7 @@ public static class AgentPipelineBuilderExtensions
     {
         builder
             .Use<EventPublishingMiddleware>() // 在最外层, 用于ui监听agent事件
+            .Use<CommandMiddleware>()         // 拦截 / 命令,在持久化之前短路
             .Use<ReadPersistenceMiddleware>()
             .Use<SavePersistenceMiddleware>()
             .Use<SkillMiddleware>()

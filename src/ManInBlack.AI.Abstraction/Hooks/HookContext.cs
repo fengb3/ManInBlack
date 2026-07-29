@@ -32,6 +32,15 @@ public record HookContext
     /// <summary>工具执行错误信息（AfterToolExecute 时可用）</summary>
     public string? Error { get; init; }
 
+    /// <summary>命令名(AfterCommand 时可用)</summary>
+    public string? CommandName { get; init; }
+
+    /// <summary>命令参数数组的 JSON(AfterCommand 时可用)</summary>
+    public string? CommandArgs { get; init; }
+
+    /// <summary>命令是否执行成功(AfterCommand 时可用)</summary>
+    public bool Succeeded { get; init; }
+
     /// <summary>附加属性，用于传递任意键值对（如 RootUserId、SessionId 等）</summary>
     public Dictionary<string, string>? Properties { get; init; }
 }
