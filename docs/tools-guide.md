@@ -106,6 +106,26 @@ public partial class MyTools
 
 自定义工具只需定义在引用了 `ManInBlack.AI.SourceGenerator` 的项目中，源生成器会自动生成 handler 和声明注册，与内置工具一起通过 DI 自动组合。
 
+### 复杂对象/数组参数
+
+工具参数可使用对象或集合，源生成器自动生成嵌套 JSON Schema 并在运行时反序列化：
+
+```csharp
+public class ChoiceOption
+{
+    /// <summary>选项文案</summary>
+    public string Label { get; set; } = "";
+    /// <summary>选项说明（可选）</summary>
+    public string? Description { get; set; }
+}
+
+[AiTool]
+public string Ask(string question, List<ChoiceOption> options) => ...;
+```
+
+> 对象成员取**公共可读属性**（schema 属性名转 camelCase）；运行时反序列化大小写不敏感，enum 既接受名称也接受数字。
+> `Dictionary<,>`、元组、开放泛型、`object` 等参数类型不受支持，会触发 MIB014 编译错误。
+
 ### 在自定义 Pipeline 中使用工具
 
 ```csharp
