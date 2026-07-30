@@ -122,7 +122,7 @@ public static class ToolCallerEmitter
     private static string BuildDeclarationExpression(ToolMethodModel tool)
     {
         var jsonSchema = BuildParametersJsonSchema(tool);
-        var returnSchema = BuildReturnJsonSchema(tool);
+        var returnSchema = tool.ReturnJsonSchema;
         var toolName = EscapeString(tool.ToolName);
         var summary = EscapeString(tool.Summary ?? "");
         var schemaVerbatim = EscapeVerbatimString(jsonSchema);
@@ -326,61 +326,6 @@ public static class ToolCallerEmitter
 
         sb.Append('}');
         return sb.ToString();
-    }
-
-    private static string? BuildReturnJsonSchema(ToolMethodModel tool)
-    {
-        if (tool.ReturnsVoid)
-            return null;
-
-        return BuildTypeSchemaJson(tool.ReturnType, false, tool.ReturnsDescription);
-    }
-
-    private static string BuildTypeSchemaJson(string type, bool isNullable, string? description)
-    {
-        var jsonType = MapToJsonSchemaType(type);
-        var format = GetFormat(type);
-
-        var sb = new StringBuilder();
-        sb.Append('{');
-
-        if (isNullable)
-            sb.Append($"\"type\":[\"{jsonType}\",\"null\"]");
-        else
-            sb.Append($"\"type\":\"{jsonType}\"");
-
-        if (format is not null)
-            sb.Append($",\"format\":\"{format}\"");
-
-        if (!string.IsNullOrWhiteSpace(description))
-            sb.Append($",\"description\":\"{EscapeJsonString(description!)}\"");
-
-        sb.Append('}');
-        return sb.ToString();
-    }
-
-    private static string MapToJsonSchemaType(string type)
-    {
-        return type switch
-        {
-            "int" or "System.Int32" or "long" or "System.Int64" or "short" or "System.Int16"
-            or "byte" or "System.Byte" or "sbyte" or "System.SByte" or "uint" or "System.UInt32"
-            or "ulong" or "System.UInt64" or "ushort" or "System.UInt16" => "integer",
-            "float" or "System.Single" or "double" or "System.Double" or "decimal" or "System.Decimal" => "number",
-            "string" or "System.String" or "char" or "System.Char" or "System.DateTime" or "DateTime"
-            or "System.DateTimeOffset" or "DateTimeOffset" => "string",
-            "bool" or "System.Boolean" => "boolean",
-            _ => "object"
-        };
-    }
-
-    private static string? GetFormat(string type)
-    {
-        return type switch
-        {
-            "System.DateTime" or "DateTime" or "System.DateTimeOffset" or "DateTimeOffset" => "date-time",
-            _ => null
-        };
     }
 
     #endregion

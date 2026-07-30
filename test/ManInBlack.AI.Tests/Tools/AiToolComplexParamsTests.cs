@@ -50,4 +50,15 @@ public class AiToolComplexParamsTests
         Assert.Equal("object", options.GetProperty("items").GetProperty("type").GetString());
         Assert.Equal("string", options.GetProperty("items").GetProperty("properties").GetProperty("label").GetProperty("type").GetString());
     }
+
+    [Fact]
+    public void Schema_enum参数_生成string与枚举值()
+    {
+        var decl = GetDecl("SetColor");
+        var color = decl.JsonSchema.GetProperty("properties").GetProperty("color");
+
+        Assert.Equal("string", color.GetProperty("type").GetString());
+        var values = color.GetProperty("enum").EnumerateArray().Select(t => t.GetString()).ToArray();
+        Assert.Equal(new[] { "Red", "Green", "Blue" }, values);
+    }
 }

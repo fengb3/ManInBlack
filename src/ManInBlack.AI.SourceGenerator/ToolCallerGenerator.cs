@@ -149,7 +149,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         }).ToList();
 
         // 检测 async 返回类型
-        var (isAsync, actualReturnType, returnsVoid) = UnwrapAsyncReturnType(methodSymbol.ReturnType, fullyQualifiedFormat);
+        var (isAsync, actualReturnSymbol, actualReturnType, returnsVoid) = UnwrapAsyncReturnType(methodSymbol.ReturnType, fullyQualifiedFormat);
 
         // 提取 [AiTool.HasFilter<T...>] 属性中的 filter 类型
         var filterTypes = new List<string>();
@@ -174,6 +174,10 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
 
         // 提取 XML 文档注释（已在参数构造前完成）
 
+        string? returnJsonSchema = null;
+        if (!returnsVoid)
+            returnJsonSchema = BuildJsonSchema(actualReturnSymbol, returnsDescription, out _, out _);
+
         return new ToolMethodModel
         {
             MethodName = methodSymbol.Name,
@@ -185,6 +189,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
             IsAsync = isAsync,
             ReturnsVoid = returnsVoid,
             ReturnType = actualReturnType,
+            ReturnJsonSchema = returnJsonSchema,
             Parameters = parameters,
             FilterTypes = filterTypes,
             Summary = summary,
@@ -510,7 +515,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
     private static string EnumJson(ITypeSymbol enumType, bool isNullable, string? description)
     {
         var names = enumType.GetMembers().OfType<IFieldSymbol>().Where(f => f.ConstantValue is not null)
-            .Select(f => EscapeJson(f.Name));
+            .Select(f => $"\"{EscapeJson(f.Name)}\"");
         var values = string.Join(",", names);
         var sb = new System.Text.StringBuilder("{");
         sb.Append(isNullable ? $"\"type\":[\"string\",\"null\"]" : "\"type\":\"string\"");
@@ -651,22 +656,22 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         }
     }
 
-    private static (bool isAsync, string returnType, bool returnsVoid) UnwrapAsyncReturnType(
+    private static (bool isAsync, ITypeSymbol returnTypeSymbol, string returnType, bool returnsVoid) UnwrapAsyncReturnType(
         ITypeSymbol returnType, SymbolDisplayFormat format)
     {
         if (returnType is not INamedTypeSymbol named)
-            return (false, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
+            return (false, returnType, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
 
         if (!IsTaskType(named))
-            return (false, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
+            return (false, returnType, returnType.ToDisplayString(format), returnType.SpecialType == SpecialType.System_Void);
 
         if (named.IsGenericType && named.TypeArguments.Length == 1)
         {
             var innerType = named.TypeArguments[0];
-            return (true, innerType.ToDisplayString(format), false);
+            return (true, innerType, innerType.ToDisplayString(format), false);
         }
 
-        return (true, "void", true);
+        return (true, returnType, "void", true);
     }
 
     private static bool IsTaskType(INamedTypeSymbol type)

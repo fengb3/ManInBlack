@@ -9,6 +9,8 @@ public class ChoiceOption
     public string? Description { get; set; }
 }
 
+public enum Color { Red, Green, Blue }
+
 /// <summary>
 /// 承载复杂参数的工具，供生成器/运行时测试。partial 供源生成器生成 handler。
 /// 不标 [ServiceRegister]，测试里手动 AddScoped 注册。
@@ -18,6 +20,7 @@ public partial class ComplexParamsTestTools
     public ChoiceOption? LastOption { get; private set; }
     public List<ChoiceOption>? LastList { get; private set; }
     public ChoiceOption[]? LastArray { get; private set; }
+    public Color LastColor { get; private set; }
 
     /// <summary>选一个选项。</summary>
     /// <param name="option">单个选项对象</param>
@@ -47,5 +50,15 @@ public partial class ComplexParamsTestTools
     {
         LastArray = options;
         return options.Length.ToString();
+    }
+
+    /// <summary>设置颜色。</summary>
+    /// <param name="color">颜色枚举</param>
+    /// <returns>所选颜色名</returns>
+    [AiTool]
+    public string SetColor(Color color)
+    {
+        LastColor = color;
+        return color.ToString();
     }
 }

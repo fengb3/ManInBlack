@@ -17,6 +17,7 @@ public sealed class ToolMethodModel
     public bool IsAsync { get; set; }
     public bool ReturnsVoid { get; set; }
     public string ReturnType { get; set; } = "void";
+    public string? ReturnJsonSchema { get; set; }
     public List<ToolParameterModel> Parameters { get; set; } = [];
     public List<string> FilterTypes { get; set; } = [];
 
