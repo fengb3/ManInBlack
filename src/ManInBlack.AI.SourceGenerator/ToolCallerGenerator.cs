@@ -180,8 +180,6 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         var isStaticClass = classDecl is not null &&
                             classDecl.Modifiers.Any(SyntaxKind.StaticKeyword);
 
-        // 提取 XML 文档注释（已在参数构造前完成）
-
         string? returnJsonSchema = null;
         if (!returnsVoid)
             returnJsonSchema = BuildJsonSchema(actualReturnSymbol, returnsDescription, out _, out _);
@@ -453,6 +451,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
 
     #region 参数 JSON Schema 递归构造（生成器运行时拼接 JSON 字符串）
 
+    /// <summary>对象 schema 的最大嵌套层数；超过则降级为不透明 object（防自引用死循环）。</summary>
     private const int MaxSchemaDepth = 4;
 
     /// <summary>递归构造参数 JSON Schema 字符串。isUnsupported/unsupportedReason 由引用参数回传给调用方做诊断。</summary>

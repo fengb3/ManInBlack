@@ -260,6 +260,7 @@ public static class ToolCallerEmitter
             var convertMethod = GetConvertMethod(targetType);
             if (!string.IsNullOrEmpty(convertMethod))
                 return $"{varName} is {targetType} {varName}_v ? {varName}_v : {convertMethod}({jeExtract})";
+            // GetConvertMethod 未覆盖的类型（enum / Nullable<T> / 自定义 struct）：用 JsonElement.Deserialize
             return $"{varName} is {targetType} {varName}_v ? {varName}_v"
                  + $" : ({varName} is System.Text.Json.JsonElement {varName}_je"
                  + $" ? {varName}_je.Deserialize<{targetType}>(ToolArgumentJsonOptions.Default)"

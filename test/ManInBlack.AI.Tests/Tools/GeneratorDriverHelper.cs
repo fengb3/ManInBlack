@@ -80,10 +80,13 @@ public static class GeneratorDriverHelper
         {
             var candidate = Path.Combine(dir, fileName);
             if (File.Exists(candidate)) return candidate;
-            // 也尝试 SG 的 netstandard2.0 输出
-            var probe = Path.Combine(dir, "..", "..", "..", "..", "..",
-                "src", "ManInBlack.AI.SourceGenerator", "bin", "Debug", "netstandard2.0", fileName);
-            if (File.Exists(probe)) return Path.GetFullPath(probe);
+            // 也尝试 SG 的 netstandard2.0 输出（兼容 Debug / Release 两种配置）
+            foreach (var config in new[] { "Debug", "Release" })
+            {
+                var probe = Path.Combine(dir, "..", "..", "..", "..", "..",
+                    "src", "ManInBlack.AI.SourceGenerator", "bin", config, "netstandard2.0", fileName);
+                if (File.Exists(probe)) return Path.GetFullPath(probe);
+            }
             dir = Directory.GetParent(dir)?.FullName;
         }
         throw new FileNotFoundException("未找到 ManInBlack.AI.SourceGenerator.dll", fileName);
