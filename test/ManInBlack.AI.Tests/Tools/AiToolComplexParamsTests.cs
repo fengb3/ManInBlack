@@ -156,4 +156,33 @@ public class AiToolComplexParamsTests
         Assert.Null(error);
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public async Task 运行时_数组参数_反序列化()
+    {
+        var (result, error) = await ExecuteAsync("PickFromArray",
+            new Dictionary<string, object?> { ["options"] = El("""[{"label":"X"},{"label":"Y"},{"label":"Z"}]""") });
+        Assert.Null(error);
+        Assert.Equal("3", result);
+    }
+
+    [Fact]
+    public void Schema_可空对象参数_生成nullable数组形式()
+    {
+        var decl = GetDecl("Maybe");
+        var option = decl.JsonSchema.GetProperty("properties").GetProperty("option");
+        // 可空引用类型 → "type":["object","null"]
+        var types = GetTypes(option.GetProperty("type"));
+        Assert.Contains("object", types);
+        Assert.Contains("null", types);
+    }
+
+    [Fact]
+    public async Task 运行时_可空对象参数_jsonNull反序列化为null()
+    {
+        var (result, error) = await ExecuteAsync("Maybe",
+            new Dictionary<string, object?> { ["option"] = El("null") });
+        Assert.Null(error);
+        Assert.Equal("none", result);
+    }
 }

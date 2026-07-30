@@ -74,4 +74,10 @@ public partial class ComplexParamsTestTools
     /// <returns>根节点名</returns>
     [AiTool]
     public string Walk(Node root) => root.Name;
+
+    /// <summary>可能为空的选项。</summary>
+    /// <param name="option">可选选项</param>
+    /// <returns>label 或 none</returns>
+    [AiTool]
+    public string Maybe(ChoiceOption? option) => option is null ? "none" : option.Label;
 }
