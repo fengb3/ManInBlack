@@ -11,6 +11,13 @@ public class ChoiceOption
 
 public enum Color { Red, Green, Blue }
 
+/// <summary>自引用类型，用于验证 schema 深度上限。</summary>
+public class Node
+{
+    public string Name { get; set; } = "";
+    public Node? Child { get; set; }
+}
+
 /// <summary>
 /// 承载复杂参数的工具，供生成器/运行时测试。partial 供源生成器生成 handler。
 /// 不标 [ServiceRegister]，测试里手动 AddScoped 注册。
@@ -61,4 +68,10 @@ public partial class ComplexParamsTestTools
         LastColor = color;
         return color.ToString();
     }
+
+    /// <summary>遍历节点。</summary>
+    /// <param name="root">根节点（自引用）</param>
+    /// <returns>根节点名</returns>
+    [AiTool]
+    public string Walk(Node root) => root.Name;
 }

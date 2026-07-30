@@ -63,6 +63,44 @@ public class AiToolComplexParamsTests
         Assert.Equal(new[] { "Red", "Green", "Blue" }, values);
     }
 
+    [Fact]
+    public void Schema_自引用类型_深度上限内降级不无限递归()
+    {
+        var decl = GetDecl("Walk");
+        var root = decl.JsonSchema.GetProperty("properties").GetProperty("root");
+
+        // 顶层 Node 有 properties（name/child）
+        Assert.Contains("object", GetTypes(root.GetProperty("type")));
+        Assert.True(root.GetProperty("properties").TryGetProperty("child", out _));
+
+        // 逐层下钻 child，第 MaxSchemaDepth(4) 层起应为不透明 object（无 properties）
+        var current = root.GetProperty("properties").GetProperty("child");
+        for (var i = 0; i < 4; i++)
+        {
+            if (current.TryGetProperty("properties", out var props) &&
+                props.TryGetProperty("child", out var next))
+            {
+                current = next;
+                continue;
+            }
+            break; // 已降级为不透明 object
+        }
+        // 走到降级层：type 仍是 object，但无 properties
+        Assert.Contains("object", GetTypes(current.GetProperty("type")));
+        Assert.False(current.TryGetProperty("properties", out _));
+    }
+
+    /// <summary>
+    /// type 节点可能是字符串（"object"）或可空形式的数组（["object","null"]），
+    /// 统一抽成字符串集合便于断言。
+    /// </summary>
+    private static IReadOnlyList<string> GetTypes(JsonElement typeNode) => typeNode.ValueKind switch
+    {
+        JsonValueKind.String => new[] { typeNode.GetString()! },
+        JsonValueKind.Array => typeNode.EnumerateArray().Select(t => t.GetString()!).ToArray(),
+        _ => Array.Empty<string>(),
+    };
+
     private static async Task<(object? Result, Exception? Error)> ExecuteAsync(
         string toolName, IDictionary<string, object?> arguments)
     {
