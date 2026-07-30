@@ -37,4 +37,17 @@ public class AiToolComplexParamsTests
         Assert.Contains("label", required);
         Assert.DoesNotContain("description", required);
     }
+
+    [Theory]
+    [InlineData("PickMany")]
+    [InlineData("PickFromArray")]
+    public void Schema_集合参数_生成array与items(string toolName)
+    {
+        var decl = GetDecl(toolName);
+        var options = decl.JsonSchema.GetProperty("properties").GetProperty("options");
+
+        Assert.Equal("array", options.GetProperty("type").GetString());
+        Assert.Equal("object", options.GetProperty("items").GetProperty("type").GetString());
+        Assert.Equal("string", options.GetProperty("items").GetProperty("properties").GetProperty("label").GetProperty("type").GetString());
+    }
 }
