@@ -42,4 +42,7 @@ public sealed class ToolParameterModel
     public bool IsValueType { get; set; }
     public bool HasDefaultValue { get; set; }
     public string? DefaultValueExpr { get; set; }
+    public string? JsonSchema { get; set; }            // 预生成的参数 JSON Schema 字符串
+    public bool IsUnsupportedType { get; set; }        // 类型不受支持（触发 MIB014）
+    public string? UnsupportedReason { get; set; }     // 不支持原因（诊断消息）
 }

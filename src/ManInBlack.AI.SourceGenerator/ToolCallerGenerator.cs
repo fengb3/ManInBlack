@@ -124,18 +124,28 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         var containingNamespace = containingType.ContainingNamespace.ToDisplayString(
             new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces));
 
-        var parameters = methodSymbol.Parameters.Select(p => new ToolParameterModel
+        var (summary, paramDescriptions, returnsDescription) = ExtractXmlDoc(methodDecl);
+
+        var parameters = methodSymbol.Parameters.Select(p =>
         {
-            Name = p.Name,
-            Type = p.Type.ToDisplayString(fullyQualifiedFormat),
-            FullTypeName = p.Type.ToDisplayString(fullyQualifiedFormat),
-            IsNullable = p.NullableAnnotation == NullableAnnotation.Annotated ||
-                         p.Type.NullableAnnotation == NullableAnnotation.Annotated,
-            IsValueType = p.Type.IsValueType,
-            HasDefaultValue = p.HasExplicitDefaultValue,
-            DefaultValueExpr = p.HasExplicitDefaultValue
-                ? FormatDefaultValue(p.ExplicitDefaultValue, p.Type)
-                : null
+            var model = new ToolParameterModel
+            {
+                Name = p.Name,
+                Type = p.Type.ToDisplayString(fullyQualifiedFormat),
+                FullTypeName = p.Type.ToDisplayString(fullyQualifiedFormat),
+                IsNullable = p.NullableAnnotation == NullableAnnotation.Annotated ||
+                             p.Type.NullableAnnotation == NullableAnnotation.Annotated,
+                IsValueType = p.Type.IsValueType,
+                HasDefaultValue = p.HasExplicitDefaultValue,
+                DefaultValueExpr = p.HasExplicitDefaultValue
+                    ? FormatDefaultValue(p.ExplicitDefaultValue, p.Type)
+                    : null,
+            };
+            paramDescriptions.TryGetValue(p.Name, out var desc);
+            model.JsonSchema = BuildJsonSchema(p.Type, desc, isUnsupported: out var unsupported, unsupportedReason: out var reason);
+            model.IsUnsupportedType = unsupported;
+            model.UnsupportedReason = reason;
+            return model;
         }).ToList();
 
         // 检测 async 返回类型
@@ -162,8 +172,7 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         var isStaticClass = classDecl is not null &&
                             classDecl.Modifiers.Any(SyntaxKind.StaticKeyword);
 
-        // 提取 XML 文档注释
-        var (summary, paramDescriptions, returnsDescription) = ExtractXmlDoc(methodDecl);
+        // 提取 XML 文档注释（已在参数构造前完成）
 
         return new ToolMethodModel
         {
@@ -413,6 +422,216 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         if (value.GetType().IsEnum) return $"{type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)}.{value}";
         return value.ToString();
     }
+
+    #region 参数 JSON Schema 递归构造（生成器运行时拼接 JSON 字符串）
+
+    private const int MaxSchemaDepth = 4;
+
+    /// <summary>递归构造参数 JSON Schema 字符串。isUnsupported/unsupportedReason 由引用参数回传给调用方做诊断。</summary>
+    private static string BuildJsonSchema(
+        ITypeSymbol type, string? description,
+        out bool isUnsupported, out string? unsupportedReason, int depth = 0)
+    {
+        isUnsupported = false;
+        unsupportedReason = null;
+
+        var (effective, isNullable) = UnwrapNullable(type);
+
+        // 标量
+        if (ScalarInfo(effective) is var (scalarType, format) && scalarType is not null)
+            return ScalarJson(scalarType, format, isNullable, description);
+
+        // enum
+        if (effective.TypeKind == TypeKind.Enum)
+            return EnumJson(effective, isNullable, description);
+
+        // 数组 / 白名单集合（元素是否受支持由 CollectionJson 内的递归 BuildJsonSchema 回传）
+        if (TryGetCollectionElement(effective) is { } elementType)
+            return CollectionJson(elementType, isNullable, description, depth,
+                out isUnsupported, out unsupportedReason);
+
+        // 深度上限：降级为不透明 object
+        if (depth >= MaxSchemaDepth)
+            return OpaqueObjectJson(isNullable, description);
+
+        // 受支持的对象（POCO / record）
+        if (effective is INamedTypeSymbol named && IsSupportedObjectType(named))
+            return ObjectJson(named, isNullable, description, depth);
+
+        // 其余类型不支持
+        isUnsupported = true;
+        unsupportedReason = $"类型 '{effective.ToDisplayString()}' 不受支持";
+        return OpaqueObjectJson(isNullable, description);
+    }
+
+    private static (ITypeSymbol effective, bool isNullable) UnwrapNullable(ITypeSymbol type)
+    {
+        if (type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+            type is INamedTypeSymbol n && n.TypeArguments.Length == 1)
+            return (n.TypeArguments[0], true);
+        var isNullable = type.IsReferenceType &&
+                         type.NullableAnnotation == NullableAnnotation.Annotated;
+        return (isNullable ? type.WithNullableAnnotation(NullableAnnotation.NotAnnotated) : type, isNullable);
+    }
+
+    /// <returns>(jsonType, format)；非标量返回 (null, null)。</returns>
+    private static (string? type, string? format) ScalarInfo(ITypeSymbol t)
+    {
+        switch (t.SpecialType)
+        {
+            case SpecialType.System_Boolean: return ("boolean", null);
+            case SpecialType.System_String:
+            case SpecialType.System_Char: return ("string", null);
+            case SpecialType.System_DateTime: return ("string", "date-time");
+            case SpecialType.System_Single:
+            case SpecialType.System_Double:
+            case SpecialType.System_Decimal: return ("number", null);
+            case SpecialType.System_Byte: case SpecialType.System_SByte:
+            case SpecialType.System_Int16: case SpecialType.System_UInt16:
+            case SpecialType.System_Int32: case SpecialType.System_UInt32:
+            case SpecialType.System_Int64: case SpecialType.System_UInt64: return ("integer", null);
+            default: break;
+        }
+        var fqn = t.ToDisplayString();
+        if (fqn is "System.DateTimeOffset" or "DateTimeOffset") return ("string", "date-time");
+        return (null, null);
+    }
+
+    private static string ScalarJson(string type, string? format, bool isNullable, string? description)
+    {
+        var sb = new System.Text.StringBuilder("{");
+        sb.Append(isNullable ? $"\"type\":[\"{type}\",\"null\"]" : $"\"type\":\"{type}\"");
+        if (format is not null) sb.Append($",\"format\":\"{format}\"");
+        if (!string.IsNullOrWhiteSpace(description)) sb.Append($",\"description\":\"{EscapeJson(description!)}\"");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string EnumJson(ITypeSymbol enumType, bool isNullable, string? description)
+    {
+        var names = enumType.GetMembers().OfType<IFieldSymbol>().Where(f => f.ConstantValue is not null)
+            .Select(f => EscapeJson(f.Name));
+        var values = string.Join(",", names);
+        var sb = new System.Text.StringBuilder("{");
+        sb.Append(isNullable ? $"\"type\":[\"string\",\"null\"]" : "\"type\":\"string\"");
+        sb.Append($",\"enum\":[{values}]");
+        if (!string.IsNullOrWhiteSpace(description)) sb.Append($",\"description\":\"{EscapeJson(description!)}\"");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string OpaqueObjectJson(bool isNullable, string? description)
+    {
+        var sb = new System.Text.StringBuilder("{");
+        sb.Append(isNullable ? "\"type\":[\"object\",\"null\"]" : "\"type\":\"object\"");
+        if (!string.IsNullOrWhiteSpace(description)) sb.Append($",\"description\":\"{EscapeJson(description!)}\"");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string CollectionJson(
+        ITypeSymbol elementType, bool isNullable, string? description, int depth,
+        out bool isUnsupported, out string? unsupportedReason)
+    {
+        var itemSchema = BuildJsonSchema(elementType, null, out isUnsupported, out unsupportedReason, depth + 1);
+        var sb = new System.Text.StringBuilder("{");
+        sb.Append(isNullable ? "\"type\":[\"array\",\"null\"]" : "\"type\":\"array\"");
+        sb.Append($",\"items\":{itemSchema}");
+        if (!string.IsNullOrWhiteSpace(description)) sb.Append($",\"description\":\"{EscapeJson(description!)}\"");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string ObjectJson(INamedTypeSymbol type, bool isNullable, string? description, int depth)
+    {
+        var props = type.GetMembers().OfType<IPropertySymbol>()
+            .Where(p => !p.IsStatic && p.GetMethod is not null &&
+                        p.GetMethod.DeclaredAccessibility == Accessibility.Public)
+            .ToList();
+
+        var sb = new System.Text.StringBuilder("{\"type\":");
+        sb.Append(isNullable ? "[\"object\",\"null\"]" : "\"object\"");
+        sb.Append(",\"properties\":{");
+        for (var i = 0; i < props.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var p = props[i];
+            sb.Append($"\"{EscapeJson(ToCamelCase(p.Name))}\":");
+            sb.Append(BuildJsonSchema(p.Type, null, out _, out _, depth + 1));
+        }
+        sb.Append('}');
+
+        var required = props
+            .Where(p => p.NullableAnnotation != NullableAnnotation.Annotated)
+            .Select(p => $"\"{EscapeJson(ToCamelCase(p.Name))}\"").ToList();
+        if (required.Count > 0)
+        {
+            sb.Append(",\"required\":[");
+            sb.Append(string.Join(",", required));
+            sb.Append(']');
+        }
+        if (!string.IsNullOrWhiteSpace(description)) sb.Append($",\"description\":\"{EscapeJson(description!)}\"");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    /// <summary>把 PascalCase 标识符转为 camelCase（首个 ASCII 大写字母小写化）。</summary>
+    private static string ToCamelCase(string s)
+    {
+        if (string.IsNullOrEmpty(s) || char.IsLower(s[0]))
+            return s;
+        if (s.Length == 1)
+            return s.ToLowerInvariant();
+        return char.ToLowerInvariant(s[0]) + s.Substring(1);
+    }
+
+    private static ITypeSymbol? TryGetCollectionElement(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol arr) return arr.ElementType;
+        if (type is INamedTypeSymbol named)
+        {
+            var def = named.ConstructedFrom.ToDisplayString();
+            if (s_CollectionDefs.Contains(def) && named.TypeArguments.Length == 1)
+                return named.TypeArguments[0];
+        }
+        return null;
+    }
+
+    private static readonly System.Collections.Generic.HashSet<string> s_CollectionDefs =
+    [
+        "System.Collections.Generic.List<T>",
+        "System.Collections.Generic.IList<T>",
+        "System.Collections.Generic.ICollection<T>",
+        "System.Collections.Generic.IReadOnlyList<T>",
+        "System.Collections.Generic.IReadOnlyCollection<T>",
+        "System.Collections.Generic.IEnumerable<T>",
+        "System.Collections.Generic.HashSet<T>",
+        "System.Collections.Generic.ISet<T>",
+        "System.Collections.Generic.IReadOnlySet<T>",
+        "System.Collections.Generic.Queue<T>",
+        "System.Collections.Generic.Stack<T>",
+        "System.Collections.Generic.LinkedList<T>",
+    ];
+
+    /// <summary>受支持的对象类型：非Dictionary、非tuple、非开放泛型的 class/struct。</summary>
+    private static bool IsSupportedObjectType(INamedTypeSymbol t)
+    {
+        if (t.IsTupleType) return false;
+        if (t.TypeArguments.Length > 0 && t.TypeParameters.Length > 0 &&
+            t.TypeArguments.Any(a => a.Kind == SymbolKind.TypeParameter)) return false;
+        var def = t.ConstructedFrom.ToDisplayString();
+        if (def.StartsWith("System.Collections.Generic.Dictionary") ||
+            def.StartsWith("System.Collections.Generic.IDictionary") ||
+            def.StartsWith("System.Collections.Generic.IReadOnlyDictionary") ||
+            def == "System.Object" || def == "object")
+            return false;
+        return t.TypeKind is TypeKind.Class or TypeKind.Struct;
+    }
+
+    private static string EscapeJson(string s)
+        => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
+
+    #endregion
 
     private static void ResolveToolNames(List<ToolMethodModel> methods)
     {

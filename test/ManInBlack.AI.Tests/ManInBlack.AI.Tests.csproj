@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ManInBlack.AI.Abstraction\ManInBlack.AI.Abstraction.csproj" />
     <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
+    <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj" OutputItemType="Analyzer" />
   </ItemGroup>
 
 </Project>

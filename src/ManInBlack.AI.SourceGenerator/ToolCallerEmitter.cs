@@ -303,8 +303,7 @@ public static class ToolCallerEmitter
             firstProp = false;
 
             sb.Append($"\"{EscapeJsonString(param.Name)}\":");
-            sb.Append(BuildTypeSchemaJson(param.Type, param.IsNullable,
-                tool.ParamDescriptions.TryGetValue(param.Name, out var desc) ? desc : null));
+            sb.Append(param.JsonSchema);   // 由 ToolCallerGenerator.BuildJsonSchema 预生成
         }
 
         sb.Append('}');
