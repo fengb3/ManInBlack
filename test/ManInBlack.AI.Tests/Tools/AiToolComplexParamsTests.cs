@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
@@ -60,5 +61,61 @@ public class AiToolComplexParamsTests
         Assert.Equal("string", color.GetProperty("type").GetString());
         var values = color.GetProperty("enum").EnumerateArray().Select(t => t.GetString()).ToArray();
         Assert.Equal(new[] { "Red", "Green", "Blue" }, values);
+    }
+
+    private static async Task<(object? Result, Exception? Error)> ExecuteAsync(
+        string toolName, IDictionary<string, object?> arguments)
+    {
+        var sp = BuildSp();
+        using var scope = sp.CreateScope();
+        var executor = scope.ServiceProvider.GetRequiredService<IToolExecutor>();
+        var ctx = new ToolExecuteContext(scope.ServiceProvider)
+        {
+            ToolName = toolName,
+            CallId = "c1",
+            Arguments = arguments,
+        };
+        await executor.ExecuteAsync(ctx, default);
+        return (ctx.Result, ctx.Error);
+    }
+
+    private static JsonElement El(string json) => JsonDocument.Parse(json).RootElement.Clone();
+
+    [Fact]
+    public async Task 运行时_对象参数_反序列化PascalCase()
+    {
+        var (result, error) = await ExecuteAsync("PickOne",
+            new Dictionary<string, object?> { ["option"] = El("""{"Label":"A","Description":"x"}""") });
+        Assert.Null(error);
+        Assert.Equal("A", result);
+    }
+
+    [Fact]
+    public async Task 运行时_对象参数_反序列化camelCase()
+    {
+        var (result, error) = await ExecuteAsync("PickOne",
+            new Dictionary<string, object?> { ["option"] = El("""{"label":"B","description":"y"}""") });
+        Assert.Null(error);
+        Assert.Equal("B", result);
+    }
+
+    [Fact]
+    public async Task 运行时_集合参数_反序列化()
+    {
+        var (result, error) = await ExecuteAsync("PickMany",
+            new Dictionary<string, object?> { ["options"] = El("""[{"label":"A"},{"label":"B"}]""") });
+        Assert.Null(error);
+        Assert.Equal("2", result);
+    }
+
+    [Theory]
+    [InlineData("\"Green\"", "Green")]
+    [InlineData("1", "Green")]   // 数字也兼容
+    public async Task 运行时_enum参数_反序列化(string jsonValue, string expected)
+    {
+        var (result, error) = await ExecuteAsync("SetColor",
+            new Dictionary<string, object?> { ["color"] = El(jsonValue) });
+        Assert.Null(error);
+        Assert.Equal(expected, result);
     }
 }

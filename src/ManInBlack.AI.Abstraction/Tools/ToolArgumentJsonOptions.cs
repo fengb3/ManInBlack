@@ -13,5 +13,7 @@ public static class ToolArgumentJsonOptions
     {
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // LLM 可能回传枚举名("Green")或数字(1);JsonStringEnumConverter 兼容两种形式。
+        Converters = { new JsonStringEnumConverter() },
     };
 }

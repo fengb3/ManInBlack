@@ -24,7 +24,8 @@ public static class ToolCallerEmitter
                 "ManInBlack.AI.Abstraction.Tools",
                 "ManInBlack.AI.Tools",
                 "Microsoft.Extensions.AI",
-                "Microsoft.Extensions.DependencyInjection")
+                "Microsoft.Extensions.DependencyInjection",
+                "System.Text.Json")
             .Namespace(ns =>
             {
                 ns.Name = namespaceName;
@@ -259,10 +260,16 @@ public static class ToolCallerEmitter
             var convertMethod = GetConvertMethod(targetType);
             if (!string.IsNullOrEmpty(convertMethod))
                 return $"{varName} is {targetType} {varName}_v ? {varName}_v : {convertMethod}({jeExtract})";
-            return $"{varName} is {targetType} {varName}_v ? {varName}_v : ({targetType})System.Convert.ChangeType({jeExtract}, typeof({targetType}))";
+            return $"{varName} is {targetType} {varName}_v ? {varName}_v"
+                 + $" : ({varName} is System.Text.Json.JsonElement {varName}_je"
+                 + $" ? {varName}_je.Deserialize<{targetType}>(ToolArgumentJsonOptions.Default)"
+                 + $" : default({targetType}))";
         }
 
-        return $"{varName} as {targetType}";
+        return $"{varName} is {targetType} {varName}_v ? {varName}_v"
+             + $" : ({varName} is System.Text.Json.JsonElement {varName}_je"
+             + $" ? {varName}_je.Deserialize<{targetType}>(ToolArgumentJsonOptions.Default)"
+             + $" : default({targetType}))";
     }
 
     private static string GetConvertMethod(string type)
