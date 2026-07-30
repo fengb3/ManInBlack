@@ -13,6 +13,8 @@
     <PackageReference Include="xunit" Version="*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="*" />
     <PackageReference Include="System.Linq.Async" Version="*" />
+    <!-- Roslyn 源生成器驱动测试（CSharpGeneratorDriver）所需；版本须与 SG 中的 4.11.0 一致以避免类型标识冲突 -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
   </ItemGroup>
 
   <ItemGroup>

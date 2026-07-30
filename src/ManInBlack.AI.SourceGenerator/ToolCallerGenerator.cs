@@ -47,6 +47,14 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor UnsupportedParameterType = new(
+        id: "MIB014",
+        title: "[AiTool] 参数类型不受源生成器支持",
+        messageFormat: "[AiTool] 方法 '{0}' 的参数 '{1}' 类型 '{2}' 不受支持，请改用标量/enum/对象/数组/集合（{3}）",
+        category: "AiToolDeclaration",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // 1. 扫描所有有属性的 MethodDeclarationSyntax
@@ -230,6 +238,21 @@ public sealed class ToolCallerGenerator : IIncrementalGenerator
                 if (!method.ParamDescriptions.ContainsKey(param.Name))
                 {
                     spc.ReportDiagnostic(Diagnostic.Create(MissingParamDoc, null, method.MethodName, param.Name));
+                }
+            }
+
+            // MIB014: 不受支持的参数类型
+            foreach (var param in method.Parameters)
+            {
+                if (param.IsUnsupportedType)
+                {
+                    spc.ReportDiagnostic(Diagnostic.Create(
+                        UnsupportedParameterType,
+                        null,
+                        method.MethodName,
+                        param.Name,
+                        param.Type,
+                        param.UnsupportedReason ?? "未知原因"));
                 }
             }
 
