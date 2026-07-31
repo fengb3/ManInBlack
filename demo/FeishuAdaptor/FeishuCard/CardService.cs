@@ -15,7 +15,7 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter, ILogger<C
     /// <summary>
     /// 创建卡片实体并获取卡片ID, 卡片ID 用于后续更新卡片
     /// </summary>
-    public async Task<string> CreateAsync(Card card, CancellationToken ct = default)
+    public virtual async Task<string> CreateAsync(Card card, CancellationToken ct = default)
     {
         await limiter.CreateCard.WaitForSlotAsync(ct);
 
@@ -33,7 +33,7 @@ public class CardService(IFeishuTenantApi api, CardApiLimiter limiter, ILogger<C
         return result.Data!.CardId;
     }
 
-    public async Task SendMessageAsync(
+    public virtual async Task SendMessageAsync(
         string cardId,
         string receiveIdType,
         string receiveId,
