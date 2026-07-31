@@ -139,3 +139,24 @@ builder.Use(sp => new ToolsMiddleware(
 ```
 
 详见 [Source Generator & 诊断规则](./sourcegenerator-guide.md) 了解源生成器和 XML 文档要求。
+
+---
+
+## AskUser（仅 FeishuAdaptor）
+
+向当前飞书用户发送一张单选/多选卡片，**阻塞等待**用户在飞书里点选，把选择结果作为工具返回值交回 LLM。适合需要用户拍板的场景（确认、分支选择、多选收集）。
+
+```csharp
+[AiTool]
+public async Task<string> AskUserAsync(
+    string question,                 // 问题文本
+    List<AskUserOption> options,     // 可选项：Label 必填，Description/Value 可选
+    bool multiSelect = false,        // true=多选下拉+提交；false=按钮单选（点一下即返回）
+    int timeoutSeconds = 300);       // 超时自动结束
+```
+
+- 单选：每个选项一张按钮，点任一按钮立即返回 `用户选择了：{label}`。
+- 多选：飞书原生 `multi_select_static` + 提交按钮，点提交后返回 `用户选择了：{l1}、{l2}`。
+- 超时返回 `用户未在 N 秒内作答（已超时）`；会话被取消返回 `提问已被取消…`。
+
+**部署前置**：飞书应用后台须订阅「卡片回传交互」事件并走 webhook，按钮点击回调才能送达（否则工具必超时）。回调由 `CardActionCallbackHandler`（FeishuNetSdk `ICallbackHandler`）接收，自动发现，无需手动注册。
