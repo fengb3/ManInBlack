@@ -85,4 +85,19 @@ public class CardActionCallbackHandlerTests
         Assert.NotNull(resp);
         Assert.False(reg.Resolve("unknown", new AskUserResult(Array.Empty<string>())));
     }
+
+    [Fact]
+    public async Task Mismatched_Operator_Does_Not_Resolve()
+    {
+        var reg = RegistryWith("rid3", out var tcs);
+        var handler = new CardActionCallbackHandler(reg, Substitute.For<ILogger<CardActionCallbackHandler>>());
+
+        var input = SingleSelectInput("rid3", "yes");
+        input.Event!.Operator = new CardActionTriggerEventBodyDto.OperatorSuffix { UserId = "other_user" };
+
+        var resp = await handler.ExecuteAsync(input, CancellationToken.None);
+
+        Assert.NotNull(resp);
+        Assert.False(tcs.Task.IsCompleted);  // 未被解决
+    }
 }

@@ -37,6 +37,14 @@ public class CardActionCallbackHandler(
             return Task.FromResult(Toast("问题已过期或已回答"));
         }
 
+        var operatorUserId = body!.Operator?.UserId;
+        if (!string.IsNullOrEmpty(operatorUserId)
+            && !string.Equals(operatorUserId, ask.AskedUserId, StringComparison.Ordinal))
+        {
+            logger.LogDebug("卡片回调 requestId={RequestId} 的操作者 {Operator} 与提问对象 {Asked} 不一致，忽略", requestId, operatorUserId, ask.AskedUserId);
+            return Task.FromResult(Toast("无权回答此问题"));
+        }
+
         var selected = CollectSelected(action!, ask.MultiSelect);
         registry.Resolve(requestId, new AskUserResult(selected));
         return Task.FromResult(Toast("已收到你的选择"));
