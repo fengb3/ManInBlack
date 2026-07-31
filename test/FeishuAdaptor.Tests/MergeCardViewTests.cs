@@ -25,7 +25,7 @@ public class MergeCardViewTests : IAsyncLifetime
     {
         _api = Substitute.For<IFeishuTenantApi>();
         SetupApi(_api);
-        _cardService = new CardService(_api, new CardApiLimiter());
+        _cardService = new CardService(_api, new CardApiLimiter(), Substitute.For<ILogger<CardService>>());
     }
 
     public async Task InitializeAsync()
