@@ -77,6 +77,10 @@ builder.Services.AddManInBlack()
         .Use<ToolExtraParameterMiddleware>()
         .UseSimple());
 
+// 注册 FeishuAdaptor 程序集内的 [AiTool]（源生成器为本程序集生成的 internal 扩展；
+// AddManInBlack 内的同名调用只覆盖 ManInBlack.AI 的工具）。
+builder.Services.AddToolHandlers();
+
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();
