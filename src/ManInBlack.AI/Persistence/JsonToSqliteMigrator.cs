@@ -149,32 +149,40 @@ public class JsonToSqliteMigrator(
                         continue;
                     }
 
-                    string meta = "{}", sids = "[]";
+                    db.Users.Add(new UserEntity
+                    {
+                        Id = internalIdNum,
+                        UserId = oriId,
+                        CreatedAt = DateTime.UtcNow,
+                    });
+
+                    // 旧条目里的 SessionIds → 写 Sessions 行（正规化后不再写 SessionIdsJson blob）。
                     var entryFile = Path.Combine(usersDir, $"{internalId}.json");
                     if (File.Exists(entryFile))
                     {
                         try
                         {
-                            // 旧 JSON 文件是「胖 UserEntry」格式（含 Metadata/SessionIds）；
-                            // UserEntry 已瘦身不再承载这些字段，故用 JsonDocument 直接抽取原始数组，
-                            // 写入仍存在的 Users.MetadataJson/SessionIdsJson blob 列（Finalize migration 前保留）。
                             using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(entryFile, ct));
-                            var entryRoot = doc.RootElement;
-                            if (entryRoot.TryGetProperty("Metadata", out var metaEl))
-                                meta = metaEl.GetRawText();
-                            if (entryRoot.TryGetProperty("SessionIds", out var sidsEl))
-                                sids = sidsEl.GetRawText();
+                            if (doc.RootElement.TryGetProperty("SessionIds", out var sidsEl) && sidsEl.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var sidEl in sidsEl.EnumerateArray())
+                                {
+                                    var sid = sidEl.GetString();
+                                    if (string.IsNullOrEmpty(sid)) continue;
+                                    if (await db.Sessions.AnyAsync(x => x.SessionId == sid, ct)) continue;
+                                    db.Sessions.Add(new SessionEntity
+                                    {
+                                        SessionId = sid,
+                                        UserId = internalIdNum,
+                                        Source = (int)SessionSource.Interactive,
+                                        CreatedAt = DateTime.UtcNow,
+                                        LastAt = DateTime.UtcNow,
+                                    });
+                                }
+                            }
                         }
                         catch (JsonException ex) { logger.LogWarning(ex, "迁移:用户 {Id} 条目损坏,用空值", oriId); }
                     }
-
-                    db.Users.Add(new UserEntity
-                    {
-                        Id = internalIdNum,
-                        UserId = oriId,
-                        MetadataJson = meta,
-                        SessionIdsJson = sids,
-                    });
                     usr++;
                 }
                 await db.SaveChangesAsync(ct);

@@ -72,7 +72,11 @@ public class JsonToSqliteMigratorTests
             var user = await db.Users.SingleAsync();
             Assert.Equal("ext-1", user.UserId);
             Assert.Equal(3, user.Id); // 保留原数字内部 id
-            Assert.Contains("ext-1_1", JsonSerializer.Deserialize<List<string>>(user.SessionIdsJson)!);
+            // 正规化后旧 SessionIds 写入 Sessions 表（不再写 SessionIdsJson blob）
+            var session = await db.Sessions.SingleAsync();
+            Assert.Equal("ext-1_1", session.SessionId);
+            Assert.Equal(user.Id, session.UserId);
+            Assert.Equal((int)SessionSource.Interactive, session.Source);
         }
         finally
         {
