@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ManInBlack.AI.Persistence;
 
@@ -39,7 +40,8 @@ public static class StorageMigrationExtensions
             await using var db0 = factory.CreateDbContext();
             var migrator = db0.Database.GetService<IMigrator>();
             await migrator.MigrateAsync(LastPreFinalizeMigration, ct);
-            await NormalizeSessionsDataMigration.RunAsync(factory, ct: ct);
+            var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("NormalizeSessionsDataMigration");
+            await NormalizeSessionsDataMigration.RunAsync(factory, logger, ct);
         }
 
         // migrate 到最新（Task 5 阶段 = TimeTypes，no-op；Task 7 起应用 Finalize）
