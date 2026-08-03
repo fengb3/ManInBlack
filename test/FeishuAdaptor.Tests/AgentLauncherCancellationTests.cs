@@ -135,10 +135,14 @@ public class AgentLauncherCancellationTests
     private sealed class FakeUserStorage : IUserStorage
     {
         public Task<UserEntry> GetOrCreateUser(string userId)
-            => Task.FromResult(new UserEntry { UserId = userId, SelfHostUserId = "1", SessionIds = ["s1"] });
+            => Task.FromResult(new UserEntry { UserId = userId, SelfHostUserId = "1" });
 
         public Task SaveUserAsync(UserEntry userEntry) => Task.CompletedTask;
 
-        public Task<string> CreateNewSessionIdAsync(string userId) => Task.FromResult("s-new");
+        public Task<string> CreateNewSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+            => Task.FromResult("s-new");
+
+        public Task<string?> GetLatestSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+            => Task.FromResult<string?>("s-latest");
     }
 }

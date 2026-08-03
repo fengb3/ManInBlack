@@ -70,19 +70,11 @@ public interface ISessionStorage
 
 public record UserEntry
 {
-    public string UserId { get; set; }
-    
-    public string SelfHostUserId { get; set; }
-    
-    public Dictionary<string, object> Metadata { get; set; } = new();
-    
-    public IList<string> SessionIds { get; set; } = new List<string>();
-}
+    public string UserId { get; set; } = "";
 
-public static class UserEntryExtensions
-{
-    public static string? GetLatestSessionId(this UserEntry userEntry)
-        => userEntry.SessionIds.OrderBy(s => s).LastOrDefault();
+    public string SelfHostUserId { get; set; } = "";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>

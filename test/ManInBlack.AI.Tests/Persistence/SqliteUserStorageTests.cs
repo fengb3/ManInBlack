@@ -34,41 +34,15 @@ public class SqliteUserStorageTests
     }
 
     [Fact]
-    public async Task SaveUser_PersistsMetadataAndSessionIds()
-    {
-        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
-        try
-        {
-            var storage = CreateStorage(factory);
-            var user = await storage.GetOrCreateUser("ext-1");
-            user.Metadata["role"] = "admin";
-            user.SessionIds.Add("ext-1_111");
-
-            await storage.SaveUserAsync(user);
-
-            var again = await storage.GetOrCreateUser("ext-1");
-            Assert.Equal("admin", again.Metadata["role"].ToString());
-            Assert.Contains("ext-1_111", again.SessionIds);
-        }
-        finally
-        {
-            sp.Dispose();
-            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
-        }
-    }
-
-    [Fact]
-    public async Task CreateNewSessionId_AppendsAndPersists()
+    public async Task CreateNewSessionId_WritesSessionRow()
     {
         var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
         try
         {
             var storage = CreateStorage(factory);
             var sid = await storage.CreateNewSessionIdAsync("ext-1");
-
-            Assert.StartsWith("ext-1_", sid);
-            var again = await storage.GetOrCreateUser("ext-1");
-            Assert.Contains(sid, again.SessionIds);
+            await using var db = factory.CreateDbContext();
+            Assert.True(await db.Sessions.AnyAsync(x => x.SessionId == sid));
         }
         finally
         {

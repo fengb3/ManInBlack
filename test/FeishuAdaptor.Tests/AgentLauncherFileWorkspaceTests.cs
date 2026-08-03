@@ -110,6 +110,10 @@ public class AgentLauncherFileWorkspaceTests
 
         public Task SaveUserAsync(UserEntry userEntry) => Task.CompletedTask;
 
-        public Task<string> CreateNewSessionIdAsync(string userId) => Task.FromResult($"{userId}_1");
+        public Task<string> CreateNewSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+            => Task.FromResult($"{userId}_1");
+
+        public Task<string?> GetLatestSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+            => Task.FromResult<string?>(null);
     }
 }

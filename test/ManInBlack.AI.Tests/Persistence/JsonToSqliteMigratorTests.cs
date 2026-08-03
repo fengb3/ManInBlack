@@ -58,7 +58,7 @@ public class JsonToSqliteMigratorTests
             await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
                 JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-1"] = "3" }));
             await File.WriteAllTextAsync(Path.Combine(root, "users", "3.json"),
-                JsonSerializer.Serialize(new UserEntry { UserId = "ext-1", SelfHostUserId = "3", SessionIds = new List<string> { "ext-1_1" } }));
+                JsonSerializer.Serialize(new { UserId = "ext-1", SelfHostUserId = "3", SessionIds = new List<string> { "ext-1_1" } }));
 
             var summary = await migrator.MigrateAsync();
 
@@ -129,7 +129,7 @@ public class JsonToSqliteMigratorTests
             await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
                 JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-old"] = "7" }));
             await File.WriteAllTextAsync(Path.Combine(root, "users", "7.json"),
-                JsonSerializer.Serialize(new UserEntry { UserId = "ext-old", SelfHostUserId = "7" }));
+                JsonSerializer.Serialize(new { UserId = "ext-old", SelfHostUserId = "7" }));
 
             await migrator.MigrateAsync();
 

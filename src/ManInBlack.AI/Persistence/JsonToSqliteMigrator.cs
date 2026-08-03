@@ -155,12 +155,15 @@ public class JsonToSqliteMigrator(
                     {
                         try
                         {
-                            var entry = JsonSerializer.Deserialize<UserEntry>(await File.ReadAllTextAsync(entryFile, ct), JsonOptions);
-                            if (entry is not null)
-                            {
-                                meta = JsonSerializer.Serialize(entry.Metadata ?? new(), JsonOptions);
-                                sids = JsonSerializer.Serialize(entry.SessionIds ?? new List<string>(), JsonOptions);
-                            }
+                            // 旧 JSON 文件是「胖 UserEntry」格式（含 Metadata/SessionIds）；
+                            // UserEntry 已瘦身不再承载这些字段，故用 JsonDocument 直接抽取原始数组，
+                            // 写入仍存在的 Users.MetadataJson/SessionIdsJson blob 列（Finalize migration 前保留）。
+                            using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(entryFile, ct));
+                            var entryRoot = doc.RootElement;
+                            if (entryRoot.TryGetProperty("Metadata", out var metaEl))
+                                meta = metaEl.GetRawText();
+                            if (entryRoot.TryGetProperty("SessionIds", out var sidsEl))
+                                sids = sidsEl.GetRawText();
                         }
                         catch (JsonException ex) { logger.LogWarning(ex, "迁移:用户 {Id} 条目损坏,用空值", oriId); }
                     }
