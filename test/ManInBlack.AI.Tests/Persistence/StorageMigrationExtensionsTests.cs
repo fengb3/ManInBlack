@@ -54,4 +54,34 @@ public class StorageMigrationExtensionsTests
         }
         finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
     }
+
+    /// <summary>
+    /// 旧 blob 可能有重复 sessionId（老 CreateNewSessionIdAsync 同秒创建未去重，真实数据踩到过）。
+    /// Finalize 的搬迁用 INSERT OR IGNORE 去重，重复项按唯一索引跳过，只留一行。
+    /// </summary>
+    [Fact]
+    public async Task MigrateManInBlackStorage_DedupsDuplicateBlobSessionIds()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync("InitialCreate");
+        try
+        {
+            await using (var seed = factory.CreateDbContext())
+            {
+                await seed.Database.ExecuteSqlRawAsync(
+                    "INSERT INTO Users (UserId, MetadataJson, SessionIdsJson) VALUES ({0}, {1}, {2})",
+                    "u1", "{}", """["u1_1700000000", "u1_1700000000"]""");
+                await seed.Database.ExecuteSqlRawAsync(
+                    "INSERT INTO SessionMessages (SessionId, CreatedAt, PayloadJson) VALUES ({0}, {1}, {2})",
+                    "u1_1700000000", "2024-01-01T00:00:00Z", "{}");
+            }
+
+            await sp.MigrateManInBlackStorageAsync();
+
+            await using var db = factory.CreateDbContext();
+            var applied = await db.Database.GetAppliedMigrationsAsync();
+            Assert.Contains(applied, m => m.Contains("NormalizeSessionsFinalize"));
+            Assert.Equal(1, await db.Sessions.CountAsync(x => x.SessionId == "u1_1700000000")); // 重复 → 去重为一行
+        }
+        finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
+    }
 }

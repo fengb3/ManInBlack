@@ -14,8 +14,10 @@ namespace ManInBlack.AI.Persistence.Migrations
             //（此时 Sessions 表已由 Prep 建好、blob 列仍在）。json_each 展开 JSON 数组；
             // CreatedAt 从 {userId}_{unix秒} 后缀解析；LastAt 取该会话最晚消息时间。
             // 仅取字符串元素（typeof='text'），跳过坏 blob 里的非字符串项。
+            // INSERT OR IGNORE：旧 blob 可能有重复 sessionId（老 CreateNewSessionIdAsync 同秒创建未去重），
+            // 重复行按唯一索引跳过（同 sessionId 数据一致，留一行即可）。
             migrationBuilder.Sql(@"
-INSERT INTO Sessions (SessionId, UserId, Source, CreatedAt, LastAt)
+INSERT OR IGNORE INTO Sessions (SessionId, UserId, Source, CreatedAt, LastAt)
 SELECT je.value,
        u.Id,
        0,
