@@ -132,6 +132,40 @@ public class JsonToSqliteMigratorTests
         }
     }
 
+    /// <summary>
+    /// 一个无主的旧 sessions 文件：sessionId 不含可解析的 {userId}_ 前缀，也没有归属用户条目。
+    /// 期望：该会话消息被跳过（Skipped++），不写任何 Sessions/SessionMessages 行，且整体导入不抛。
+    /// </summary>
+    [Fact]
+    public async Task Migrate_OwnerlessSessionFile_IsSkippedWithoutThrowing()
+    {
+        var (migrator, factory, sp, root) = await CreateAsync();
+        try
+        {
+            // 不写任何 users/userIdMap.json —— 没有归属用户。
+            // 文件名 plainnothsuffix.jsonl → sessionId="plainnothsuffix"，无 '_' 前缀，EnsureSessionRowAsync 返回 false。
+            WriteRealJsonLl(Path.Combine(root, "sessions", "plainnothsuffix.jsonl"),
+                new ChatMessage(ChatRole.User, "ownerless"));
+
+            var summary = await migrator.MigrateAsync();
+
+            // 无主会话：消息 0、用户 0、快照 0；该文件计入 Skipped。
+            Assert.Equal(0, summary.Messages);
+            Assert.Equal(0, summary.Users);
+            Assert.Equal(0, summary.Snapshots);
+            Assert.True(summary.Skipped >= 1);
+
+            await using var db = factory.CreateDbContext();
+            Assert.False(await db.Sessions.AnyAsync(x => x.SessionId == "plainnothsuffix"));
+            Assert.False(await db.SessionMessages.AnyAsync(x => x.SessionId == "plainnothsuffix"));
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
     [Fact]
     public async Task Migrate_PreservesExplicitId_NextAutoIncrementContinues()
     {

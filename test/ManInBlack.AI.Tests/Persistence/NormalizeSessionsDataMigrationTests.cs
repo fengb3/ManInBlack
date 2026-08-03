@@ -70,6 +70,68 @@ public class NormalizeSessionsDataMigrationTests
         finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
     }
 
+    /// <summary>
+    /// 被引用的 sessionId 完全不含 '_'（LastIndexOf('_') = -1 → i&lt;=0）→ 前缀解析直接判负 → 真孤儿 → 消息删除。
+    /// 区别于上一个用例（有 '_' 但前缀对不上用户），覆盖 ResolveOwnerByPrefixAsync 的 i&lt;=0 分支。
+    /// </summary>
+    [Fact]
+    public async Task Run_DeletesOrphanMessages_WhenSessionIdHasNoUnderscoreSuffix()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync(PreFinalizeTarget);
+        try
+        {
+            const string orphanSid = "plainnothsuffix"; // 无 '_'、无匹配用户
+            await using (var db = factory.CreateDbContext())
+            {
+                db.SessionMessages.Add(new SessionMessageEntity { SessionId = orphanSid, CreatedAt = DateTime.UtcNow, PayloadJson = "{}" });
+                db.SessionMessages.Add(new SessionMessageEntity { SessionId = orphanSid, CreatedAt = DateTime.UtcNow, PayloadJson = "{}" });
+                await db.SaveChangesAsync();
+            }
+
+            await NormalizeSessionsDataMigration.RunAsync(factory);
+
+            await using var db2 = factory.CreateDbContext();
+            Assert.False(await db2.Sessions.AnyAsync(x => x.SessionId == orphanSid));
+            Assert.False(await db2.SessionMessages.AnyAsync(x => x.SessionId == orphanSid)); // 真孤儿，消息被删
+            Assert.Equal(0, await db2.Sessions.CountAsync()); // 整库没有任何会话行被建出来
+        }
+        finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
+    }
+
+    /// <summary>
+    /// 损坏的 SessionIdsJson blob（含非字符串元素 / 整体非法 JSON）应被静默跳过，搬迁继续不抛。
+    /// </summary>
+    [Theory]
+    [InlineData("[123, 456]")]              // 数组里是非字符串 → 反序列化为 List&lt;string&gt; 抛 JsonException
+    [InlineData("not a json array at all")] // 整体非 JSON
+    [InlineData("{\"\"]")]                  // 截断/非法 JSON
+    public async Task Run_SkipsCorruptSessionIdsBlob_WithoutThrowing(string corruptBlob)
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync(PreFinalizeTarget);
+        try
+        {
+            await using (var db = factory.CreateDbContext())
+            {
+                // 这个用户持有坏 blob；另一个用户持有正常 blob，用来验证坏的不影响好的
+                await SeedUserWithBlobAsync(db, "good", """["good_1"]""");
+                await SeedUserWithBlobAsync(db, "bad", corruptBlob);
+            }
+
+            // 不应抛
+            var ex = await Record.ExceptionAsync(() => NormalizeSessionsDataMigration.RunAsync(factory));
+            Assert.Null(ex);
+
+            await using var db2 = factory.CreateDbContext();
+            // 好 blob 正常搬迁；坏 blob 的 sessionId 不应出现
+            var rows = await db2.Sessions.ToDictionaryAsync(x => x.SessionId);
+            Assert.True(rows.ContainsKey("good_1"));
+            Assert.False(rows.ContainsKey("123"));
+            Assert.False(rows.ContainsKey("456"));
+        }
+        finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
+    }
+
+
     [Fact]
     public async Task Run_IsIdempotent()
     {
