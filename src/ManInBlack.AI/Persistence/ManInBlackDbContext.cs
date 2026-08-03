@@ -11,6 +11,7 @@ public class ManInBlackDbContext(DbContextOptions<ManInBlackDbContext> options) 
     public DbSet<SessionMessageEntity> SessionMessages => Set<SessionMessageEntity>();
     public DbSet<AgentStateSnapshotEntity> AgentStateSnapshots => Set<AgentStateSnapshotEntity>();
     public DbSet<UserEntity> Users => Set<UserEntity>();
+    public DbSet<SessionEntity> Sessions => Set<SessionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,22 @@ public class ManInBlackDbContext(DbContextOptions<ManInBlackDbContext> options) 
             b.HasIndex(x => x.UserId).IsUnique();
             b.Property(x => x.MetadataJson).IsRequired();
             b.Property(x => x.SessionIdsJson).IsRequired();
+        });
+
+        modelBuilder.Entity<SessionEntity>(b =>
+        {
+            b.ToTable("Sessions");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedOnAdd();
+            b.Property(x => x.SessionId).IsRequired();
+            b.HasIndex(x => x.SessionId).IsUnique();
+            b.Property(x => x.Source).IsRequired();
+            b.Property(x => x.CreatedAt).IsRequired();
+            b.Property(x => x.LastAt).IsRequired();
+            b.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

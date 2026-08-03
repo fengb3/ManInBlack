@@ -2,6 +2,15 @@
 
 namespace ManInBlack.AI.Abstraction.Storage;
 
+/// <summary>会话来源：区分用户交互会话与自动化触发会话。</summary>
+public enum SessionSource
+{
+    /// <summary>用户交互（飞书 IM 等）。</summary>
+    Interactive = 0,
+    /// <summary>自动化 webhook 触发。</summary>
+    Webhook = 1,
+}
+
 /// <summary>
 /// 工作空间策略模式
 /// </summary>
