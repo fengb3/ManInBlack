@@ -84,16 +84,12 @@ var rootSp = services.BuildServiceProvider();
 await rootSp.MigrateManInBlackStorageAsync();
 ```
 
-`MigrateManInBlackStorageAsync()` 做以下几件事：
+`MigrateManInBlackStorageAsync()` 做两件事：
 
-1. **分阶段 migrate**（避免在删 blob 列前丢失数据）：
-   - 探测 `NormalizeSessionsFinalize` 是否已应用。
-   - 若**尚未** Finalize：先 migrate 到 `NormalizeSessionsTimeTypes`（保证 `Sessions` 表与 `Users.SessionIdsJson` 列同时就位、且绝不降级已超过它的库），再跑幂等的 `NormalizeSessionsDataMigration`（把旧 `Users.SessionIdsJson` blob 拆成 `Sessions` 行；并为 `SessionMessages`/`AgentStateSnapshots` 引用但不在任何 blob 里的孤儿 sessionId 按 `{userId}_` 前缀解析归属补建会话行；前缀解析不到真实用户的真孤儿，其消息/快照被删除以满足 Finalize 的 FK 约束）。损坏的 blob（非 JSON / 含非字符串元素）被静默跳过，不影响其它用户。
-   - 最后 migrate 到最新（应用 `NormalizeSessionsFinalize`：加 `Sessions.SessionId` 唯一约束 + `SessionMessages`/`AgentStateSnapshots` 的 FK，并删除 `Users.MetadataJson`/`Users.SessionIdsJson` 列）。
-   - 若**已** Finalize（blob 列已删）：跳过数据搬迁，直接 migrate 到最新——**绝不降级**已 Finalize 的库。
+1. **应用 EF Core 迁移**（`Database.MigrateAsync`）。旧 `Users.SessionIdsJson` blob → `Sessions` 行的数据搬迁**内置于 `NormalizeSessionsFinalize` migration 的 `Up`**（`migrationBuilder.Sql` + SQLite `json_each`，在加 FK / 删 blob 列之前执行）：blob 里每个 sessionId 转成一行 `Sessions`（`Source=Interactive`，`CreatedAt` 从 `{userId}_{unix秒}` 解析，`LastAt` 取该会话最晚消息时间）；不在任何 blob 里的孤儿 sessionId，其 `SessionMessages`/`AgentStateSnapshots` 在加 FK 前被删除。`Down` 用 `json_group_array(json_quote(...))` 反向重建 blob。因此 `dotnet ef database update` 与 app 启动**都**能完整升级，无需分阶段启动逻辑。
 2. 设置 WAL 模式。
 
-> **注意：** 必须在无事务的上下文中调用，WAL pragma 只能在无事务时设置。数据搬迁在 Finalize 之前运行，因此 blob 列此刻仍存在。
+> **注意：** 必须在无事务的上下文中调用，WAL pragma 只能在无事务时设置。数据搬迁 SQL 在 Finalize 的 `Up` 内、删 blob 列之前执行，故 blob 列此刻仍存在。
 
 ---
 
@@ -106,7 +102,7 @@ await rootSp.MigrateManInBlackStorageAsync();
 | `InitialCreate`             | 创建 `Users`/`SessionMessages`/`AgentStateSnapshots` 三表及索引       |
 | `NormalizeSessionsPrep`     | 新增 `Sessions` 表 + `Users.CreatedAt`（additive，向前兼容）         |
 | `NormalizeSessionsTimeTypes`| 时间列改 `DateTime`（数据搬迁在这一步之后、Finalize 之前执行）       |
-| `NormalizeSessionsFinalize` | 加 `Sessions.SessionId` 唯一约束 + FK→Sessions、删 `Users` blob 列   |
+| `NormalizeSessionsFinalize` | 数据搬迁（blob→Sessions，`json_each`）+ 孤儿清理 + 加 `Sessions.SessionId` 唯一约束 + FK→Sessions + 删 `Users` blob 列 |
 
 迁移文件位于 `src/ManInBlack.AI/Persistence/Migrations/`。
 
@@ -120,7 +116,6 @@ await rootSp.MigrateManInBlackStorageAsync();
 | `SqliteUserStorage`         | `IUserStorage`            | 用户 + `Sessions` 读写（建会话/取最近会话） |
 | `ManInBlackDbContext`       | `DbContext`               | EF Core 上下文                              |
 | `JsonToSqliteMigrator`      | 一次性迁移工具            | JSON 文件 → SQLite 导入（含 `Sessions` 行） |
-| `NormalizeSessionsDataMigration` | 静态迁移工具        | 启动期 blob → `Sessions` 幂等搬迁           |
 | `SqliteInitInterceptor`     | `DbConnectionInterceptor` | 设置 busy_timeout                           |
 
 所有存储实现使用 `IDbContextFactory<ManInBlackDbContext>`（工厂本身为 Singleton），每次操作创建短生命周期上下文，符合 EF 标准用法。
