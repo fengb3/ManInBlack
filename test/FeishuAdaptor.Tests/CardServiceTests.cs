@@ -4,6 +4,7 @@ using FeishuAdaptor.Helper;
 using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using FeishuNetSdk.Im;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -22,7 +23,7 @@ public class CardServiceTests
     {
         _api = Substitute.For<IFeishuTenantApi>();
         _limiter = new CardApiLimiter();
-        _sut = new CardService(_api, _limiter);
+        _sut = new CardService(_api, _limiter, NullLogger<CardService>.Instance);
     }
 
     /// <summary>
