@@ -7,13 +7,13 @@ public sealed record SessionSummary
     public required string FirstAt { get; init; }
     public required string LastAt { get; init; }
     public string? UserId { get; init; }
+    public required int Source { get; init; }     // SessionSource
 }
 
 public sealed record UserSummary
 {
     public required string UserId { get; init; }
-    public required Dictionary<string, object?> Metadata { get; init; }
-    public required IReadOnlyList<string> SessionIds { get; init; }
+    public required string CreatedAt { get; init; }
 }
 
 public enum MessageBlockKind { Text, ToolCall, ToolResult, Reasoning, Unknown }

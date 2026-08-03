@@ -19,28 +19,35 @@ public sealed class ChatHistoryQueries(
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(CancellationToken ct = default)
     {
         await using var db = dbFactory.CreateDbContext();
-        var groups = await db.SessionMessages.AsNoTracking()
-            .GroupBy(x => x.SessionId)
-            .Select(g => new
-            {
-                SessionId = g.Key,
-                Count = g.Count(),
-                First = g.Min(x => x.CreatedAt),
-                Last = g.Max(x => x.CreatedAt),
-            })
+        // 直查 Sessions 表(已正规化),关联 Users 取 UserId;
+        // MessageCount / FirstAt 由 SessionMessages 关联子查询聚合后,在内存里格式化为 string ReadModel。
+        var rows = await db.Sessions.AsNoTracking()
+            .Join(db.Users,
+                s => s.UserId,
+                u => u.Id,
+                (s, u) => new
+                {
+                    s.SessionId,
+                    s.LastAt,
+                    s.Source,
+                    UserId = u.UserId,
+                    MessageCount = db.SessionMessages.Count(m => m.SessionId == s.SessionId),
+                    FirstAt = db.SessionMessages
+                        .Where(m => m.SessionId == s.SessionId)
+                        .Min(m => (DateTime?)m.CreatedAt),
+                })
+            .OrderByDescending(x => x.LastAt)
             .ToListAsync(ct);
 
-        var userBySession = await BuildSessionToUserMapAsync(db, logger, ct);
-
-        return groups
-            .OrderByDescending(g => g.Last)
-            .Select(g => new SessionSummary
+        return rows
+            .Select(x => new SessionSummary
             {
-                SessionId = g.SessionId,
-                MessageCount = g.Count,
-                FirstAt = g.First.ToString("O"),
-                LastAt = g.Last.ToString("O"),
-                UserId = userBySession.GetValueOrDefault(g.SessionId),
+                SessionId = x.SessionId,
+                MessageCount = x.MessageCount,
+                FirstAt = x.FirstAt?.ToString("O") ?? "",
+                LastAt = x.LastAt.ToString("O"),
+                UserId = x.UserId,
+                Source = x.Source,
             })
             .ToList();
     }
@@ -48,23 +55,9 @@ public sealed class ChatHistoryQueries(
     public async Task<IReadOnlyList<UserSummary>> ListUsersAsync(CancellationToken ct = default)
     {
         await using var db = dbFactory.CreateDbContext();
-        var rows = await db.Users.AsNoTracking().ToListAsync(ct);
-
-        var list = new List<UserSummary>(rows.Count);
-        foreach (var u in rows)
-        {
-            try
-            {
-                var metadata = JsonSerializer.Deserialize<Dictionary<string, object?>>(u.MetadataJson) ?? new();
-                var sessionIds = JsonSerializer.Deserialize<List<string>>(u.SessionIdsJson) ?? new();
-                list.Add(new UserSummary { UserId = u.UserId, Metadata = metadata, SessionIds = sessionIds });
-            }
-            catch (JsonException ex)
-            {
-                logger.LogWarning(ex, "用户 {UserId} 元数据反序列化失败,跳过", u.UserId);
-            }
-        }
-        return list;
+        return await db.Users.AsNoTracking()
+            .Select(u => new UserSummary { UserId = u.UserId, CreatedAt = u.CreatedAt.ToString("O") })
+            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<MessageView>> GetSessionMessagesAsync(string sessionId, CancellationToken ct = default)
@@ -109,26 +102,6 @@ public sealed class ChatHistoryQueries(
             CreatedAt = r.CreatedAt.ToString("O"),
             Snippet = MakeSnippet(r.PayloadJson, query),
         }).ToList();
-    }
-
-    private static async Task<Dictionary<string, string>> BuildSessionToUserMapAsync(ManInBlackDbContext db, ILogger logger, CancellationToken ct)
-    {
-        var users = await db.Users.AsNoTracking().ToListAsync(ct);
-        var map = new Dictionary<string, string>();
-        foreach (var u in users)
-        {
-            try
-            {
-                var ids = JsonSerializer.Deserialize<List<string>>(u.SessionIdsJson);
-                if (ids is null) continue;
-                foreach (var sid in ids) map.TryAdd(sid, u.UserId);
-            }
-            catch (JsonException ex)
-            {
-                logger.LogWarning(ex, "用户 {UserId} 的 SessionIdsJson 反序列化失败,跳过会话映射", u.UserId);
-            }
-        }
-        return map;
     }
 
     private static string MakeSnippet(string payload, string query, int radius = 60)
