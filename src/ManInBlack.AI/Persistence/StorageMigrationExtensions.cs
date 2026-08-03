@@ -31,7 +31,9 @@ public static class StorageMigrationExtensions
         await using (var probe = factory.CreateDbContext())
         {
             var applied = await probe.Database.GetAppliedMigrationsAsync(ct);
-            finalizeApplied = applied.Contains("NormalizeSessionsFinalize");
+            // __EFMigrationsHistory 存带时间戳的全名(如 20260803141400_NormalizeSessionsFinalize),
+            // 用 substring 匹配;exact Contains 会失配 → 误判 Finalize 未应用 → 已 Finalize 的库每次启动降级再升级。
+            finalizeApplied = applied.Any(m => m.Contains("NormalizeSessionsFinalize"));
         }
 
         if (!finalizeApplied)
