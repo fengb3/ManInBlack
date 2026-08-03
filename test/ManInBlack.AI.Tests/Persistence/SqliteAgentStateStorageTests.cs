@@ -198,4 +198,39 @@ public class SqliteAgentStateStorageTests
             try { Directory.Delete(root, recursive: true); } catch (IOException) { }
         }
     }
+
+    /// <summary>
+    /// 规约 §Task3: SaveMessage 写消息后应更新对应 Sessions.LastAt。
+    /// 会话行由 CreateNewSessionIdAsync 预建（正常路径）；此处走真实建会话路径，
+    /// 连写两条消息后断言 Sessions.LastAt == 该会话消息 CreatedAt 的最大值。
+    /// </summary>
+    [Fact]
+    public async Task SaveMessage_UpdatesSessionLastAt()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            // 真实建会话路径：CreateNewSessionIdAsync 预建 Sessions 行（含合规 UserId）
+            var userStorage = new SqliteUserStorage(factory, NullLogger<SqliteUserStorage>.Instance);
+            var sessionId = await userStorage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
+
+            await storage.SaveMessage(sessionId, new ChatMessage(ChatRole.User, "hi"));
+            await Task.Delay(50);
+            await storage.SaveMessage(sessionId, new ChatMessage(ChatRole.User, "again"));
+
+            await using var db = factory.CreateDbContext();
+            var session = await db.Sessions.SingleAsync(x => x.SessionId == sessionId);
+            var times = await db.SessionMessages
+                .Where(x => x.SessionId == sessionId)
+                .Select(x => x.CreatedAt)
+                .ToListAsync();
+            Assert.Equal(times.Max(), session.LastAt);
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
 }

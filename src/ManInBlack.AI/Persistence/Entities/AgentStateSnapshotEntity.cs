@@ -6,6 +6,6 @@ namespace ManInBlack.AI.Persistence.Entities;
 public sealed class AgentStateSnapshotEntity
 {
     public string SessionId { get; set; } = "";
-    public string SavedAt { get; set; } = "";
+    public DateTime SavedAt { get; set; }
     public string PayloadJson { get; set; } = "";
 }

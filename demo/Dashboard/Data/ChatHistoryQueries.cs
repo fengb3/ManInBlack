@@ -25,8 +25,8 @@ public sealed class ChatHistoryQueries(
             {
                 SessionId = g.Key,
                 Count = g.Count(),
-                First = g.Min(x => x.CreatedAt) ?? "",
-                Last = g.Max(x => x.CreatedAt) ?? "",
+                First = g.Min(x => x.CreatedAt),
+                Last = g.Max(x => x.CreatedAt),
             })
             .ToListAsync(ct);
 
@@ -38,8 +38,8 @@ public sealed class ChatHistoryQueries(
             {
                 SessionId = g.SessionId,
                 MessageCount = g.Count,
-                FirstAt = g.First,
-                LastAt = g.Last,
+                FirstAt = g.First.ToString("O"),
+                LastAt = g.Last.ToString("O"),
                 UserId = userBySession.GetValueOrDefault(g.SessionId),
             })
             .ToList();
@@ -106,7 +106,7 @@ public sealed class ChatHistoryQueries(
         return rows.Select(r => new SearchResult
         {
             SessionId = r.SessionId,
-            CreatedAt = r.CreatedAt,
+            CreatedAt = r.CreatedAt.ToString("O"),
             Snippet = MakeSnippet(r.PayloadJson, query),
         }).ToList();
     }

@@ -26,12 +26,23 @@ public class SqliteAgentStateStorage(
     public async Task SaveMessage(string sessionId, ChatMessage message)
     {
         await using var db = dbFactory.CreateDbContext();
+        var now = DateTime.UtcNow;
         db.SessionMessages.Add(new SessionMessageEntity
         {
             SessionId = sessionId,
-            CreatedAt = DateTimeOffset.UtcNow.ToString("O"),
+            CreatedAt = now,
             PayloadJson = JsonSerializer.Serialize(message, JsonOptions),
         });
+
+        // 更新对应 Sessions.LastAt。会话行由 CreateNewSessionIdAsync 预建（正常路径必先于 SaveMessage）；
+        // 此处仅更新已存在的行，不在无 userId 上下文时凭空补建（Sessions.UserId 为 NOT NULL + FK→Users，
+        // 无 userId 无法合规建行；遗留孤儿会话的补建归 Task 5 启动期数据搬迁）。
+        var session = await db.Sessions.FirstOrDefaultAsync(x => x.SessionId == sessionId);
+        if (session is not null)
+        {
+            session.LastAt = now;
+        }
+
         await db.SaveChangesAsync();
     }
 
@@ -83,7 +94,7 @@ public class SqliteAgentStateStorage(
     {
         await using var db = dbFactory.CreateDbContext();
         var existing = await db.AgentStateSnapshots.FirstOrDefaultAsync(x => x.SessionId == sessionId, ct);
-        var savedAt = (snapshot.SavedAt == default ? DateTimeOffset.UtcNow : snapshot.SavedAt).ToString("O");
+        DateTime savedAt = snapshot.SavedAt == default ? DateTimeOffset.UtcNow.UtcDateTime : snapshot.SavedAt.UtcDateTime;
         var payload = JsonSerializer.Serialize(snapshot, JsonOptions);
 
         if (existing is null)

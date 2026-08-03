@@ -50,7 +50,7 @@ public class JsonToSqliteMigrator(
                     var sessionId = Path.GetFileNameWithoutExtension(file);
                     if (await db.SessionMessages.AnyAsync(x => x.SessionId == sessionId, ct)) { skip++; continue; }
 
-                    var now = DateTimeOffset.UtcNow.ToString("O");
+                    var now = DateTime.UtcNow;
                     foreach (var line in await File.ReadAllLinesAsync(file, ct))
                     {
                         if (string.IsNullOrWhiteSpace(line)) continue;
@@ -100,7 +100,7 @@ public class JsonToSqliteMigrator(
                         db.AgentStateSnapshots.Add(new AgentStateSnapshotEntity
                         {
                             SessionId = sessionId,
-                            SavedAt = (s.SavedAt == default ? DateTimeOffset.UtcNow : s.SavedAt).ToString("O"),
+                            SavedAt = s.SavedAt == default ? DateTimeOffset.UtcNow.UtcDateTime : s.SavedAt.UtcDateTime,
                             PayloadJson = JsonSerializer.Serialize(s, JsonOptions),
                         });
                         snap++;

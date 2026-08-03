@@ -7,6 +7,6 @@ public sealed class SessionMessageEntity
 {
     public long Id { get; set; }
     public string SessionId { get; set; } = "";
-    public string CreatedAt { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
     public string PayloadJson { get; set; } = "";
 }

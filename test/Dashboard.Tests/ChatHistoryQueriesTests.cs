@@ -28,8 +28,8 @@ public class ChatHistoryQueriesTests
             Assert.Equal(2, sessions.Count); // s1, s2
             var s1 = sessions.Single(s => s.SessionId == "s1");
             Assert.Equal(2, s1.MessageCount);
-            Assert.Equal("2026-01-01T00:00:00Z", s1.FirstAt);
-            Assert.Equal("2026-01-02T00:00:00Z", s1.LastAt);
+            Assert.Equal(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), DateTime.Parse(s1.FirstAt, null, System.Globalization.DateTimeStyles.RoundtripKind));
+            Assert.Equal(new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc), DateTime.Parse(s1.LastAt, null, System.Globalization.DateTimeStyles.RoundtripKind));
             Assert.Equal("u1", s1.UserId); // 关联用户
         }
         finally { sp.Dispose(); TryDelete(root); }
@@ -85,9 +85,9 @@ public class ChatHistoryQueriesTests
     private static async Task SeedAsync(IDbContextFactory<ManInBlackDbContext> factory)
     {
         await using var db = factory.CreateDbContext();
-        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s1", CreatedAt = "2026-01-01T00:00:00Z", PayloadJson = JsonSerializer.Serialize(new ChatMessage(ChatRole.User, "hello")) });
-        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s1", CreatedAt = "2026-01-02T00:00:00Z", PayloadJson = JsonSerializer.Serialize(new ChatMessage(ChatRole.Assistant, "hi")) });
-        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s2", CreatedAt = "2026-01-03T00:00:00Z", PayloadJson = "{not-json" });
+        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s1", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), PayloadJson = JsonSerializer.Serialize(new ChatMessage(ChatRole.User, "hello")) });
+        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s1", CreatedAt = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc), PayloadJson = JsonSerializer.Serialize(new ChatMessage(ChatRole.Assistant, "hi")) });
+        db.SessionMessages.Add(new SessionMessageEntity { SessionId = "s2", CreatedAt = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc), PayloadJson = "{not-json" });
         db.Users.Add(new UserEntity { UserId = "u1", MetadataJson = "{}", SessionIdsJson = JsonSerializer.Serialize(new List<string> { "s1" }) });
         await db.SaveChangesAsync();
     }
