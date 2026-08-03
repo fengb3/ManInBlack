@@ -44,14 +44,15 @@ public class JsonToSqliteMigratorTests
         var (migrator, factory, sp, root) = await CreateAsync();
         try
         {
-            // 造 sessions/s1.jsonl(2 条真实 ChatMessage)
-            WriteRealJsonLl(Path.Combine(root, "sessions", "s1.jsonl"),
+            // 造 sessions/ext-1_1.jsonl(2 条真实 ChatMessage)。sessionId 必须带 {userId}_ 前缀，
+            // 否则迁移器无法解析归属(FK 要求 Sessions 行先于消息存在)。
+            WriteRealJsonLl(Path.Combine(root, "sessions", "ext-1_1.jsonl"),
                 new ChatMessage(ChatRole.User, "hi"),
                 new ChatMessage(ChatRole.Assistant, "yo"));
 
-            // 造 sessions/s1.state.json
-            await File.WriteAllTextAsync(Path.Combine(root, "sessions", "s1.state.json"),
-                JsonSerializer.Serialize(new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p", SavedAt = DateTimeOffset.UtcNow }));
+            // 造 sessions/ext-1_1.state.json
+            await File.WriteAllTextAsync(Path.Combine(root, "sessions", "ext-1_1.state.json"),
+                JsonSerializer.Serialize(new AgentStateSnapshot { SessionId = "ext-1_1", SystemPrompt = "p", SavedAt = DateTimeOffset.UtcNow }));
 
             // 造 users/userIdMap.json + users/3.json
             Directory.CreateDirectory(Path.Combine(root, "users"));
@@ -91,10 +92,18 @@ public class JsonToSqliteMigratorTests
         var (migrator, factory, sp, root) = await CreateAsync();
         try
         {
-            WriteRealJsonLl(Path.Combine(root, "sessions", "s1.jsonl"),
+            // sessionId 带 {userId}_ 前缀并提供归属用户条目，确保首跑真正导入(FK 要求)。
+            Directory.CreateDirectory(Path.Combine(root, "users"));
+            await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
+                JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-1"] = "3" }));
+            await File.WriteAllTextAsync(Path.Combine(root, "users", "3.json"),
+                JsonSerializer.Serialize(new { UserId = "ext-1", SelfHostUserId = "3" }));
+
+            WriteRealJsonLl(Path.Combine(root, "sessions", "ext-1_1.jsonl"),
                 new ChatMessage(ChatRole.User, "hi"));
 
-            await migrator.MigrateAsync();
+            var first = await migrator.MigrateAsync();
+            Assert.Equal(1, first.Messages);
             var second = await migrator.MigrateAsync();
 
             Assert.Equal(0, second.Messages);

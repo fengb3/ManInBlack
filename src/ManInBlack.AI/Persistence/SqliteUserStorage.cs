@@ -33,8 +33,7 @@ public class SqliteUserStorage(
         await using var db = dbFactory.CreateDbContext();
         var entity = await db.Users.FirstOrDefaultAsync(x => x.UserId == userEntry.UserId)
             ?? throw new InvalidOperationException($"用户不存在: {userEntry.UserId}");
-        // MetadataJson/SessionIdsJson 列在 Finalize migration 前仍存在；
-        // 正规化后 UserEntry 不再承载 Metadata/SessionIds，保留旧列值供数据搬迁读取。
+        // 正规化后 UserEntry 仅承载 UserId/Id；会话列表由 Sessions 表管理（CreateNewSessionIdAsync 写入）。
         await db.SaveChangesAsync();
     }
 

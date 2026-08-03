@@ -24,6 +24,11 @@ public class ManInBlackDbContext(DbContextOptions<ManInBlackDbContext> options) 
             b.Property(x => x.CreatedAt).IsRequired();
             b.Property(x => x.PayloadJson).IsRequired();
             b.HasIndex(x => new { x.SessionId, x.Id });
+            b.HasOne<SessionEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SessionId)
+                .HasPrincipalKey(x => x.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AgentStateSnapshotEntity>(b =>
@@ -32,6 +37,11 @@ public class ManInBlackDbContext(DbContextOptions<ManInBlackDbContext> options) 
             b.HasKey(x => x.SessionId);
             b.Property(x => x.SavedAt).IsRequired();
             b.Property(x => x.PayloadJson).IsRequired();
+            b.HasOne<SessionEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SessionId)
+                .HasPrincipalKey(x => x.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserEntity>(b =>
@@ -41,8 +51,6 @@ public class ManInBlackDbContext(DbContextOptions<ManInBlackDbContext> options) 
             b.Property(x => x.Id).ValueGeneratedOnAdd();
             b.Property(x => x.UserId).IsRequired();
             b.HasIndex(x => x.UserId).IsUnique();
-            b.Property(x => x.MetadataJson).IsRequired();
-            b.Property(x => x.SessionIdsJson).IsRequired();
         });
 
         modelBuilder.Entity<SessionEntity>(b =>

@@ -1,5 +1,6 @@
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence;
+using ManInBlack.AI.Persistence.Entities;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -13,6 +14,27 @@ public class SqliteAgentStateStorageTests
     private static SqliteAgentStateStorage CreateStorage(IDbContextFactory<ManInBlackDbContext> factory) =>
         new(factory, NullLogger<SqliteAgentStateStorage>.Instance);
 
+    /// <summary>
+    /// 正规化后 SessionMessages/AgentStateSnapshots 对 Sessions 有 FK，写消息/快照前须先有 Sessions 行。
+    /// 种一个归属用户 + 该 sessionId 的 Sessions 行。
+    /// </summary>
+    private static async Task SeedSessionAsync(IDbContextFactory<ManInBlackDbContext> factory, string sessionId, string userId = "u1")
+    {
+        await using var db = factory.CreateDbContext();
+        var user = new UserEntity { UserId = userId };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        db.Sessions.Add(new SessionEntity
+        {
+            SessionId = sessionId,
+            UserId = user.Id,
+            Source = (int)SessionSource.Interactive,
+            CreatedAt = DateTime.UtcNow,
+            LastAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task SaveMessage_Then_LoadMessages_ShouldRoundTrip_InOrder()
     {
@@ -21,6 +43,7 @@ public class SqliteAgentStateStorageTests
         {
             var storage = CreateStorage(factory);
             var sessionId = "s1";
+            await SeedSessionAsync(factory, sessionId);
 
             var m1 = new ChatMessage(ChatRole.User, "hello");
             var m2 = new ChatMessage(ChatRole.Assistant, "hi");
@@ -72,6 +95,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             var snap = new AgentStateSnapshot
             {
                 SessionId = "s1",
@@ -105,6 +129,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "first" });
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "second" });
 
@@ -142,6 +167,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p" });
             await storage.DeleteSnapshotAsync("s1");
             Assert.Null(await storage.LoadSnapshotAsync("s1"));
@@ -167,6 +193,7 @@ public class SqliteAgentStateStorageTests
             const int taskCount = 5;
             const int messagesPerTask = 20;
             var sessionId = "concurrent-s1";
+            await SeedSessionAsync(factory, sessionId);
 
             var tasks = Enumerable.Range(0, taskCount).Select(taskIndex =>
             {
