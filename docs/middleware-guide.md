@@ -286,6 +286,21 @@ public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
 }
 ```
 
+> **取消安全（重要）**：真实的 `AgentLoopMiddleware` 在工具执行期间被取消（用户打断）时，
+> 必须仍为**每个** `FunctionCallContent` 回填一条 `FunctionResultContent`（已执行的填真实结果/错误，
+> 未执行的中断桩），并始终把 tool 结果消息追加进 `context.Messages`，然后 `yield break`。
+> 否则持久化历史会留下「assistant(tool_calls) 无对应 tool 结果」的孤儿，下一轮 API 调用会被
+> OpenAI 兼容接口以 400 拒绝（`insufficient tool messages following tool_calls message`）。
+> 因此工具执行块用 `try/catch (OperationCanceledException)` 包裹 `Task.WhenAll`，并在打断时
+> 跳过 `AllToolsCompletedEvent` 与 `AfterToolCall` 检查点。
+>
+> **打断还可能引发并发持久化交错**：被打断的旧轮次若工具未观测取消令牌，会继续跑完并延后落库，
+> 与随后启动的新轮次往同一会话乱序写——产生「tool 结果的前一条不是配对 tool_calls」的孤儿，
+> 同样会被 API 以 400 拒绝。两层防御：
+> - `SavePersistenceMiddleware` 在取消令牌触发后**不再持久化**新追加的消息，从源头避免交错；
+> - `ReadPersistenceMiddleware` 加载时 `SanitizeToolCallHistory` 双向修复——既为缺失结果补中断桩，
+>   也**丢弃**配对错乱的孤儿 tool 结果。已健全的历史是 no-op。
+
 ---
 
 ## 注册与管道顺序
@@ -387,8 +402,8 @@ builder.Services.AddManInBlack()
 | 13  | `HookMiddleware`                  | 执行用户自定义钩子脚本             |
 | 14  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
 | 15  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
-| 16  | `RetryMiddleware`                 | 处理 API 重试逻辑                  |
-| 17  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点 |
+| 16  | `RetryMiddleware`                 | 处理 API 重试逻辑；仅重试瞬时错误（连接级、超时、5xx、408、429），4xx 立即抛出不重试 |
+| 17  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点；工具执行被取消时仍回填 tool 结果以保持历史一致 |
 
 ### 顺序规则
 

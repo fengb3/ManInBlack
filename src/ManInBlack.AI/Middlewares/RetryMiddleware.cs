@@ -1,3 +1,4 @@
+using System.Net;
 using System.Runtime.CompilerServices;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Middleware;
@@ -100,8 +101,19 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
     static partial void LogRetryExhausted(ILogger<RetryMiddleware> logger, string agentId, int attempt);
 
     /// <summary>
-    /// 判断异常是否值得重试（网络/TLS/超时类瞬时错误）。逻辑错误（如 InvalidOperationException）不重试，立即抛。
+    /// 判断异常是否值得重试。仅重试瞬时错误（连接级、超时、5xx、408、429）；
+    /// 4xx 客户端错误（如 400 历史非法）是确定性的，重试无意义，立即抛。
     /// </summary>
-    private static bool IsRetryable(Exception ex) =>
-        ex is IOException or HttpRequestException or System.Net.Sockets.SocketException or TimeoutException;
+    private static bool IsRetryable(Exception ex)
+    {
+        if (ex is not HttpRequestException hre)
+            return ex is IOException or System.Net.Sockets.SocketException or TimeoutException;
+
+        var status = hre.StatusCode;
+        if (status is null) return true;                               // 连接级错误（无状态码），保守重试
+        if (status == HttpStatusCode.RequestTimeout) return true;      // 408
+        if (status == HttpStatusCode.TooManyRequests) return true;     // 429
+        if (status >= HttpStatusCode.InternalServerError) return true; // 5xx 服务端错误
+        return false;                                                  // 其余 4xx：确定性错误，不重试
+    }
 }

@@ -35,7 +35,7 @@ Hook 通过两个集成层接入框架：
 | `AfterLlmCall`      | LLM 响应流结束后                     | `AgentLoopMiddleware` | 检查响应内容、记录日志           |
 | `BeforeToolExecute` | 单个工具执行前                        | `AgentLifecycleFilter` | 阻断执行、检查参数             |
 | `AfterToolExecute`  | 单个工具执行后                        | `AgentLifecycleFilter` | 检查结果、审计日志             |
-| `AllToolsCompleted` | 本批次所有工具执行完毕后                   | `AgentLoopMiddleware` | 批量后处理                 |
+| `AllToolsCompleted` | 本批次所有工具执行完毕后（工具执行被取消/打断时不触发） | `AgentLoopMiddleware` | 批量后处理                 |
 | `AgentCompleted`    | Agent 循环结束（无更多 function call）时 | `HookMiddleware`      | 最终处理、清理资源             |
 
 ---

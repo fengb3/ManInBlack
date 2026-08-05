@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Tools;
@@ -251,5 +253,139 @@ public class AgentLoopMiddlewareTests
         Assert.Equal(2, afterLlmCallCount);
         // 1 批工具执行 → 1 次 AllToolsCompleted
         Assert.Equal(1, allToolsCompletedCount);
+    }
+
+    /// <summary>
+    /// 构造一个“开始执行即被打断”的执行器：拿到 semaphore 后取消令牌并抛 OCE，
+    /// 模拟工具执行期间用户打断。FakeToolExecutor 自身不观测 ct、不吞异常，OCE 会从
+    /// AgentLoopMiddleware 的 Task.WhenAll 抛出。
+    /// </summary>
+    private static FakeToolExecutor InterruptingExecutor(CancellationTokenSource cts, string result = "x") =>
+        new()
+        {
+            Result = result,
+            OnExecute = _ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            }
+        };
+
+    [Fact]
+    public async Task HandleAsync_CancelledDuringToolExecution_AppendsToolResultsForEveryCallId()
+    {
+        var cts = new CancellationTokenSource();
+        var executor = InterruptingExecutor(cts);
+        var middleware = new AgentLoopMiddleware(executor, NullLogger<AgentContext>.Instance);
+        var bus = new EventBus();
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "test-agent",
+            Messages = []
+        };
+
+        ChatResponseUpdateHandler next = () => TestHelpers.AsyncSeq(new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("call_1", "SlowTool", null)]));
+
+        // 取消被妥善处理，不应抛 OperationCanceledException
+        await middleware.HandleAsync(ctx, next, cts.Token).ToListAsync();
+
+        // 历史保持一致：assistant(tool_calls) 后必须存在覆盖全部 CallId 的 tool 结果
+        var assistantMsg = ctx.Messages.Single(m =>
+            m.Role == ChatRole.Assistant && m.Contents.OfType<FunctionCallContent>().Any());
+        var expectedCallIds = assistantMsg.Contents.OfType<FunctionCallContent>()
+            .Select(f => f.CallId).ToArray();
+
+        var toolMsg = ctx.Messages.Single(m => m.Role == ChatRole.Tool);
+        var actualCallIds = toolMsg.Contents.OfType<FunctionResultContent>()
+            .Select(r => r.CallId).ToArray();
+
+        Assert.Equal(expectedCallIds, actualCallIds);
+        // 结果是中断桩
+        Assert.All(toolMsg.Contents.OfType<FunctionResultContent>(),
+            r => Assert.Contains("中断", r.Result?.ToString() ?? ""));
+    }
+
+    [Fact]
+    public async Task HandleAsync_CancelledDuringMultipleToolExecution_AllCallIdsCovered()
+    {
+        var cts = new CancellationTokenSource();
+        var executor = InterruptingExecutor(cts);
+        var middleware = new AgentLoopMiddleware(executor, NullLogger<AgentContext>.Instance);
+        var bus = new EventBus();
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "test-agent",
+            Messages = []
+        };
+
+        ChatResponseUpdateHandler next = () => TestHelpers.AsyncSeq(new ChatResponseUpdate(ChatRole.Assistant,
+        [
+            new FunctionCallContent("c1", "ToolA", null),
+            new FunctionCallContent("c2", "ToolB", null)
+        ]));
+
+        await middleware.HandleAsync(ctx, next, cts.Token).ToListAsync();
+
+        var toolMsg = ctx.Messages.Single(m => m.Role == ChatRole.Tool);
+        var resultIds = toolMsg.Contents.OfType<FunctionResultContent>()
+            .Select(r => r.CallId).OrderBy(x => x).ToArray();
+        Assert.Equal(new[] { "c1", "c2" }, resultIds);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CancelledDuringToolExecution_DoesNotPublishAllToolsCompleted()
+    {
+        var cts = new CancellationTokenSource();
+        var executor = InterruptingExecutor(cts);
+        var middleware = new AgentLoopMiddleware(executor, NullLogger<AgentContext>.Instance);
+        var bus = new EventBus();
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "test-agent",
+            Messages = []
+        };
+
+        var allToolsCompletedCount = 0;
+        bus.Subscribe<AllToolsCompletedEvent>(EventBus.HookKey("test-agent"), (evt, ct) =>
+        {
+            allToolsCompletedCount++;
+            return Task.CompletedTask;
+        });
+
+        ChatResponseUpdateHandler next = () => TestHelpers.AsyncSeq(new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("c1", "ToolA", null)]));
+
+        await middleware.HandleAsync(ctx, next, cts.Token).ToListAsync();
+
+        Assert.Equal(0, allToolsCompletedCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CancelledDuringToolExecution_DoesNotRunSaveCheckpoint()
+    {
+        var cts = new CancellationTokenSource();
+        var executor = InterruptingExecutor(cts);
+        var middleware = new AgentLoopMiddleware(executor, NullLogger<AgentContext>.Instance);
+        var bus = new EventBus();
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "test-agent",
+            Messages = []
+        };
+
+        var checkpointInvoked = 0;
+        ctx.Items["SaveCheckpoint"] = (Func<string?, CancellationToken, Task>)((_, _) =>
+        {
+            checkpointInvoked++;
+            return Task.CompletedTask;
+        });
+
+        ChatResponseUpdateHandler next = () => TestHelpers.AsyncSeq(new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("c1", "ToolA", null)]));
+
+        await middleware.HandleAsync(ctx, next, cts.Token).ToListAsync();
+
+        Assert.Equal(0, checkpointInvoked);
     }
 }

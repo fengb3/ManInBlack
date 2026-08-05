@@ -41,7 +41,7 @@ ManInBlack 通过 `EventBus` 实现组件间的事件通信。EventBus 是一个
 | `AfterLlmCallEvent` | LLM 响应后 | `AgentLoopMiddleware` |
 | `BeforeToolExecuteEvent` | 工具执行前，支持阻断 | `AgentLifecycleFilter` |
 | `AfterToolExecuteEvent` | 工具执行后 | `AgentLifecycleFilter` |
-| `AllToolsCompletedEvent` | 本批次所有工具执行完毕 | `AgentLoopMiddleware` |
+| `AllToolsCompletedEvent` | 本批次所有工具执行完毕（工具执行被取消时不触发） | `AgentLoopMiddleware` |
 | `AgentCompletedEvent` | Agent 循环结束 | `HookMiddleware` |
 
 ### 子 Agent 委托事件

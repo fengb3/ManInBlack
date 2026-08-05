@@ -39,7 +39,9 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException(
-                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}");
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}",
+                null,
+                response.StatusCode);
         }
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -60,7 +62,9 @@ public sealed class AnthropicCompatibleChatClient : IChatClient
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException(
-                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}");
+                $"Response status code does not indicate success: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {errorBody}",
+                null,
+                response.StatusCode);
         }
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
