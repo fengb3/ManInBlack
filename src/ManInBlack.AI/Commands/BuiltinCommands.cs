@@ -19,7 +19,7 @@ public sealed partial class BuiltinCommands
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var userStorage = context.ServiceProvider.GetRequiredService<IUserStorage>();
-        context.SessionId = await userStorage.CreateNewSessionIdAsync(context.ParentId);
+        context.SessionId = await userStorage.CreateNewSessionIdAsync(context.ParentId, SessionSource.Interactive);
         context.Messages.Clear();
 
         yield return new ChatResponseUpdate

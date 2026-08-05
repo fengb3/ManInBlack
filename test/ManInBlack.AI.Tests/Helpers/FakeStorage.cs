@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using ManInBlack.AI.Abstraction;
 using ManInBlack.AI.Abstraction.Storage;
@@ -45,6 +46,7 @@ public class FakeSessionStorage : ISessionStorage
 public class FakeUserStorage : IUserStorage
 {
     private readonly Dictionary<string, UserEntry> _users = new();
+    private readonly Dictionary<string, List<(string? SessionId, SessionSource Source, DateTime LastAt)>> _sessions = new();
 
     public Task<UserEntry> GetOrCreateUser(string userId)
     {
@@ -62,13 +64,21 @@ public class FakeUserStorage : IUserStorage
         return Task.CompletedTask;
     }
 
-    public async Task<string> CreateNewSessionIdAsync(string userId)
+    public Task<string> CreateNewSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
     {
-        var user = await GetOrCreateUser(userId);
-        var sessionId = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-        user.SessionIds.Add(sessionId);
-        await SaveUserAsync(user);
-        return sessionId;
+        var user = GetOrCreateUser(userId).GetAwaiter().GetResult();
+        var sid = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        if (!_sessions.ContainsKey(userId)) _sessions[userId] = new();
+        _sessions[userId].Add((sid, source, DateTime.UtcNow));
+        return Task.FromResult(sid);
+    }
+
+    public Task<string?> GetLatestSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+    {
+        if (!_sessions.TryGetValue(userId, out var list))
+            return Task.FromResult<string?>(null);
+        var latest = list.Where(x => x.Source == source).OrderByDescending(x => x.LastAt).FirstOrDefault();
+        return Task.FromResult(latest.SessionId);
     }
 }
 

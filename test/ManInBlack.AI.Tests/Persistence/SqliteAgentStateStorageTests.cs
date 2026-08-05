@@ -1,5 +1,6 @@
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence;
+using ManInBlack.AI.Persistence.Entities;
 using ManInBlack.AI.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -13,6 +14,27 @@ public class SqliteAgentStateStorageTests
     private static SqliteAgentStateStorage CreateStorage(IDbContextFactory<ManInBlackDbContext> factory) =>
         new(factory, NullLogger<SqliteAgentStateStorage>.Instance);
 
+    /// <summary>
+    /// 正规化后 SessionMessages/AgentStateSnapshots 对 Sessions 有 FK，写消息/快照前须先有 Sessions 行。
+    /// 种一个归属用户 + 该 sessionId 的 Sessions 行。
+    /// </summary>
+    private static async Task SeedSessionAsync(IDbContextFactory<ManInBlackDbContext> factory, string sessionId, string userId = "u1")
+    {
+        await using var db = factory.CreateDbContext();
+        var user = new UserEntity { UserId = userId };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        db.Sessions.Add(new SessionEntity
+        {
+            SessionId = sessionId,
+            UserId = user.Id,
+            Source = (int)SessionSource.Interactive,
+            CreatedAt = DateTime.UtcNow,
+            LastAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task SaveMessage_Then_LoadMessages_ShouldRoundTrip_InOrder()
     {
@@ -21,6 +43,7 @@ public class SqliteAgentStateStorageTests
         {
             var storage = CreateStorage(factory);
             var sessionId = "s1";
+            await SeedSessionAsync(factory, sessionId);
 
             var m1 = new ChatMessage(ChatRole.User, "hello");
             var m2 = new ChatMessage(ChatRole.Assistant, "hi");
@@ -72,6 +95,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             var snap = new AgentStateSnapshot
             {
                 SessionId = "s1",
@@ -105,6 +129,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "first" });
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "second" });
 
@@ -142,6 +167,7 @@ public class SqliteAgentStateStorageTests
         try
         {
             var storage = CreateStorage(factory);
+            await SeedSessionAsync(factory, "s1");
             await storage.SaveSnapshotAsync("s1", new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p" });
             await storage.DeleteSnapshotAsync("s1");
             Assert.Null(await storage.LoadSnapshotAsync("s1"));
@@ -167,6 +193,7 @@ public class SqliteAgentStateStorageTests
             const int taskCount = 5;
             const int messagesPerTask = 20;
             var sessionId = "concurrent-s1";
+            await SeedSessionAsync(factory, sessionId);
 
             var tasks = Enumerable.Range(0, taskCount).Select(taskIndex =>
             {
@@ -191,6 +218,41 @@ public class SqliteAgentStateStorageTests
                 Assert.NotNull(m);
                 Assert.False(string.IsNullOrEmpty(m.Text));
             }
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>
+    /// 规约 §Task3: SaveMessage 写消息后应更新对应 Sessions.LastAt。
+    /// 会话行由 CreateNewSessionIdAsync 预建（正常路径）；此处走真实建会话路径，
+    /// 连写两条消息后断言 Sessions.LastAt == 该会话消息 CreatedAt 的最大值。
+    /// </summary>
+    [Fact]
+    public async Task SaveMessage_UpdatesSessionLastAt()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            // 真实建会话路径：CreateNewSessionIdAsync 预建 Sessions 行（含合规 UserId）
+            var userStorage = new SqliteUserStorage(factory, NullLogger<SqliteUserStorage>.Instance);
+            var sessionId = await userStorage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
+
+            await storage.SaveMessage(sessionId, new ChatMessage(ChatRole.User, "hi"));
+            await Task.Delay(50);
+            await storage.SaveMessage(sessionId, new ChatMessage(ChatRole.User, "again"));
+
+            await using var db = factory.CreateDbContext();
+            var session = await db.Sessions.SingleAsync(x => x.SessionId == sessionId);
+            var times = await db.SessionMessages
+                .Where(x => x.SessionId == sessionId)
+                .Select(x => x.CreatedAt)
+                .ToListAsync();
+            Assert.Equal(times.Max(), session.LastAt);
         }
         finally
         {

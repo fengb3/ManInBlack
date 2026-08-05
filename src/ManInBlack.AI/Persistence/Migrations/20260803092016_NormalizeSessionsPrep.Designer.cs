@@ -3,6 +3,7 @@ using System;
 using ManInBlack.AI.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ManInBlack.AI.Persistence.Migrations
 {
     [DbContext(typeof(ManInBlackDbContext))]
-    partial class ManInBlackDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260803092016_NormalizeSessionsPrep")]
+    partial class NormalizeSessionsPrep
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -26,7 +29,8 @@ namespace ManInBlack.AI.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("SavedAt")
+                    b.Property<string>("SavedAt")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("SessionId");
@@ -72,7 +76,8 @@ namespace ManInBlack.AI.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PayloadJson")
@@ -99,6 +104,14 @@ namespace ManInBlack.AI.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SessionIdsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -111,16 +124,6 @@ namespace ManInBlack.AI.Persistence.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("ManInBlack.AI.Persistence.Entities.AgentStateSnapshotEntity", b =>
-                {
-                    b.HasOne("ManInBlack.AI.Persistence.Entities.SessionEntity", null)
-                        .WithMany()
-                        .HasForeignKey("SessionId")
-                        .HasPrincipalKey("SessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("ManInBlack.AI.Persistence.Entities.SessionEntity", b =>
                 {
                     b.HasOne("ManInBlack.AI.Persistence.Entities.UserEntity", "User")
@@ -130,16 +133,6 @@ namespace ManInBlack.AI.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ManInBlack.AI.Persistence.Entities.SessionMessageEntity", b =>
-                {
-                    b.HasOne("ManInBlack.AI.Persistence.Entities.SessionEntity", null)
-                        .WithMany()
-                        .HasForeignKey("SessionId")
-                        .HasPrincipalKey("SessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

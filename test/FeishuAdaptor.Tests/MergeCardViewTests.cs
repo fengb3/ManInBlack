@@ -4,6 +4,7 @@ using FeishuNetSdk;
 using FeishuNetSdk.Cardkit;
 using FeishuNetSdk.Im;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -25,7 +26,7 @@ public class MergeCardViewTests : IAsyncLifetime
     {
         _api = Substitute.For<IFeishuTenantApi>();
         SetupApi(_api);
-        _cardService = new CardService(_api, new CardApiLimiter());
+        _cardService = new CardService(_api, new CardApiLimiter(), NullLogger<CardService>.Instance);
     }
 
     public async Task InitializeAsync()

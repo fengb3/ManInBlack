@@ -2,6 +2,15 @@
 
 namespace ManInBlack.AI.Abstraction.Storage;
 
+/// <summary>会话来源：区分用户交互会话与自动化触发会话。</summary>
+public enum SessionSource
+{
+    /// <summary>用户交互（飞书 IM 等）。</summary>
+    Interactive = 0,
+    /// <summary>自动化 webhook 触发。</summary>
+    Webhook = 1,
+}
+
 /// <summary>
 /// 工作空间策略模式
 /// </summary>
@@ -61,19 +70,11 @@ public interface ISessionStorage
 
 public record UserEntry
 {
-    public string UserId { get; set; }
-    
-    public string SelfHostUserId { get; set; }
-    
-    public Dictionary<string, object> Metadata { get; set; } = new();
-    
-    public IList<string> SessionIds { get; set; } = new List<string>();
-}
+    public string UserId { get; set; } = "";
 
-public static class UserEntryExtensions
-{
-    public static string? GetLatestSessionId(this UserEntry userEntry)
-        => userEntry.SessionIds.OrderBy(s => s).LastOrDefault();
+    public string SelfHostUserId { get; set; } = "";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>

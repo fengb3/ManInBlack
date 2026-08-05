@@ -44,21 +44,22 @@ public class JsonToSqliteMigratorTests
         var (migrator, factory, sp, root) = await CreateAsync();
         try
         {
-            // 造 sessions/s1.jsonl(2 条真实 ChatMessage)
-            WriteRealJsonLl(Path.Combine(root, "sessions", "s1.jsonl"),
+            // 造 sessions/ext-1_1.jsonl(2 条真实 ChatMessage)。sessionId 必须带 {userId}_ 前缀，
+            // 否则迁移器无法解析归属(FK 要求 Sessions 行先于消息存在)。
+            WriteRealJsonLl(Path.Combine(root, "sessions", "ext-1_1.jsonl"),
                 new ChatMessage(ChatRole.User, "hi"),
                 new ChatMessage(ChatRole.Assistant, "yo"));
 
-            // 造 sessions/s1.state.json
-            await File.WriteAllTextAsync(Path.Combine(root, "sessions", "s1.state.json"),
-                JsonSerializer.Serialize(new AgentStateSnapshot { SessionId = "s1", SystemPrompt = "p", SavedAt = DateTimeOffset.UtcNow }));
+            // 造 sessions/ext-1_1.state.json
+            await File.WriteAllTextAsync(Path.Combine(root, "sessions", "ext-1_1.state.json"),
+                JsonSerializer.Serialize(new AgentStateSnapshot { SessionId = "ext-1_1", SystemPrompt = "p", SavedAt = DateTimeOffset.UtcNow }));
 
             // 造 users/userIdMap.json + users/3.json
             Directory.CreateDirectory(Path.Combine(root, "users"));
             await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
                 JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-1"] = "3" }));
             await File.WriteAllTextAsync(Path.Combine(root, "users", "3.json"),
-                JsonSerializer.Serialize(new UserEntry { UserId = "ext-1", SelfHostUserId = "3", SessionIds = new List<string> { "ext-1_1" } }));
+                JsonSerializer.Serialize(new { UserId = "ext-1", SelfHostUserId = "3", SessionIds = new List<string> { "ext-1_1" } }));
 
             var summary = await migrator.MigrateAsync();
 
@@ -72,7 +73,11 @@ public class JsonToSqliteMigratorTests
             var user = await db.Users.SingleAsync();
             Assert.Equal("ext-1", user.UserId);
             Assert.Equal(3, user.Id); // 保留原数字内部 id
-            Assert.Contains("ext-1_1", JsonSerializer.Deserialize<List<string>>(user.SessionIdsJson)!);
+            // 正规化后旧 SessionIds 写入 Sessions 表（不再写 SessionIdsJson blob）
+            var session = await db.Sessions.SingleAsync();
+            Assert.Equal("ext-1_1", session.SessionId);
+            Assert.Equal(user.Id, session.UserId);
+            Assert.Equal((int)SessionSource.Interactive, session.Source);
         }
         finally
         {
@@ -87,10 +92,18 @@ public class JsonToSqliteMigratorTests
         var (migrator, factory, sp, root) = await CreateAsync();
         try
         {
-            WriteRealJsonLl(Path.Combine(root, "sessions", "s1.jsonl"),
+            // sessionId 带 {userId}_ 前缀并提供归属用户条目，确保首跑真正导入(FK 要求)。
+            Directory.CreateDirectory(Path.Combine(root, "users"));
+            await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
+                JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-1"] = "3" }));
+            await File.WriteAllTextAsync(Path.Combine(root, "users", "3.json"),
+                JsonSerializer.Serialize(new { UserId = "ext-1", SelfHostUserId = "3" }));
+
+            WriteRealJsonLl(Path.Combine(root, "sessions", "ext-1_1.jsonl"),
                 new ChatMessage(ChatRole.User, "hi"));
 
-            await migrator.MigrateAsync();
+            var first = await migrator.MigrateAsync();
+            Assert.Equal(1, first.Messages);
             var second = await migrator.MigrateAsync();
 
             Assert.Equal(0, second.Messages);
@@ -119,6 +132,40 @@ public class JsonToSqliteMigratorTests
         }
     }
 
+    /// <summary>
+    /// 一个无主的旧 sessions 文件：sessionId 不含可解析的 {userId}_ 前缀，也没有归属用户条目。
+    /// 期望：该会话消息被跳过（Skipped++），不写任何 Sessions/SessionMessages 行，且整体导入不抛。
+    /// </summary>
+    [Fact]
+    public async Task Migrate_OwnerlessSessionFile_IsSkippedWithoutThrowing()
+    {
+        var (migrator, factory, sp, root) = await CreateAsync();
+        try
+        {
+            // 不写任何 users/userIdMap.json —— 没有归属用户。
+            // 文件名 plainnothsuffix.jsonl → sessionId="plainnothsuffix"，无 '_' 前缀，EnsureSessionRowAsync 返回 false。
+            WriteRealJsonLl(Path.Combine(root, "sessions", "plainnothsuffix.jsonl"),
+                new ChatMessage(ChatRole.User, "ownerless"));
+
+            var summary = await migrator.MigrateAsync();
+
+            // 无主会话：消息 0、用户 0、快照 0；该文件计入 Skipped。
+            Assert.Equal(0, summary.Messages);
+            Assert.Equal(0, summary.Users);
+            Assert.Equal(0, summary.Snapshots);
+            Assert.True(summary.Skipped >= 1);
+
+            await using var db = factory.CreateDbContext();
+            Assert.False(await db.Sessions.AnyAsync(x => x.SessionId == "plainnothsuffix"));
+            Assert.False(await db.SessionMessages.AnyAsync(x => x.SessionId == "plainnothsuffix"));
+        }
+        finally
+        {
+            sp.Dispose();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
     [Fact]
     public async Task Migrate_PreservesExplicitId_NextAutoIncrementContinues()
     {
@@ -129,7 +176,7 @@ public class JsonToSqliteMigratorTests
             await File.WriteAllTextAsync(Path.Combine(root, "users", "userIdMap.json"),
                 JsonSerializer.Serialize(new Dictionary<string, string> { ["ext-old"] = "7" }));
             await File.WriteAllTextAsync(Path.Combine(root, "users", "7.json"),
-                JsonSerializer.Serialize(new UserEntry { UserId = "ext-old", SelfHostUserId = "7" }));
+                JsonSerializer.Serialize(new { UserId = "ext-old", SelfHostUserId = "7" }));
 
             await migrator.MigrateAsync();
 

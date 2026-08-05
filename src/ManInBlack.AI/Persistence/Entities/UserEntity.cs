@@ -7,6 +7,5 @@ public sealed class UserEntity
 {
     public long Id { get; set; }
     public string UserId { get; set; } = "";
-    public string MetadataJson { get; set; } = "{}";
-    public string SessionIdsJson { get; set; } = "[]";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

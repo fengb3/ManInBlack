@@ -16,10 +16,9 @@ public interface IUserStorage
     /// <returns></returns>
     Task SaveUserAsync(UserEntry userEntry);
 
-    /// <summary>
-    /// 为用户创建新的会话 ID
-    /// </summary>
-    /// <param name="userId"></param>
-    /// <returns>新会话 ID</returns>
-    Task<string> CreateNewSessionIdAsync(string userId);
+    /// <summary>为用户创建新会话并写入 Sessions 表，返回 SessionId。</summary>
+    Task<string> CreateNewSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive);
+
+    /// <summary>返回指定来源的最新会话 Id（按 LastAt 倒序），无则 null。</summary>
+    Task<string?> GetLatestSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive);
 }

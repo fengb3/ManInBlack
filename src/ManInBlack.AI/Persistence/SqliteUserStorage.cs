@@ -1,5 +1,3 @@
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Persistence.Entities;
@@ -10,17 +8,13 @@ namespace ManInBlack.AI.Persistence;
 
 /// <summary>
 /// SQLite 实现的用户存储。SelfHostUserId = 自增 Id 的字符串形式。
+/// 会话列表正规化到 Sessions 表（按 Source 区分），不再走 Users.SessionIdsJson blob。
 /// </summary>
 [ServiceRegister.Singleton.As<IUserStorage>]
 public class SqliteUserStorage(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
     ILogger<SqliteUserStorage> logger) : IUserStorage
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-    };
-
     public async Task<UserEntry> GetOrCreateUser(string userId)
     {
         await using var db = dbFactory.CreateDbContext();
@@ -39,26 +33,44 @@ public class SqliteUserStorage(
         await using var db = dbFactory.CreateDbContext();
         var entity = await db.Users.FirstOrDefaultAsync(x => x.UserId == userEntry.UserId)
             ?? throw new InvalidOperationException($"用户不存在: {userEntry.UserId}");
-
-        entity.MetadataJson = JsonSerializer.Serialize(userEntry.Metadata, JsonOptions);
-        entity.SessionIdsJson = JsonSerializer.Serialize(userEntry.SessionIds, JsonOptions);
+        // 正规化后 UserEntry 仅承载 UserId/Id；会话列表由 Sessions 表管理（CreateNewSessionIdAsync 写入）。
         await db.SaveChangesAsync();
     }
 
-    public async Task<string> CreateNewSessionIdAsync(string userId)
+    public async Task<string> CreateNewSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
     {
         var user = await GetOrCreateUser(userId);
         var sessionId = $"{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-        user.SessionIds.Add(sessionId);
-        await SaveUserAsync(user);
+        await using var db = dbFactory.CreateDbContext();
+        var now = DateTime.UtcNow;
+        db.Sessions.Add(new SessionEntity
+        {
+            SessionId = sessionId,
+            UserId = long.Parse(user.SelfHostUserId),
+            Source = (int)source,
+            CreatedAt = now,
+            LastAt = now,
+        });
+        await db.SaveChangesAsync();
         return sessionId;
+    }
+
+    public async Task<string?> GetLatestSessionIdAsync(string userId, SessionSource source = SessionSource.Interactive)
+    {
+        await using var db = dbFactory.CreateDbContext();
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId);
+        if (user is null) return null;
+        var row = await db.Sessions.AsNoTracking()
+            .Where(x => x.UserId == user.Id && x.Source == (int)source)
+            .OrderByDescending(x => x.LastAt)
+            .FirstOrDefaultAsync();
+        return row?.SessionId;
     }
 
     private static UserEntry ToEntry(UserEntity e) => new()
     {
         UserId = e.UserId,
         SelfHostUserId = e.Id.ToString(),
-        Metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(e.MetadataJson, JsonOptions) ?? new(),
-        SessionIds = JsonSerializer.Deserialize<List<string>>(e.SessionIdsJson, JsonOptions) ?? new(),
+        CreatedAt = e.CreatedAt,
     };
 }

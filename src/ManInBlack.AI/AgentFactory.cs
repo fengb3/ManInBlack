@@ -168,15 +168,16 @@ public class AgentFactory
                     ? root
                     : parentId;
 
-            // 5. 获取或创建根用户
-            var user = await userStorage.GetOrCreateUser(rootUserId);
+            // 5. 获取或创建根用户（确保用户行存在，Sessions FK 依赖之）
+            await userStorage.GetOrCreateUser(rootUserId);
 
             // 6. 设置 AgentContext 属性
             agentContext.AgentId = Guid.NewGuid().ToString();
             agentContext.ParentId = parentId;
             agentContext.ParentType = parentType;
             agentContext.RootUserId = rootUserId;
-            agentContext.SessionId = user.GetLatestSessionId() ?? await userStorage.CreateNewSessionIdAsync(rootUserId);
+            agentContext.SessionId = await userStorage.GetLatestSessionIdAsync(rootUserId, SessionSource.Interactive)
+                                   ?? await userStorage.CreateNewSessionIdAsync(rootUserId, SessionSource.Interactive);
             agentContext.SystemPrompt = definition.Instruction;
             agentContext.UserInput = userInput;
             agentContext.AgentName = definition.Name;
