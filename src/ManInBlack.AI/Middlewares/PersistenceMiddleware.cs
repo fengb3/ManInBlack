@@ -77,8 +77,12 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         //     }
         // }
 
+        // 修复孤儿 tool_calls：工具执行被打断后会残留「assistant(tool_calls) 无对应 tool 结果」，
+        // 下一轮 API 会因此报 400。这里为缺失的结果补一条中断桩。已健全的历史不受影响。
+        var sanitized = SanitizeToolCallHistory(messages);
+
         // 将持久化消息添加到上下文中
-        foreach (var message in messages)
+        foreach (var message in sanitized)
         {
             context.Messages.Add(message);
         }
@@ -88,6 +92,76 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         {
             yield return update;
         }
+    }
+
+    /// <summary>
+    /// 工具执行被打断时回填给 LLM 的结果文本。与 <see cref="AgentLoopMiddleware"/> 中的同名常量保持一致。
+    /// </summary>
+    private const string ToolInterruptedMessage = "工具执行已被中断，未获得结果。";
+
+    /// <summary>
+    /// 修复消息历史中两类会触发 400 的 tool_calls/tool 配对错乱：
+    /// 1. assistant(tool_calls) 后缺少对应 tool 结果 → 补一条 <see cref="ToolInterruptedMessage"/> 桩消息
+    ///    （典型来源：工具执行被打断，assistant(tool_calls) 落库却没有 tool 结果）。
+    /// 2. tool 结果的前一条不是配对的 tool_calls（CallId 已被应答或不匹配）→ 丢弃该孤儿结果
+    ///    （典型来源：打断后旧一轮的 tool 结果姗姗来迟，和新一轮消息交错落库）。
+    /// 已健全的历史是 no-op。
+    /// </summary>
+    private static IList<ChatMessage> SanitizeToolCallHistory(IList<ChatMessage> messages)
+    {
+        if (messages.Count == 0)
+            return messages;
+
+        var result = new List<ChatMessage>(messages.Count + 1);
+        var pendingCallIds = new HashSet<string>();
+
+        foreach (var msg in messages)
+        {
+            // assistant 的工具调用：先结算上一组未应答的调用，再登记本轮 CallId
+            if (msg.Role == ChatRole.Assistant && msg.Contents.OfType<FunctionCallContent>().Any())
+            {
+                FlushPendingToolResults(result, pendingCallIds);
+                result.Add(msg);
+                foreach (var callId in msg.Contents.OfType<FunctionCallContent>().Select(c => c.CallId))
+                    pendingCallIds.Add(callId);
+                continue;
+            }
+
+            // tool 结果：仅保留对最近一次 tool_calls 的应答（CallId 仍在 pending 中）。
+            // CallId 不在 pending 的结果，是与已应答/缺失 tool_calls 错配的残留——典型来源是
+            // 「打断后旧一轮的 tool 结果姗姗来迟，和新一轮的消息交错落库」。这类孤儿 tool 结果
+            // 会被 API 以 "tool must be a response to a preceding message with tool_calls" 拒绝，故丢弃。
+            if (msg.Role == ChatRole.Tool)
+            {
+                var allResults = msg.Contents.OfType<FunctionResultContent>().ToList();
+                var validResults = allResults.Where(fr => pendingCallIds.Remove(fr.CallId)).ToList();
+                if (validResults.Count == allResults.Count)
+                    result.Add(msg);                       // 全部有效：原样保留（保元数据）
+                else if (validResults.Count > 0)
+                    result.Add(new ChatMessage(ChatRole.Tool,
+                        validResults.Select(r => (AIContent)r).ToList())); // 仅保留有效结果
+                // 全部为孤儿/重复 → 丢弃整条 tool 消息
+                continue;
+            }
+
+            // user / system / 无调用的 assistant：若有未应答调用，先补桩再追加
+            FlushPendingToolResults(result, pendingCallIds);
+            result.Add(msg);
+        }
+
+        // 尾部孤儿（最常见）：最后一条 assistant(tool_calls) 没有任何 tool 结果
+        FlushPendingToolResults(result, pendingCallIds);
+
+        return result;
+    }
+
+    private static void FlushPendingToolResults(List<ChatMessage> result, HashSet<string> pendingCallIds)
+    {
+        if (pendingCallIds.Count == 0)
+            return;
+        result.Add(new ChatMessage(ChatRole.Tool,
+            pendingCallIds.Select(id => (AIContent)new FunctionResultContent(id, ToolInterruptedMessage)).ToList()));
+        pendingCallIds.Clear();
     }
 }
 
@@ -107,7 +181,7 @@ public class SavePersistenceMiddleware : AgentMiddleware
 
         // 用包装集合替换原始 Messages，通过 Channel 异步持久化
         var original = context.Messages;
-        var persisting = new PersistingMessageCollection(original, sessionStorage, context.SessionId);
+        var persisting = new PersistingMessageCollection(original, sessionStorage, context.SessionId, ct);
         context.Messages = persisting;
 
         await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
@@ -132,10 +206,12 @@ public class SavePersistenceMiddleware : AgentMiddleware
     {
         private readonly Channel<ChatMessage> _channel = Channel.CreateUnbounded<ChatMessage>();
         private readonly Task _consumerTask;
+        private readonly CancellationToken _ct;
 
-        public PersistingMessageCollection(IList<ChatMessage> list, ISessionStorage storage, string sessionId)
+        public PersistingMessageCollection(IList<ChatMessage> list, ISessionStorage storage, string sessionId, CancellationToken ct)
             : base(list)
         {
+            _ct = ct;
             _consumerTask = Task.Run(async () =>
             {
                 await foreach (var msg in _channel.Reader.ReadAllAsync())
@@ -146,6 +222,10 @@ public class SavePersistenceMiddleware : AgentMiddleware
         protected override void InsertItem(int index, ChatMessage item)
         {
             base.InsertItem(index, item);
+            // 被取消（打断）后追加的消息不再落库：避免旧一轮残余输出与新轮次并发写同一会话，
+            // 产生 tool 结果/消息交错的污染。取消前已追加的消息照常持久化。
+            if (_ct.IsCancellationRequested)
+                return;
             if (item.Role != ChatRole.System)
                 _channel.Writer.TryWrite(item);
         }

@@ -25,6 +25,11 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
     /// </summary>
     private const int MaxToolConcurrency = 5;
 
+    /// <summary>
+    /// 工具执行被打断时回填给 LLM 的结果文本，使模型知道该调用未获得结果。
+    /// </summary>
+    private const string ToolInterruptedMessage = "工具执行已被中断，未获得结果。";
+
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -87,7 +92,12 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                 yield break;
 
             // ── 工具：经 ToolExecutor 执行（handler 内的 AgentLifecycleFilter 自动发 Before/After 事件）──
+            // 预填「中断」桩：保证每个 tool_call_id 都有对应结果。即便工具执行被取消，
+            // 消息历史也保持「assistant(tool_calls) → tool(results)」一致，避免下一轮 API 报 400。
             var localResults = new FunctionResultContent[functionCalls.Count];
+            for (var i = 0; i < functionCalls.Count; i++)
+                localResults[i] = new FunctionResultContent(functionCalls[i].CallId, ToolInterruptedMessage);
+
             using var semaphore = new SemaphoreSlim(MaxToolConcurrency);
             var tasks = functionCalls.Select(async (fc, i) =>
             {
@@ -116,15 +126,35 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                 }
             }).ToArray();
 
-            await Task.WhenAll(tasks);
-
-            foreach (var result in localResults)
+            // 工具执行被取消时，Task.WhenAll 会抛 OperationCanceledException：吞掉并补齐结果，
+            // 让历史保持一致后干净退出本轮。
+            var interrupted = false;
+            try
             {
-                toolResults.Add(result);
-                yield return new ChatResponseUpdate(ChatRole.Tool, [result]);
+                await Task.WhenAll(tasks);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                interrupted = true;
+            }
+            catch (AggregateException ae) when (ct.IsCancellationRequested && ae.Flatten().InnerExceptions.All(e => e is OperationCanceledException))
+            {
+                // 安全网：await Task.WhenAll 通常抛首个解包异常，多任务同时失败时理论上可能聚合为 OCE。
+                interrupted = true;
             }
 
+            // 无条件追加 tool 结果消息（打断路径也补齐，保证历史一致）
+            foreach (var result in localResults)
+                toolResults.Add(result);
             context.Messages.Add(new ChatMessage(ChatRole.Tool, toolResults));
+
+            // 被打断：历史已一致，直接结束本轮。不再 yield 工具更新（已取消，无人监听）、
+            // 不发 AllToolsCompleted、不保存检查点、不回环调 LLM。
+            if (interrupted)
+                yield break;
+
+            foreach (var result in localResults)
+                yield return new ChatResponseUpdate(ChatRole.Tool, [result]);
 
             // ── AllToolsCompleted：本批次所有工具执行完毕后触发 ──
             await bus.PublishAsync(EventBus.HookKey(key), new AllToolsCompletedEvent

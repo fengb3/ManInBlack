@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -117,5 +118,78 @@ public class RetryMiddlewareTests
                 TestHelpers.ThrowOnMoveNext<ChatResponseUpdate>(new InvalidOperationException("bad state")),
                 CancellationToken.None)) { }
         });
+    }
+
+    [Fact]
+    public async Task HandleAsync_HttpRequestException400_ShouldNotRetry()
+    {
+        var middleware = new RetryMiddleware(NullLogger<RetryMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "test" };
+
+        var callCount = 0;
+        ChatResponseUpdateHandler next = () =>
+        {
+            callCount++;
+            return TestHelpers.ThrowOnMoveNext<ChatResponseUpdate>(
+                new HttpRequestException("400 Bad Request", null, HttpStatusCode.BadRequest));
+        };
+
+        // 4xx 是确定性错误，应立即抛出、不重试
+        await Assert.ThrowsAsync<HttpRequestException>(async () =>
+        {
+            await foreach (var _ in middleware.HandleAsync(ctx, next, CancellationToken.None)) { }
+        });
+
+        Assert.Equal(1, callCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HttpRequestException500_ShouldRetry()
+    {
+        var middleware = new RetryMiddleware(NullLogger<RetryMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "test" };
+
+        var callCount = 0;
+        ChatResponseUpdateHandler next = () =>
+        {
+            callCount++;
+            if (callCount == 1)
+            {
+                return TestHelpers.ThrowOnMoveNext<ChatResponseUpdate>(
+                    new HttpRequestException("500", null, HttpStatusCode.InternalServerError));
+            }
+            return TestHelpers.AsyncSeq(
+                new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("ok")]));
+        };
+
+        var results = await middleware.HandleAsync(ctx, next, CancellationToken.None).ToListAsync();
+
+        Assert.Equal(2, callCount);
+        Assert.Contains(results.ExtractTexts(), t => t.Contains("ok"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_HttpRequestException429_ShouldRetry()
+    {
+        var middleware = new RetryMiddleware(NullLogger<RetryMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "test" };
+
+        var callCount = 0;
+        ChatResponseUpdateHandler next = () =>
+        {
+            callCount++;
+            if (callCount == 1)
+            {
+                return TestHelpers.ThrowOnMoveNext<ChatResponseUpdate>(
+                    new HttpRequestException("429", null, HttpStatusCode.TooManyRequests));
+            }
+            return TestHelpers.AsyncSeq(
+                new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("ok")]));
+        };
+
+        var results = await middleware.HandleAsync(ctx, next, CancellationToken.None).ToListAsync();
+
+        Assert.Equal(2, callCount);
+        Assert.Contains(results.ExtractTexts(), t => t.Contains("ok"));
     }
 }
