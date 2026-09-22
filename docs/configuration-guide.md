@@ -225,7 +225,7 @@ public class MyService(IOptionsMonitor<ManInBlackSettings> monitor)
 | `IOptionsMonitor<T>`    | Singleton | 需要响应文件变更                 |
 | `IOptionsSnapshot<T>`   | Scoped    | 请求内一致，请求间刷新（ASP.NET） |
 
-飞书配置同理：`IOptions<FeishuSettings>` 读取 `Feishu` 子节。
+适配器自有配置（如飞书）由适配器自行声明类型并通过 `builder.Services.Configure<T>()` 绑定对应子节，核心库不感知适配器概念（飞书的 `FeishuSettings` 定义在 FeishuAdaptor 项目内）。
 
 ---
 

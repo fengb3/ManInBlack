@@ -2,7 +2,7 @@ namespace ManInBlack.AI.Configuration;
 
 /// <summary>
 /// 把一份完整的 source ManInBlackSettings 按 key 合并进 target，供 UseJson/UseConfiguration 使用。
-/// 字典按 key 覆盖（保留 target 中 source 没有的 key）；Hooks 累加；标量后者覆盖；Feishu 仅在非空时覆盖。
+/// 字典按 key 覆盖（保留 target 中 source 没有的 key）；Hooks 累加；标量后者覆盖。
 /// </summary>
 internal static class SettingsMerger
 {
@@ -33,8 +33,5 @@ internal static class SettingsMerger
         target.UseSandbox = source.UseSandbox;
 
         target.ToolExtraParameter = source.ToolExtraParameter;
-
-        if (source.Feishu is not null)
-            target.Feishu = source.Feishu;
     }
 }

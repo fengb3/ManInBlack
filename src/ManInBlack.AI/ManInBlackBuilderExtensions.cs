@@ -168,14 +168,12 @@ public static class ManInBlackBuilderExtensions
     }
 
     /// <summary>
-    /// 复用已有 IConfiguration（Web 场景）作为配置源。同时绑定 FeishuSettings 供适配器读取。
+    /// 复用已有 IConfiguration（Web 场景）作为配置源。
     /// </summary>
     public static IManInBlackBuilder UseConfiguration(this IManInBlackBuilder builder, IConfiguration configuration)
     {
         var loaded = new ManInBlackSettings();
         configuration.Bind(loaded);
-        // Configure 仅注册 IConfigureOptions，延迟到 IOptions<T> 首次访问才解析，与下方 ApplySource 顺序无关。
-        builder.Services.Configure<FeishuSettings>(configuration.GetSection("Feishu"));
         return ApplySource(builder, loaded);
     }
 

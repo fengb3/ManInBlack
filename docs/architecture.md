@@ -199,7 +199,6 @@ AddManInBlackFromSettings(configure?)
 
 AddManInBlackFromConfiguration(IConfiguration, configure?)
     ├── Configure<ManInBlackSettings>(configuration)
-    ├── Configure<FeishuSettings>(configuration.GetSection("Feishu"))
     ├── IValidateOptions<ManInBlackSettings> 校验 Providers、ModelChoices
     └── 调用 AddManInBlack
 ```

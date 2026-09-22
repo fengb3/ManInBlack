@@ -1,6 +1,5 @@
 using FeishuAdaptor;
 using ManInBlack.AI;
-using ManInBlack.AI.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;

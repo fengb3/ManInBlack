@@ -1,5 +1,4 @@
 using ManInBlack.AI;
-using ManInBlack.AI.Configuration;
 
 namespace FeishuAdaptor;
 

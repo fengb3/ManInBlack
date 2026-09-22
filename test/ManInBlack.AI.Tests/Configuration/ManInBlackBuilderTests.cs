@@ -229,7 +229,7 @@ public class ManInBlackBuilderTests
     }
 
     [Fact]
-    public void UseConfiguration_BindsAndMergesAndBindsFeishu()
+    public void UseConfiguration_BindsAndMerges()
     {
         var dict = new Dictionary<string, string?>
         {
@@ -239,7 +239,6 @@ public class ManInBlackBuilderTests
             ["ModelChoices:default:ModelId"] = "gpt-4o",
             ["Agents:console-agent:Instruction"] = "cfg agent",
             ["Agents:console-agent:PipelineName"] = "default",
-            ["Feishu:AppId"] = "cli_xxx",
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
 
@@ -251,9 +250,6 @@ public class ManInBlackBuilderTests
 
         Assert.Equal("from-cfg", settings.Providers["default"].ApiKey);
         Assert.Equal("cfg agent", settings.Agents["console-agent"].Instruction);
-        // Feishu 单独绑定
-        var feishu = services.BuildServiceProvider().GetRequiredService<IOptions<FeishuSettings>>().Value;
-        Assert.Equal("cli_xxx", feishu.AppId);
         // 每个 agent 即时注册 AgentDefinition 单例
         Assert.Single(services.BuildServiceProvider().GetServices<AgentDefinition>(), d => d.Name == "console-agent");
     }
