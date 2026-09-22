@@ -14,6 +14,21 @@
 - 生成工具声明（`ToolFunctionDeclaration`）并注册为 `IToolDeclaration`
 - 生成 `ToolExecutor`（字典查找分发）和 `AddToolHandlers()` DI 扩展方法
 
+## 跨程序集自动注册（ModuleInitializer）
+
+三个生成器（工具/命令/服务注册）在有注册项的程序集中额外生成一个模块初始化器类
+（`ManInBlackToolModuleRegistration` / `ManInBlackCommandModuleRegistration` / `ManInBlackServiceModuleRegistration`），
+以 `[ModuleInitializer]` 修饰的 `Register()` 方法在程序集被加载时自动把本程序集的注册委托
+登记到 `ManInBlack.AI.Abstraction.ManInBlackAssemblyRegistrations` 全局注册表；
+`AddManInBlack()` 调用 `ApplyTo(services)` 统一应用全部委托。
+
+由此实现"标记即注册、自动组合跨程序集的工具/命令/服务"——消费者（含 NuGet 包引用方）
+无需手动调用任何生成的 internal 扩展方法。
+
+注意：模块初始化器在程序集**首次加载**时运行。工具定义在独立类库、且宿主在
+`AddManInBlack()` 之前从未触碰该库任何类型时，该库尚未加载、注册不会发生；
+此时需手动调用该库程序集内生成的 internal 扩展（如 `services.AddToolHandlers()`）或先引用任一类型。
+
 All emitters use **Fengb3.EasyCodeBuilder** (`Code.Create().Using(...).Namespace(ns => ...)` /
 `Code.Build(option, new CodeBuilder())`).
 

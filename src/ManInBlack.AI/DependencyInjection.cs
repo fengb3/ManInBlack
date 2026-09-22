@@ -105,7 +105,9 @@ public static class DependencyInjection
 
             services.AddScoped<FileAccessPolicyResolver>();
 
-            services.AddAutoRegisteredServices();
+            // 应用所有已加载程序集经模块初始化器登记的源生成注册
+            //（本库与消费者程序集的 [AiTool]/[SlashCommand]/[ServiceRegister]，实现跨程序集自动组合）
+            ManInBlackAssemblyRegistrations.ApplyTo(services);
 
             // 沙盒:UseSandbox 在 IOptions resolve 时才确定,故做成 resolve 期工厂
             services.AddScoped<IShellExecutor>(sp =>
@@ -118,8 +120,6 @@ public static class DependencyInjection
                 }
                 return new ProcessShellExecutor();
             });
-            services.AddToolHandlers();
-            services.AddSlashCommands();
 
             // MCP：单例 client 池（HostedService 启动时连接 server + 注册工具声明）+ 工具执行 provider
             services.AddSingleton<McpClientHostedService>();

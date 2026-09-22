@@ -10,7 +10,10 @@ public class ToolRegistry
 
     public ToolRegistry(IEnumerable<IToolDeclaration> declarations)
     {
-        _declarations = new(declarations.ToDictionary(d => d.ToolName));
+        // 同名工具首个注册者胜出：容忍"手动 AddToolHandlers + AddManInBlack 自动应用"等重复注册场景
+        _declarations = new(declarations
+            .GroupBy(d => d.ToolName)
+            .ToDictionary(g => g.Key, g => g.First()));
     }
 
     public IReadOnlyList<AIFunctionDeclaration> GetAll()

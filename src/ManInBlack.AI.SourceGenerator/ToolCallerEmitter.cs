@@ -36,9 +36,29 @@ public static class ToolCallerEmitter
 
                 // 生成 AddToolHandlers() DI 注册扩展方法
                 BuildServiceCollectionExtensions(ns, tools);
+
+                // 模块初始化器：程序集加载时登记本程序集的工具注册，供 AddManInBlack 统一应用
+                BuildModuleInitializerClass(ns);
             });
 
         return option.Build();
+    }
+
+    private static void BuildModuleInitializerClass(NamespaceOption ns)
+    {
+        ns.Internal.Static.Class(cls =>
+        {
+            cls.WithName("ManInBlackToolModuleRegistration");
+
+            cls.Internal.Method(m =>
+            {
+                m.WithName("Register")
+                 .WithReturnType("void")
+                 .WithKeyword("static");
+                m.WithAttributes(["System.Runtime.CompilerServices.ModuleInitializer"]);
+                m.AppendLine("ManInBlack.AI.Abstraction.ManInBlackAssemblyRegistrations.Register(static services => services.AddToolHandlers());");
+            });
+        });
     }
 
     private static void BuildHandlerClass(NamespaceOption ns, ToolMethodModel tool)

@@ -18,10 +18,29 @@ public static class ServiceRegistrationEmitter
             {
                 ns.Name = rootNamespace;
                 ns.Internal.Static.Class(cls => BuildServiceRegistrationClass(cls, models));
+                ns.Internal.Static.Class(cls => BuildModuleInitializerClass(cls));
             });
 
         var body = option.Build();
         return body;
+    }
+
+    /// <summary>
+    /// 生成模块初始化器：程序集加载时把本程序集的注册委托登记到全局注册表，
+    /// 供 AddManInBlack 统一应用（跨程序集自动组合）。
+    /// </summary>
+    private static void BuildModuleInitializerClass(TypeOption cls)
+    {
+        cls.WithName("ManInBlackServiceModuleRegistration");
+
+        cls.Internal.Method(m =>
+        {
+            m.WithName("Register")
+             .WithReturnType("void")
+             .WithKeyword("static");
+            m.WithAttributes(["System.Runtime.CompilerServices.ModuleInitializer"]);
+            m.AppendLine("ManInBlack.AI.Abstraction.ManInBlackAssemblyRegistrations.Register(static services => services.AddAutoRegisteredServices());");
+        });
     }
 
     private static void BuildServiceRegistrationClass(TypeOption cls, List<ServiceRegistrationModel> models)

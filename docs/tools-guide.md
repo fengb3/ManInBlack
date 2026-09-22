@@ -14,6 +14,15 @@
 
 源生成器为每个 `[AiTool]` 方法生成独立的 `IToolHandler` 实现和 `IToolDeclaration` 注册，通过 DI 自动组合跨项目的工具。
 
+### 跨程序集自动注册
+
+每个含 `[AiTool]` 的程序集经源生成器的模块初始化器（ModuleInitializer）在加载时把注册委托登记进
+`ManInBlack.AI.Abstraction.ManInBlackAssemblyRegistrations`，`AddManInBlack()` 统一应用——
+应用项目里定义的工具无需任何手动注册；工具类库被宿主加载后同样自动并入。
+
+若工具定义在独立类库、宿主在 `AddManInBlack()` 前从未加载该库（未引用其任何类型），
+需手动调用该库程序集内生成的 internal 扩展 `services.AddToolHandlers()`，或先引用库中任一类型。
+
 ## 工具类概览
 
 所有工具类标记 `[ServiceRegister.Scoped]`，方法标记 `[AiTool]`，由源生成器自动生成 handler 和声明注册代码。
