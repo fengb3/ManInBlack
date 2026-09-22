@@ -7,6 +7,16 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <NoWarn>RS2008</NoWarn>
+    <!-- NuGet 打包：analyzer/development dependency 包（元数据继承自根 Directory.Build.props） -->
+    <PackageId>ManInBlack.AI.SourceGenerator</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>ManInBlack 的源生成器：[AiTool] 工具派发、[SlashCommand] 命令与 [ServiceRegister] 服务注册代码生成。随 ManInBlack.AI 主包自动携带，一般无需单独安装。</Description>
+    <PackageTags>ai;agent;source-generator;analyzer</PackageTags>
+    <!-- 不产出 lib/，编译产物放入 analyzers/ 目录 -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeSymbols>false</IncludeSymbols>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- this one ensuer u have referenced packages when u build 👇 -->
     <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
   </PropertyGroup>
@@ -14,6 +24,12 @@
   <ItemGroup>
     <PackageReference Include="Fengb3.EasyCodeBuilder" Version="0.1.6" GeneratePathProperty="true" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- 生成器 dll 及其运行时依赖 EasyCodeBuilder 打入 analyzers 目录；Roslyn 编译器程序集由宿主提供，无需打包 -->
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/netstandard2.0/" Visible="false" />
+    <None Include="$(PkgFengb3_EasyCodeBuilder)/lib/netstandard2.0/EasyCodeBuilder.dll" Pack="true" PackagePath="analyzers/netstandard2.0/" Visible="false" />
   </ItemGroup>
 
   <!-- add this Target to pack references in to your project 👇  -->

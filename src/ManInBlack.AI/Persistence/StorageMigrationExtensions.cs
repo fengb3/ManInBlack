@@ -10,7 +10,7 @@ public static class StorageMigrationExtensions
     ///
     /// 旧 Users.SessionIdsJson blob → Sessions 行的数据搬迁已内置于 <c>NormalizeSessionsFinalize</c>
     /// migration 的 <c>Up</c>（migrationBuilder.Sql + json_each，在加 FK / 删 blob 列之前执行），
-    /// 故 <see cref="DatabaseFacade.MigrateAsync"/> 即可完整升级；<c>dotnet ef database update</c> 同样可用，
+    /// 故 <c>db.Database.MigrateAsync()</c> 即可完整升级；<c>dotnet ef database update</c> 同样可用，
     /// 无需分阶段启动逻辑。
     /// </summary>
     public static async Task MigrateManInBlackStorageAsync(this IServiceProvider sp, CancellationToken ct = default)

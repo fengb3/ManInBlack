@@ -35,7 +35,7 @@ public class HookExecutor(
     /// <summary>懒加载缓存，每个 Scope 只加载一次</summary>
     private List<(HookSettings Hook, bool IsGlobal)>? _cachedHooks;
 
-    /// <inheritdoc />
+    /// <summary>
     /// 执行指定挂载点的所有已启用钩子（全局先于用户），返回合并后的结果。
     /// 第一个返回 IsBlocked=true 的钩子会短路，不再执行后续钩子。
     /// 多个钩子的 InjectedText 会被拼接为单个字符串。

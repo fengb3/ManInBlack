@@ -1,0 +1,23 @@
+<Project>
+
+    <!-- 仓库级共享打包元数据。各库项目仅需声明 PackageId/Description/IsPackable。 -->
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <Authors>fengb3</Authors>
+        <Company>fengb3</Company>
+        <Copyright>Copyright © fengb3</Copyright>
+        <RepositoryUrl>https://github.com/fengb3/ManInBlack</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/fengb3/ManInBlack</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <!-- 默认不可打包；在 4 个库项目内显式置 true -->
+        <IsPackable>false</IsPackable>
+        <!-- CI 构建时锁定源链接路径（git commit hash），本地构建不受影响 -->
+        <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+</Project>

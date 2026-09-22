@@ -4,12 +4,20 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!-- NuGet 打包（元数据继承自根 Directory.Build.props） -->
+        <PackageId>ManInBlack.AI</PackageId>
+        <IsPackable>true</IsPackable>
+        <Description>.NET AI Agent 框架：经 Microsoft.Extensions.AI (IChatClient) 统一 OpenAI/Anthropic/Gemini 三种协议，洋葱模型中间件管道 + 源生成器工具派发 + MCP + SQLite 持久化，Linux 下可用 bubblewrap 沙盒执行命令。内置 [AiTool] 源生成器，装包即用。</Description>
+        <PackageTags>ai;agent;llm;mcp;microsoft-extensions-ai;chatclient</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\ManInBlack.AI.Abstraction\ManInBlack.AI.Abstraction.csproj" />
         <ProjectReference Include="..\..\bwarp\Bwarp\Bwarp.csproj" />
-        <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
     <ItemGroup>
@@ -26,14 +34,22 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <!-- 仅为取 $(PkgFengb3_EasyCodeBuilder) 路径以打包生成器依赖；不参与编译、不进 nuspec 依赖 -->
+        <PackageReference Include="Fengb3.EasyCodeBuilder" Version="0.1.6" GeneratePathProperty="true" PrivateAssets="all" ExcludeAssets="all" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="ManInBlack.AI.Tests" />
     </ItemGroup>
 
+    <!-- 包内嵌 [AiTool] 源生成器（单包分发）：analyzers 目录同时携带生成器 dll 与其运行时依赖 EasyCodeBuilder -->
     <ItemGroup>
-        <Content Include="DefaultSkills\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="DefaultSkills\" />
+        <None Include="..\ManInBlack.AI.SourceGenerator\bin\$(Configuration)\netstandard2.0\ManInBlack.AI.SourceGenerator.dll"
+              Pack="true" PackagePath="analyzers/netstandard2.0/" Visible="false" />
+        <None Include="$(PkgFengb3_EasyCodeBuilder)/lib/netstandard2.0/EasyCodeBuilder.dll"
+              Pack="true" PackagePath="analyzers/netstandard2.0/" Visible="false" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
     </ItemGroup>
 
 </Project>

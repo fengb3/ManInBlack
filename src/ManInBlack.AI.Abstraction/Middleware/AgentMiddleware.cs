@@ -4,7 +4,8 @@ namespace ManInBlack.AI.Abstraction.Middleware;
 
 
 /// <summary>
-/// equal to <see cref="Func&lt;IAsyncEnumerable&lt;ChatResponseUpdate&gt;&gt;"/>, represents the next middleware in the pipeline that returns an async stream of chat response updates
+/// 表示管道中的下一个中间件，返回聊天响应更新的异步流。
+/// 等价于 Func&lt;IAsyncEnumerable&lt;ChatResponseUpdate&gt;&gt;，定义为具名委托以便在 XML 文档中引用。
 /// </summary>
 public delegate IAsyncEnumerable<ChatResponseUpdate> ChatResponseUpdateHandler();
 

@@ -18,9 +18,10 @@ dotnet run --project demo/AppHost                              # Aspire:同时�
 cd demo/Dashboard/client && npm run dev                        # Dashboard 前端（:5173）
 dotnet publish demo/Dashboard -c Release                       # 发布（含前端构建）
 dotnet test test/Dashboard.Tests                               # Dashboard 测试
+dotnet pack ManInBlack.slnx -c Release -o artifacts/packages   # 打 NuGet 包（4 个库项目）
 ```
 
-未配置 linter、formatter 或 CI 管道。无 `global.json`、`Directory.Build.props` 或 `.editorconfig`。
+未配置 linter、formatter 或 CI 管道。无 `global.json` 或 `.editorconfig`。仓库根有 `Directory.Build.props`（NuGet 包元数据与版本，默认 `IsPackable=false`，详见 [NuGet 打包指南](docs/nuget-packaging.md)）。
 
 ## 关键陷阱
 
@@ -55,5 +56,6 @@ dotnet test test/Dashboard.Tests                               # Dashboard 测�
 - [飞书适配器指南](docs/feishu-guide.md)
 - [快速开始](docs/quick-start.md)
 - [存储指南](docs/storage-guide.md)
+- [NuGet 打包指南](docs/nuget-packaging.md)
 - [Dashboard 指南](docs/dashboard-guide.md)
 - [Aspire 编排指南](docs/aspire-guide.md)

@@ -20,14 +20,20 @@ cd MyAgent
 
 ---
 
-## 第二步：添加项目引用
+## 第二步：安装 NuGet 包
+
+```bash
+dotnet add package ManInBlack.AI
+```
+
+`[AiTool]` 源生成器已内嵌在包内，无需单独安装。
+
+也可以直接引用本仓库项目（开发模式）：
 
 ```bash
 dotnet add reference <path>/src/ManInBlack.AI/ManInBlack.AI.csproj
 dotnet add reference <path>/src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj
 ```
-
-> 项目当前为本地引用模式。NuGet 包模式待后续发布。
 
 ---
 
