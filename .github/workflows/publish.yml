@@ -1,0 +1,61 @@
+# 通过 NuGet Trusted Publishing（OIDC，无长期 API Key）发布 4 个库包。
+# 触发方式：推送 v* 标签（如 v0.0.1），或手动 dispatch。
+# 前置条件（一次性，nuget.org 网页操作）：
+#   1. nuget.org → 用户名 → Trusted Publishing → 新建策略：
+#      Repository Owner = fengb3，Repository = ManInBlack，Workflow File = publish.yml
+#   2. 仓库 Settings → Secrets and variables → Actions → Variables 新建 NUGET_USER（nuget.org 个人资料用户名）
+
+name: publish-nuget
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # 允许 GitHub 签发 OIDC 令牌，换取 nuget.org 临时 API Key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # 校验标签与 Directory.Build.props 中的 <Version> 一致，防止发错版本
+      - name: 校验标签与包版本一致
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "标签 v$TAG 与 Directory.Build.props 中的版本 $VERSION 不一致"
+            exit 1
+          fi
+          echo "发布版本：$VERSION"
+
+      # 逐项目打包（dotnet pack 一次只接受一个项目；不整解打包，避免依赖未入库的 WIP 项目）
+      - name: 打包
+        run: |
+          dotnet pack src/ManInBlack.AI -c Release -o artifacts/packages
+          dotnet pack src/ManInBlack.AI.Abstraction -c Release -o artifacts/packages
+          dotnet pack src/ManInBlack.AI.SourceGenerator -c Release -o artifacts/packages
+          dotnet pack bwarp/Bwarp -c Release -o artifacts/packages
+
+      # OIDC 令牌 → nuget.org 临时 API Key（有效期 1 小时，仅本次发布可用）
+      - name: NuGet 登录（OIDC）
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: 推送 nupkg
+        run: dotnet nuget push artifacts/packages/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: 推送符号包 snupkg
+        run: dotnet nuget push artifacts/packages/*.snupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

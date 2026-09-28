@@ -56,12 +56,29 @@ dotnet pack src/ManInBlack.AI -c Release -o artifacts/packages
 
 ## 发布
 
+推荐 **Trusted Publishing**（OIDC 无密钥）：GitHub Actions 用短期 OIDC 令牌向 nuget.org 换临时 API Key（1 小时有效），无需创建或轮换长期 API Key。详见 [nuget.org Trusted Publishing 文档](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)。
+
+一次性配置：
+
+1. nuget.org → 右上角用户名 → **Trusted Publishing** → 新建策略：`Repository Owner = fengb3`、`Repository = ManInBlack`、`Workflow File = publish.yml`（即 `.github/workflows/publish.yml`，只填文件名）。
+2. 仓库 Settings → Secrets and variables → Actions → **Variables** 新建 `NUGET_USER`（nuget.org 个人资料用户名，非邮箱）。
+3. 注意：私有仓库的首次策略仅有 7 天临时有效期，7 天内完成一次成功发布即转为永久。
+
+发布流程（打标签即发布，工作流会先校验标签与 `Directory.Build.props` 的 `<Version>` 一致）：
+
 ```bash
-dotnet nuget push artifacts/packages/ManInBlack.AI.0.1.0.nupkg \
+# Version 改为 0.0.2 并提交后：
+git tag v0.0.2 && git push origin v0.0.2
+```
+
+命令行手动发布（不经 CI）仍可使用长期 API Key，nuget.org 目前继续支持：
+
+```bash
+dotnet nuget push artifacts/packages/ManInBlack.AI.0.0.1.nupkg \
     --api-key <API_KEY> --source https://api.nuget.org/v3/index.json
 ```
 
-snupkg 用同一条命令随 nupkg 一起推送（NuGet.org 会同时接收）。若使用 GitHub Packages 等私有源，把 `--source` 换成对应 endpoint 并配置 credential provider 或 `nuget.config`。
+snupkg 推送到同一 endpoint（NuGet.org 会同时接收）。若使用 GitHub Packages 等私有源，把 `--source` 换成对应 endpoint 并配置 credential provider 或 `nuget.config`。
 
 ## 本地消费（不发布）
 
