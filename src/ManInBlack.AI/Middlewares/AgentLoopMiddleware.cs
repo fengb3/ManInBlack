@@ -91,7 +91,7 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
             if (functionCalls.Count == 0)
                 yield break;
 
-            // ── 工具：经 ToolExecutor 执行（handler 内的 AgentLifecycleFilter 自动发 Before/After 事件）──
+            // ── 工具：经 ToolExecutor 执行（ToolExecutor 统一包裹 AgentLifecycleFilter，自动发 Before/After 事件）──
             // 预填「中断」桩：保证每个 tool_call_id 都有对应结果。即便工具执行被取消，
             // 消息历史也保持「assistant(tool_calls) → tool(results)」一致，避免下一轮 API 报 400。
             var localResults = new FunctionResultContent[functionCalls.Count];

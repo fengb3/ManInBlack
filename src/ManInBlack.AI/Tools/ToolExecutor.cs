@@ -8,8 +8,9 @@ namespace ManInBlack.AI.Tools;
 
 /// <summary>
 /// 工具执行器：按 ToolName 派发。先查静态 handler 字典（源生成器生成的 [AiTool] handler），
-/// 未命中时 fallback 到 <see cref="IMcpToolProvider"/>（MCP 工具）。MCP 执行路径内联包
-/// <see cref="AgentLifecycleFilter"/>，复用本地工具的事件链（飞书卡片、audit hook、阻断）。
+/// 未命中时 fallback 到 <see cref="IMcpToolProvider"/>（MCP 工具）。
+/// 两条路径都包裹同一 filter 链（LoggingFilter → AgentLifecycleFilter，从请求 scope 取），
+/// 保证本地工具与 MCP 工具在日志/事件（Before/AfterToolExecuteEvent）/阻断上行为一致。
 /// </summary>
 public sealed class ToolExecutor : IToolExecutor
 {
@@ -29,18 +30,23 @@ public sealed class ToolExecutor : IToolExecutor
     {
         try
         {
+            Func<ToolExecuteContext, Task> core;
             if (_handlers.TryGetValue(ctx.ToolName, out var handler))
             {
-                await handler.ExecuteAsync(ctx, ct);
+                var h = handler;
+                core = async c => await h.ExecuteAsync(c, ct);
             }
             else if (_mcpProvider is not null && _mcpProvider.IsMcpTool(ctx.ToolName))
             {
-                await ExecuteMcpAsync(ctx, ct);
+                var mcp = _mcpProvider;
+                core = async c => { c.Result = await mcp.ExecuteAsync(c.ToolName, c.Arguments, ct); };
             }
             else
             {
                 throw new ArgumentException($"Unknown tool: '{ctx.ToolName}'.");
             }
+
+            await BuildFilterPipeline(ctx, core)(ctx);
         }
         catch (Exception ex)
         {
@@ -49,22 +55,16 @@ public sealed class ToolExecutor : IToolExecutor
     }
 
     /// <summary>
-    /// MCP 工具执行：内联包本地工具同款 filter 链（LoggingFilter → AgentLifecycleFilter，从请求 scope 取），
-    /// 保证 MCP 工具与本地工具在日志/事件/阻断上行为一致。最内层调用 <see cref="IMcpToolProvider.ExecuteAsync"/>。
+    /// 组装 filter 链（外 → 内）：LoggingFilter → AgentLifecycleFilter → core。
+    /// 每步用局部变量捕获当前 pipeline 快照，避免闭包捕获被重新赋值的变量导致无限递归。
     /// </summary>
-    private async Task ExecuteMcpAsync(ToolExecuteContext ctx, CancellationToken ct)
+    private Func<ToolExecuteContext, Task> BuildFilterPipeline(
+        ToolExecuteContext ctx, Func<ToolExecuteContext, Task> core)
     {
         var sp = ctx.ServiceProvider;
         var logging = sp.GetService<LoggingFilter>();
         var lifecycle = sp.GetService<AgentLifecycleFilter>();
 
-        Func<ToolExecuteContext, Task> core = async c =>
-        {
-            c.Result = await _mcpProvider!.ExecuteAsync(ctx.ToolName, c.Arguments, ct);
-        };
-
-        // 按本地工具 filter 链顺序包裹（外 → 内）：LoggingFilter → AgentLifecycleFilter → core
-        // 注意：每步用局部变量捕获当前 pipeline 快照，避免闭包捕获被重新赋值的变量导致无限递归
         Func<ToolExecuteContext, Task> pipeline = core;
         if (lifecycle is not null)
         {
@@ -76,7 +76,6 @@ public sealed class ToolExecutor : IToolExecutor
             var inner = pipeline;
             pipeline = c => logging.ExecuteAsync(c, inner);
         }
-
-        await pipeline(ctx);
+        return pipeline;
     }
 }

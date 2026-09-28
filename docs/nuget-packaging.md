@@ -74,7 +74,7 @@ git tag v0.0.2 && git push origin v0.0.2
 命令行手动发布（不经 CI）仍可使用长期 API Key，nuget.org 目前继续支持：
 
 ```bash
-dotnet nuget push artifacts/packages/ManInBlack.AI.0.0.1.nupkg \
+dotnet nuget push artifacts/packages/ManInBlack.AI.0.0.2.nupkg \
     --api-key <API_KEY> --source https://api.nuget.org/v3/index.json
 ```
 
