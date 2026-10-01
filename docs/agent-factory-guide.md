@@ -21,19 +21,20 @@
 | `Name`             | `string`   | 必填       | 唯一标识，`RunAsync` 按此查找            |
 | `Description`      | `string`   | `""`       | Agent 描述                               |
 | `Instruction`      | `string`   | `""`       | 系统提示词，赋值给 `AgentContext.SystemPrompt` |
-| `PipelineName`     | `string`   | `"default"` | 管道名称，决定使用哪套中间件组合         |
+| `PipelineName`     | `string`   | `"default"` | 管道名称，决定使用哪套中间件组合。仍兼容 JSON 配置 |
+| `PipelineType`     | `Type?`    | `null`     | 类型化管道引用（可选）。设置后 `RunAsync` 按类型解析名称，优先级高于 `PipelineName` |
 | `ParentAgentName`  | `string?`  | `null`     | 父 Agent 名称（可选，用于多 Agent 编排） |
 | `SubAgents`        | `List<string>` | `[]`   | 可委托的子 Agent 名称列表 |
 | `ModelChoiceName`  | `string?`  | `null`     | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice |
 
 ### 管道注册 — 命名管道配置委托
 
-每个管道对应一个 `Func<AgentPipelineBuilder, AgentPipelineBuilder>` 委托。Factory 内置两个预设：
+每个管道对应一个 `Func<AgentPipelineBuilder, AgentPipelineBuilder>` 委托。Factory 内置两个类型化预设：
 
-- `"simple"` — `builder.UseSimple()`，最小管道。库消费者推荐从该管道起步，按需叠加能力。
-- `"default"` — `builder.UseDefault()`，产品形态管道（含 profile、skill、持久化、压缩等），会引入较多环境耦合。
+- `SimplePipeline` — 字符串名 `"simple"`，`builder.UseSimple()`，最小管道。库消费者推荐从该管道起步，按需叠加能力。
+- `DefaultPipeline` — 字符串名 `"default"`，`builder.UseDefault()`，产品形态管道（含 profile、skill、持久化、压缩等），会引入较多环境耦合。
 
-自定义管道推荐通过 `.AddPipeline()` 在 DI 期注册，也可通过 `factory.RegisterPipeline()` 运行时动态注册（见[注册自定义管道](#注册自定义管道)）。
+自定义管道推荐实现 `IAgentPipeline` 后用 `.AddPipeline<TPipeline>()` 在 DI 期注册，也可继续使用字符串 `.AddPipeline()` 或 `factory.RegisterPipeline()` 运行时动态注册（见[注册自定义管道](#注册自定义管道)）。
 
 ### 执行追踪 — 同用户并发管理
 
@@ -86,7 +87,17 @@ services.AddManInBlack()
     .UseJson()
     .AddAgent("my-agent", a => a
         .Instruction("你是一个AI助手，可以用工具帮助用户完成任务。请用中文回复。")
-        .Pipeline("simple")); // 从最小管道起步
+        .Pipeline<SimplePipeline>()); // 从最小管道起步，类型化引用避免魔法字符串
+```
+
+也可以继续使用字符串 `Pipeline()` 或 `PipelineName`，与 JSON 配置完全兼容：
+
+```csharp
+services.AddManInBlack()
+    .UseJson()
+    .AddAgent("my-agent", a => a
+        .Instruction("你是一个AI助手...")
+        .Pipeline("simple"));
 ```
 
 也可以继续使用独立的 `AddAgentDefinition()` 方法：
@@ -98,8 +109,7 @@ services.AddAgentDefinition(new AgentDefinition
 {
     Name = "my-agent",
     Instruction = "你是一个AI助手，可以用工具帮助用户完成任务。请用中文回复。",
-    PipelineName = "simple"
-});
+}.SetPipeline<SimplePipeline>());
 ```
 
 `AddAgentDefinition()` 将 `AgentDefinition` 注册为 **Singleton**。`AgentFactory` 构造时自动从 DI 中收集所有 `IEnumerable<AgentDefinition>` 并注册到内部字典。
@@ -110,21 +120,54 @@ services.AddAgentDefinition(new AgentDefinition
 
 ## 注册自定义管道
 
-### 方式一：DI 期注册（推荐）
+### 方式一：类型化 DI 期注册（推荐）
 
-在 DI 配置阶段通过 `.AddPipeline()` 注册，管道定义随 DI 容器一起构建，`AgentFactory` 构造时自动收集：
+实现 `IAgentPipeline` 接口，把管道配置逻辑收进类型，再通过泛型 `.AddPipeline<TPipeline>()` 注册。名称默认按 `类型名` 解析，可用 `[PipelineName("name")]` 特性或 `public static string Name { get; }` 覆盖：
+
+```csharp
+using ManInBlack.AI;
+using ManInBlack.AI.Middlewares;
+
+[PipelineName("my-pipeline")]
+public sealed class MyPipeline : IAgentPipeline
+{
+    public static AgentPipelineBuilder Configure(AgentPipelineBuilder builder) =>
+        builder
+            .Use<MyCustomMiddleware>()   // 只加需要的中间件
+            .UseSimple();
+}
+
+services.AddManInBlack()
+    .UseJson()
+    .AddPipeline<MyPipeline>();
+```
+
+对应的 Agent 定义可用类型化引用，避免魔法字符串：
+
+```csharp
+services.AddManInBlack()
+    .UseJson()
+    .AddAgent("my-agent", a => a
+        .Instruction("你是一个AI助手")
+        .Pipeline<MyPipeline>())
+    .AddPipeline<MyPipeline>();
+```
+
+> **注意：** `.AddPipeline<TPipeline>()` 底层仍写入字符串注册表，因此 `settings.json` 的 `PipelineName: "my-pipeline"` 完全兼容。同名注册后者覆盖前者。
+
+### 方式二：字符串 DI 期注册（兼容旧写法）
+
+仍可继续使用字符串名称注册：
 
 ```csharp
 services.AddManInBlack()
     .UseJson()
     .AddPipeline("my-pipeline", pipeline => pipeline
-        .Use<MyCustomMiddleware>()   // 只加需要的中间件
+        .Use<MyCustomMiddleware>()
         .UseSimple());
 ```
 
-> **注意：** `.AddPipeline()` 是覆盖式注册。如果名称与内置管道（`"default"`、`"simple"`）相同，新委托会替换旧的。
-
-### 方式二：运行时动态注册（逃生口）
+### 方式三：运行时动态注册（逃生口）
 
 如果在 DI 容器构建之后才需要确定管道配置，可以使用 `AgentFactory.RegisterPipeline()`。典型场景：Web 应用在 `Build()` 之后根据运行时条件注册管道。
 
@@ -140,7 +183,7 @@ factory.RegisterPipeline("my-pipeline", pipeline => pipeline
 // 对应的 Agent 定义需要指定 PipelineName = "my-pipeline"
 ```
 
-> **注意：** `RegisterPipeline` 是覆盖式注册，语义与 `.AddPipeline()` 相同。推荐优先使用 `.AddPipeline()`，仅在确实需要运行时动态注册时才用此逃生口。
+> **注意：** `RegisterPipeline` 是覆盖式注册，语义与 `.AddPipeline()` 相同。推荐优先使用 `.AddPipeline<TPipeline>()`，仅在确实需要运行时动态注册时才用此逃生口。
 
 ---
 
@@ -531,23 +574,21 @@ AgentDefinition 的 `SubAgents` 属性声明了该 Agent 可以委托的子 Agen
 或通过代码注册：
 
 ```csharp
-// 子 Agent 使用不包含 DelegationMiddleware 的 pipeline（如 "simple"），防止递归委托
+// 子 Agent 使用不包含 DelegationMiddleware 的 pipeline（如 SimplePipeline），防止递归委托
 services.AddAgentDefinition(new AgentDefinition
 {
     Name = "researcher",
     Description = "擅长搜索和分析信息",
     Instruction = "你是一个研究助手...",
-    PipelineName = "simple"
-});
+}.SetPipeline<SimplePipeline>());
 
-// 父 Agent 使用 "default" pipeline（包含 DelegationMiddleware）
+// 父 Agent 使用 DefaultPipeline（包含 DelegationMiddleware）
 services.AddAgentDefinition(new AgentDefinition
 {
     Name = "orchestrator",
     Instruction = "你是一个协调者...",
-    PipelineName = "default",
     SubAgents = ["researcher"]
-});
+}.SetPipeline<DefaultPipeline>());
 ```
 
 ### 委托流程

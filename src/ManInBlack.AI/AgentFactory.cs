@@ -5,6 +5,7 @@ using ManInBlack.AI.Abstraction.Middleware;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Pipelines;
 using ManInBlack.AI.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,9 +54,9 @@ public class AgentFactory
         foreach (var def in definitions)
             RegisterDefinition(def);
 
-        // 内置管道预设
-        _pipelineResolvers["default"] = builder => builder.UseDefault();
-        _pipelineResolvers["simple"] = builder => builder.UseSimple();
+        // 内置管道预设（使用类型化定义，保持字符串名与类型名一致）
+        _pipelineResolvers[PipelineNameResolver.Resolve<DefaultPipeline>()] = AgentPipelineResolver.For<DefaultPipeline>();
+        _pipelineResolvers[PipelineNameResolver.Resolve<SimplePipeline>()] = AgentPipelineResolver.For<SimplePipeline>();
 
         // 收集 builder 期（.AddPipeline）注册的 pipeline，覆盖同名内置
         foreach (var reg in pipelines)
@@ -197,7 +198,10 @@ public class AgentFactory
             _agentToRootUser[agentContext.AgentId] = rootUserId;
 
             // 9. 获取管道委托，构建管道
-            var pipelineName = definition.PipelineName;
+            // 若 AgentDefinition 指定了类型化管道，按类型解析字符串名；否则回退到 PipelineName。
+            var pipelineName = definition.PipelineType is not null
+                ? PipelineNameResolver.Resolve(definition.PipelineType)
+                : definition.PipelineName;
             if (!_pipelineResolvers.TryGetValue(pipelineName, out var pipelineConfigure))
                 throw new KeyNotFoundException($"未找到管道配置：{pipelineName}");
 

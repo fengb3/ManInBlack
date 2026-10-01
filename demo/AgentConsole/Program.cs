@@ -12,10 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 var services = new ServiceCollection();
 services.AddManInBlack()
     .UseJson()
-    .AddPipeline("sub-agent", builder => builder
-        .Use<EventPublishingMiddleware>()
-        .Use<ToolsMiddleware>()
-        .UseSimple());
+    .AddPipeline<SubAgentPipeline>();
 
 // 启用 SQLite 持久化（覆盖默认内存存储）
 services.AddManInBlackSqlitePersistence();
@@ -135,4 +132,17 @@ var usage = capturedContext?.AccumulatedUsage;
 if (usage is not null && (usage.InputTokenCount is not null || usage.OutputTokenCount is not null))
 {
     Console.WriteLine($"Token 用量 — 输入: {usage.InputTokenCount}, 输出: {usage.OutputTokenCount}, 总计: {usage.TotalTokenCount}, 缓存: {usage.CachedInputTokenCount}");
+}
+
+
+/// <summary>
+/// 示例：类型化自定义管道。等价于原 .AddPipeline("sub-agent", ...) 的字符串注册。
+/// </summary>
+public sealed class SubAgentPipeline : IAgentPipeline
+{
+    public static AgentPipelineBuilder Configure(AgentPipelineBuilder builder) =>
+        builder
+            .Use<EventPublishingMiddleware>()
+            .Use<ToolsMiddleware>()
+            .UseSimple();
 }

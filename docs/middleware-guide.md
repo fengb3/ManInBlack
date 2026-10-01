@@ -326,6 +326,34 @@ builder
 ```csharp
 builder.Use(new MyStatelessMiddleware());
 ```
+
+### 类型化管道（推荐）
+
+除字符串名称注册外，还可实现 `IAgentPipeline` 接口，把管道配置逻辑收进类型，获得编译期检查与重构改名 IDE 护航：
+
+```csharp
+using ManInBlack.AI;
+using ManInBlack.AI.Middlewares;
+
+[PipelineName("my-pipeline")]  // 可选：显式指定字符串名；省略时依次回退到 static Name 属性、类型名
+public sealed class MyPipeline : IAgentPipeline
+{
+    public static AgentPipelineBuilder Configure(AgentPipelineBuilder builder) =>
+        builder
+            .Use<MyCustomMiddleware>()
+            .UseSimple();
+}
+```
+
+注册时使用泛型 `AddPipeline<TPipeline>()`：
+
+```csharp
+services.AddManInBlack()
+    .UseJson()
+    .AddPipeline<MyPipeline>();
+```
+
+字符串注册表完全兼容，`[PipelineName("my-pipeline")]` 对应的字符串名仍可在 `settings.json` 或 `AgentDefinition.PipelineName` 中使用。同名注册后者覆盖前者，与字符串注册的语义一致。
  
 ### 在 ToolsMiddleware 与 UseSimple 之间插入中间件
 

@@ -93,6 +93,16 @@ public static class ManInBlackBuilderExtensions
     }
 
     /// <summary>
+    /// 注册类型化管道。名称按优先级从 <see cref="PipelineNameAttribute"/>、
+    /// 静态 <c>Name</c> 属性、类型名解析；若与已有字符串注册同名则覆盖。
+    /// </summary>
+    public static IManInBlackBuilder AddPipeline<TPipeline>(this IManInBlackBuilder builder) where TPipeline : IAgentPipeline
+    {
+        var name = PipelineNameResolver.Resolve<TPipeline>();
+        return builder.AddPipeline(name, AgentPipelineResolver.For<TPipeline>());
+    }
+
+    /// <summary>
     /// 添加 Hook 配置，按添加顺序累积。
     /// </summary>
     public static IManInBlackBuilder AddHook(this IManInBlackBuilder builder, Action<HookBuilder> configure)

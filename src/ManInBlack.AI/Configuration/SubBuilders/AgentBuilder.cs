@@ -20,6 +20,13 @@ public sealed class AgentBuilder
     /// <summary>设置关联的 Pipeline 名称。</summary>
     public AgentBuilder Pipeline(string pipelineName) { _definition.PipelineName = pipelineName; return this; }
 
+    /// <summary>设置关联的类型化 Pipeline。</summary>
+    public AgentBuilder Pipeline<TPipeline>() where TPipeline : IAgentPipeline
+    {
+        _definition.SetPipeline<TPipeline>();
+        return this;
+    }
+
     /// <summary>设置子 Agent 名称列表。</summary>
     public AgentBuilder SubAgents(params string[] subAgents) { _definition.SubAgents = [..subAgents]; return this; }
 

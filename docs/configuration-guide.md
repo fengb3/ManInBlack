@@ -78,7 +78,7 @@
 | ----------------- | ---- | --------------------------------------------------------------------------- |
 | `Description`     | 否   | Agent 描述，用于子 Agent 委托时的提示词生成                                  |
 | `Instruction`     | 否   | 系统提示词                                                                  |
-| `PipelineName`    | 否   | 管道名称，决定使用哪套中间件组合。默认 `"default"`（产品形态管道）；库消费者推荐 `"simple"` 起步 |
+| `PipelineName`    | 否   | 管道名称，决定使用哪套中间件组合。默认 `"default"`（产品形态管道）；库消费者推荐 `"simple"` 起步。代码侧可用 `AgentDefinition.PipelineType` 或 `SetPipeline<T>()` 做类型化引用，最终仍落为该字符串 |
 | `SubAgents`       | 否   | 可委托的子 Agent 名称列表（对应 Agents 字典中的 key）                       |
 | `ModelChoiceName` | 否   | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice                      |
 
@@ -98,8 +98,8 @@ services.AddManInBlack()
     .UseJson()                                                    // 载入 ~/.man-in-black/settings.json（缺失则创建默认）
     .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.openai.com"))
     .AddModelChoice("default", c => c.Provider("default").ModelId("gpt-4o"))
-    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline("simple"))   // 从 simple 起步
-    .AddPipeline("custom", builder => builder.Use<MyMiddleware>().UseSimple())      // 自定义管道以 simple 为基础
+    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline<SimplePipeline>())   // 从 simple 起步，类型化引用
+    .AddPipeline<MyCustomPipeline>()                              // 自定义管道实现 IAgentPipeline
     .UseSandbox();
 ```
 
@@ -127,13 +127,35 @@ services.AddManInBlack()
 
 `AddModelChoice`、`AddAgent`、`AddMcpServer` 同理支持对象重载。
 
+#### 类型化管道
+
+代码侧推荐用 `IAgentPipeline` 替代字符串 `PipelineName`：
+
+```csharp
+using ManInBlack.AI;
+using ManInBlack.AI.Middlewares;
+
+[PipelineName("custom")]
+public sealed class MyCustomPipeline : IAgentPipeline
+{
+    public static AgentPipelineBuilder Configure(AgentPipelineBuilder builder) =>
+        builder.Use<MyMiddleware>().UseSimple();
+}
+
+services.AddManInBlack()
+    .AddPipeline<MyCustomPipeline>()
+    .AddAgent("my-agent", a => a.Pipeline<MyCustomPipeline>());
+```
+
+名称解析优先级：`[PipelineName]` 特性 > `public static string Name { get; }` > 类型名。最终仍写入字符串注册表，因此 `settings.json` 中的 `PipelineName` 字段完全兼容。
+
 #### 子 Builder 方法速查
 
 | 子 Builder         | 关键方法                                                                 | 说明               |
 | ------------------ | ------------------------------------------------------------------------ | ------------------ |
 | `ProviderBuilder`  | `.Schema()` / `.ApiKey()` / `.BaseUrl()`                                | AI 提供商配置      |
 | `ModelChoiceBuilder` | `.Provider()` / `.ModelId()`                                          | 模型选择配置       |
-| `AgentBuilder`     | `.Description()` / `.Instruction()` / `.Pipeline()` / `.SubAgents()` / `.ModelChoice()` | Agent 定义配置  |
+| `AgentBuilder`     | `.Description()` / `.Instruction()` / `.Pipeline()` / `.Pipeline<TPipeline>()` / `.SubAgents()` / `.ModelChoice()` | Agent 定义配置  |
 | `HookBuilder`      | `.Name()` / `.HookPoint()` / `.Run()` / `.ToolName()` / `.TimeoutMs()` / `.Enabled()` | 钩子配置    |
 | `McpServerBuilder` | `.Transport()` / `.Command()` / `.Arguments()` / `.Endpoint()` / `.Header()` / `.Enabled()` | MCP 服务器配置 |
 | `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode(WorkspaceMode.CustomPath).CustomPath(...))` | 存储与工作空间配置 |
@@ -352,6 +374,8 @@ public class SessionEndOnlyPolicy : ICheckpointPolicy
 | API                                              | 用途                                        |
 | ------------------------------------------------ | ------------------------------------------- |
 | `services.AddManInBlack()`                       | 流式 Builder 入口（推荐）                   |
+| `builder.AddPipeline<TPipeline>()`               | 注册类型化管道（`TPipeline : IAgentPipeline`） |
+| `builder.AddAgent(...).Pipeline<TPipeline>()`    | 为 Agent 指定类型化管道                     |
 | `ManInBlackConfigurationBuilder.BuildConfiguration()` | 独立构建 IConfiguration               |
 | `IConfigurationBuilder.AddManInBlackSettings()`  | 将配置源加入已有 IConfigurationBuilder       |
 | `services.AddManInBlackFromSettings()`           | 便捷注册：从 settings.json 构建配置 + 注册服务（≡ `AddManInBlack().UseJson()`） |

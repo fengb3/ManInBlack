@@ -4,6 +4,7 @@ using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Abstraction.Tools;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
+using ManInBlack.AI.Pipelines;
 using ManInBlack.AI.Mcp;
 using ManInBlack.AI.Services;
 using ManInBlack.AI.Storage;
@@ -59,6 +60,11 @@ public static class DependencyInjection
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
             services.AddSingleton<AgentFactory>();
+
+            // 注册内置类型化管道，使字符串注册表与类型化定义保持一致。
+            var builder = new ManInBlackBuilder(services);
+            builder.AddPipeline<DefaultPipeline>();
+            builder.AddPipeline<SimplePipeline>();
 
             // LLM IChatClient 专用命名 HttpClient(ManInBlackHttpClients.ChatClient):
             // - 移除 host(AddServiceDefaults)注入的默认标准 resilience(每次尝试 30s 超时 + 自动重试)。
@@ -120,7 +126,7 @@ public static class DependencyInjection
             services.AddSingleton<IMcpToolProvider, McpToolProvider>();
             services.AddHostedService(sp => sp.GetRequiredService<McpClientHostedService>());
 
-            return new ManInBlackBuilder(services);
+            return builder;
         }
 
         /// <summary>

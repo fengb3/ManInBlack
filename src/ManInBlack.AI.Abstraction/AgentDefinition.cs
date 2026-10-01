@@ -26,6 +26,12 @@ public class AgentDefinition
     public string PipelineName { get; set; } = "default";
 
     /// <summary>
+    /// 类型化管道引用（可选）。设置后 <see cref="PipelineName"/> 会同步为对应字符串名称，
+    /// 最终仍落为字符串以兼容 JSON 配置。
+    /// </summary>
+    public Type? PipelineType { get; set; }
+
+    /// <summary>
     /// 父 Agent 名称（可选）
     /// </summary>
     public string? ParentAgentName { get; set; }
