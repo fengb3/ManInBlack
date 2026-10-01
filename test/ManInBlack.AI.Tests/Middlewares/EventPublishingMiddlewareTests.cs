@@ -196,4 +196,116 @@ public class EventPublishingMiddlewareTests
 
         sub.Dispose();
     }
+
+    [Fact]
+    public async Task HandleAsync_ArgumentDelta_ShouldPublishToolCallStreamEvent()
+    {
+        var bus = new EventBus();
+        var events = new List<ToolCallStreamEvent>();
+        using var sub = bus.Subscribe<ToolCallStreamEvent>("agent-delta", (e, _) =>
+        {
+            events.Add(e);
+            return Task.CompletedTask;
+        });
+
+        var middleware = new EventPublishingMiddleware(bus);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "agent-delta" };
+
+        var update = new ChatResponseUpdate(ChatRole.Assistant,
+            [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\"}")]);
+
+        var results = await middleware.HandleAsync(ctx, () => TestHelpers.AsyncSeq(update)).ToListAsync();
+
+        Assert.Single(results);
+        Assert.Single(events);
+        Assert.Equal("agent-delta", events[0].AgentId);
+        Assert.Equal("call-1", events[0].CallId);
+        Assert.Equal("ReadFile", events[0].ToolName);
+        Assert.Equal("{\"path\":\"/etc/hosts\"}", events[0].AccumulatedArguments);
+        Assert.Equal("{\"path\":\"/etc/hosts\"}", events[0].ArgumentDelta);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ArgumentDeltaInMultipleUpdates_ShouldAccumulateAndDiff()
+    {
+        var bus = new EventBus();
+        var events = new List<ToolCallStreamEvent>();
+        using var sub = bus.Subscribe<ToolCallStreamEvent>("agent-delta2", (e, _) =>
+        {
+            events.Add(e);
+            return Task.CompletedTask;
+        });
+
+        var middleware = new EventPublishingMiddleware(bus);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "agent-delta2" };
+
+        var updates = new[]
+        {
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"")]),
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\"")]),
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\",\"enco")]),
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\",\"encoding\":\"utf-8\"}")]),
+        };
+
+        var results = await middleware.HandleAsync(ctx, () => TestHelpers.AsyncSeq(updates)).ToListAsync();
+
+        Assert.Equal(4, results.Count);
+        Assert.Equal(4, events.Count);
+        Assert.Equal("{\"path\":\"", events[0].ArgumentDelta);
+        Assert.Equal("/etc/hosts\"", events[1].ArgumentDelta);
+        Assert.Equal(",\"enco", events[2].ArgumentDelta);
+        Assert.Equal("ding\":\"utf-8\"}", events[3].ArgumentDelta);
+        Assert.Equal("{\"path\":\"/etc/hosts\",\"encoding\":\"utf-8\"}", events[3].AccumulatedArguments);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MultipleCallIds_ShouldTrackIndependently()
+    {
+        var bus = new EventBus();
+        var events = new List<ToolCallStreamEvent>();
+        using var sub = bus.Subscribe<ToolCallStreamEvent>("agent-multi", (e, _) =>
+        {
+            events.Add(e);
+            return Task.CompletedTask;
+        });
+
+        var middleware = new EventPublishingMiddleware(bus);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "agent-multi" };
+
+        var updates = new[]
+        {
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("c1", "ToolA", "{\"a\":1")]),
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("c2", "ToolB", "{\"b\":2")]),
+            new ChatResponseUpdate(ChatRole.Assistant,
+                [CreateDeltaFunctionCall("c1", "ToolA", "{\"a\":12")]),
+        };
+
+        await middleware.HandleAsync(ctx, () => TestHelpers.AsyncSeq(updates)).ToListAsync();
+
+        Assert.Equal(3, events.Count);
+        Assert.Equal("{\"a\":1", events[0].AccumulatedArguments);
+        Assert.Equal("{\"b\":2", events[1].AccumulatedArguments);
+        Assert.Equal("2", events[2].ArgumentDelta);
+        Assert.Equal("{\"a\":12", events[2].AccumulatedArguments);
+    }
+
+    private static FunctionCallContent CreateDeltaFunctionCall(string callId, string name, string accumulatedJson)
+    {
+        var fcc = new FunctionCallContent(callId, name)
+        {
+            InformationalOnly = true,
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                [ToolCallStreamEventKeys.IsArgumentDelta] = true,
+                [ToolCallStreamEventKeys.AccumulatedArgumentsJson] = accumulatedJson
+            }
+        };
+        return fcc;
+    }
 }

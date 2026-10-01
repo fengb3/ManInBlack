@@ -30,6 +30,21 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
     /// </summary>
     private const string ToolInterruptedMessage = "工具执行已被中断，未获得结果。";
 
+    /// <summary>
+    /// 判断 <see cref="FunctionCallContent"/> 是否为流式参数增量（不应执行）。
+    /// 同时识别 M.E.AI 原生的 <see cref="FunctionCallContent.InformationalOnly"/> 标记，
+    /// 与第三方适配器的行为保持一致。
+    /// </summary>
+    private static bool IsArgumentDelta(FunctionCallContent fcc)
+    {
+        if (fcc.InformationalOnly)
+            return true;
+
+        return fcc.AdditionalProperties is not null
+               && fcc.AdditionalProperties.TryGetValue(ToolCallStreamEventKeys.IsArgumentDelta, out var value)
+               && value is true;
+    }
+
     public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(AgentContext context,
         ChatResponseUpdateHandler next,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -52,7 +67,10 @@ public class AgentLoopMiddleware(IToolExecutor toolExecutor, ILogger<AgentContex
                     switch (content)
                     {
                         case FunctionCallContent fcc:
-                            functionCalls.Add(fcc);
+                            // 跳过参数增量分片：它们由 EventPublishingMiddleware 广播为 ToolCallStreamEvent，
+                            // 不应被 AgentLoop 当作完整工具调用执行。
+                            if (!IsArgumentDelta(fcc))
+                                functionCalls.Add(fcc);
                             break;
                         case TextContent text:
                             textBuilder.Append(text.Text);

@@ -364,6 +364,47 @@ public async Task HandleAsync_WithToolCall_ShouldExecuteAndLoop()
 
 ---
 
+## 模式六：全管道集成测试
+
+如果需要验证跨中间件的 wiring（例如 ToolExecutor 是否正确包裹 filter 链、事件顺序是否正确），需要启动真实 DI 容器并跑完整默认管道。
+
+### 可替换 `IChatClient` 的接缝
+
+`AddManInBlack()` 把 `IChatClient` 注册为 Scoped。测试时只要在 `AddManInBlack()` 之后再次调用 `services.AddScoped<IChatClient>(_ => fakeClient)`，DI 会以后注册者胜出，无需改动产品代码。
+
+```csharp
+var services = new ServiceCollection()
+    .AddManInBlack()
+    .AddProvider("default", p => p.Schema("OpenAI").ApiKey("fake-key"))
+    .AddModelChoice("default", c => c.Provider("default").ModelId("fake-model"))
+    .UseStorage(s => s.RootPath(tempRoot))
+    .AddAgent("math-agent", a => a
+        .Instruction("你是一个数学助手。")
+        .Pipeline("default"))
+    .Services
+    .AddScoped<IChatClient>(_ => fakeClient)   // 替换真实 LLM
+    .AddScoped<IHookExecutor>(_ => fakeHooks)  // 避免执行真实钩子脚本
+    .BuildServiceProvider();
+```
+
+### FakeChatClient 剧本
+
+实现 `IChatClient`，`GetStreamingResponseAsync` 按轮次返回预定 `ChatResponseUpdate`。典型剧本：
+
+- 第一轮：若干参数增量 `FunctionCallContent`（带 `__mib_arg_delta` 标记）+ 一个完整 `FunctionCallContent`
+- 第二轮：最终文本回答
+
+### 断言要点
+
+- 订阅 `EventBus` 收集事件，断言顺序包含 `BeforeLlmCallEvent`、`ToolCallStreamEvent`、`AfterLlmCallEvent`、`BeforeToolExecuteEvent`、`AfterToolExecuteEvent`、`AllToolsCompletedEvent`、`AgentCompletedEvent`
+- 断言 `[AiTool]` 工具确实执行、参数正确
+- 断言 `FunctionResultContent` 进入消息历史
+- 断言最终文本输出
+
+参考实现：`test/ManInBlack.AI.Tests/Integration/FullPipelineIntegrationTests.cs`
+
+---
+
 ## 常见误区
 
 1. **不要 mock `AgentContext`** — 它是普通类，直接 `new` 更直观

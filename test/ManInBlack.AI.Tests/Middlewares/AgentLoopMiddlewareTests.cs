@@ -388,4 +388,60 @@ public class AgentLoopMiddlewareTests
 
         Assert.Equal(0, checkpointInvoked);
     }
+
+    [Fact]
+    public async Task HandleAsync_WithArgumentDelta_ShouldSkipDeltaAndExecuteCompleteCall()
+    {
+        var executor = new FakeToolExecutor { Result = "ok" };
+        var middleware = new AgentLoopMiddleware(executor, NullLogger<AgentContext>.Instance);
+        var bus = new EventBus();
+        var ctx = new AgentContext(BuildSp(bus))
+        {
+            AgentId = "test-agent",
+            Messages = [new(ChatRole.User, "read file")]
+        };
+
+        var callCount = 0;
+        ChatResponseUpdateHandler next = () =>
+        {
+            callCount++;
+            if (callCount == 1)
+            {
+                return TestHelpers.AsyncSeq(
+                    new ChatResponseUpdate(ChatRole.Assistant,
+                        [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\"")]),
+                    new ChatResponseUpdate(ChatRole.Assistant,
+                        [CreateDeltaFunctionCall("call-1", "ReadFile", "{\"path\":\"/etc/hosts\",\"encoding\":\"utf-8\"}")]),
+                    new ChatResponseUpdate(ChatRole.Assistant,
+                        [new FunctionCallContent("call-1", "ReadFile",
+                            new Dictionary<string, object?> { ["path"] = "/etc/hosts", ["encoding"] = "utf-8" })]));
+            }
+            return TestHelpers.AsyncSeq(new ChatResponseUpdate(ChatRole.Assistant,
+                [new TextContent("done")]));
+        };
+
+        var results = await middleware.HandleAsync(ctx, next).ToListAsync();
+
+        Assert.Equal(2, callCount);
+        Assert.Equal(1, executor.ExecuteCount);
+        Assert.Equal("ReadFile", executor.ExecutedContexts[0].ToolName);
+        Assert.Equal("/etc/hosts", executor.ExecutedContexts[0].Arguments!["path"]);
+
+        // 历史应只包含完整的 assistant tool_calls，不包含增量分片
+        var toolCallAssistantMsg = ctx.Messages.First(m => m.Role == ChatRole.Assistant);
+        Assert.Single(toolCallAssistantMsg.Contents.OfType<FunctionCallContent>());
+    }
+
+    private static FunctionCallContent CreateDeltaFunctionCall(string callId, string name, string accumulatedJson)
+    {
+        return new FunctionCallContent(callId, name)
+        {
+            InformationalOnly = true,
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                [ToolCallStreamEventKeys.IsArgumentDelta] = true,
+                [ToolCallStreamEventKeys.AccumulatedArgumentsJson] = accumulatedJson
+            }
+        };
+    }
 }

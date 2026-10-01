@@ -236,6 +236,8 @@ public override async IAsyncEnumerable<ChatResponseUpdate> HandleAsync(
 
 模型返回 `FunctionCallContent` 时，执行工具并将结果追加回消息列表，再次调用 `next()` 循环处理，直到模型不再发起工具调用。
 
+`AgentLoopMiddleware` 会跳过标记为参数增量（`AdditionalProperties["__mib_arg_delta"] = true` 或 `InformationalOnly = true`）的 `FunctionCallContent`，避免对尚未拼装完成的工具调用重复执行；完整（无 delta 标记）的 `FunctionCallContent` 才会进入工具执行流程。增量分片由 `EventPublishingMiddleware` 广播为 `ToolCallStreamEvent`。
+
 **核心结构**（参考 `AgentLoopMiddleware`，含检查点触发）：
 
 ```csharp
@@ -385,7 +387,7 @@ builder.Services.AddManInBlack()
 
 | #   | 中间件                            | 职责                               |
 | --- | --------------------------------- | ---------------------------------- |
-| 1   | `EventPublishingMiddleware`       | 在最外层，用于 UI 监听 Agent 事件  |
+| 1   | `EventPublishingMiddleware`       | 在最外层，将文本/推理/用量/工具参数增量广播为 `ModelContentEvent` / `ToolCallStreamEvent`，并在整条流结束后发 `Completed` |
 | 2   | `CommandMiddleware`               | 拦截 `/`-命令：命中则短路（如 `/new`、`/help`），未知命令提示 `/help`；非命令透传；执行后发 `CommandExecutedEvent` 与 `AfterCommand` hook |
 | 3   | `ReadPersistenceMiddleware`       | 加载历史消息，恢复状态快照，注入 `SaveCheckpoint` 回调 |
 | 4   | `SavePersistenceMiddleware`       | 通过 Channel 异步持久化新增消息，session 结束时触发 `SessionEnd` 检查点 |
@@ -405,7 +407,7 @@ builder.Services.AddManInBlack()
 | 13  | `SystemPromptInjectionMiddleware` | 将 `SystemPrompt` 插入消息列表开头 |
 | 14  | `UserInputMiddleware`             | 将 `UserInput` 追加为用户消息      |
 | 15  | `RetryMiddleware`                 | 处理 API 重试逻辑；仅重试瞬时错误（连接级、超时、5xx、408、429），4xx 立即抛出不重试 |
-| 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），每轮工具调用后触发 `AfterToolCall` 检查点；工具执行被取消时仍回填 tool 结果以保持历史一致 |
+| 16  | `AgentLoopMiddleware`             | 工具调用循环（必须在最后），收集完整 `FunctionCallContent` 并执行，跳过 delta 增量分片；每轮工具调用后触发 `AfterToolCall` 检查点；工具执行被取消时仍回填 tool 结果以保持历史一致 |
 
 ### 顺序规则
 

@@ -25,6 +25,7 @@ ManInBlack 通过 `EventBus` 实现组件间的事件通信。EventBus 是一个
 | `ModelContentEvent` (Reasoning) | 模型输出推理内容 | `EventPublishingMiddleware` |
 | `ModelContentEvent` (Usage) | 模型返回 Token 用量 | `EventPublishingMiddleware` |
 | `ModelContentEvent` (Completed) | 模型流式输出结束 | `EventPublishingMiddleware` |
+| `ToolCallStreamEvent` | 流式工具调用参数增量 | `EventPublishingMiddleware` |
 
 ### 工具执行事件
 
@@ -66,6 +67,25 @@ public record ModelContentEvent
     public ModelContentKind Kind { get; init; }   // Text / Reasoning / Usage / Completed
     public string? Text { get; init; }             // Text、Reasoning 时有值
     public UsageDetails? Usage { get; init; }      // Usage 时有值
+}
+```
+
+### ToolCallStreamEvent
+
+流式工具调用参数增量事件，由 `EventPublishingMiddleware` 发布到 observer lane（`AgentId`）。
+
+当底层 `IChatClient` 在流式响应中按 token 返回工具调用参数时，客户端/中间件可在 `FunctionCallContent` 上设置 `InformationalOnly = true`，并在 `AdditionalProperties` 中写入 `__mib_arg_delta = true` 与 `__mib_arg_delta_json = 累积参数 JSON`。`EventPublishingMiddleware` 会据此把每个分片广播为 `ToolCallStreamEvent`，供 UI 实时渲染参数拼装过程；`AgentLoopMiddleware` 则跳过这些增量分片，只执行完整（无 delta 标记）的 `FunctionCallContent`。
+
+> **注意**：当前 `Microsoft.Extensions.AI.OpenAI` 适配器会在流式期间内部累积参数，仅在最后 yield 一条完整的 `FunctionCallContent`，不会产出增量分片。因此接入 OpenAI 兼容端点时 `ToolCallStreamEvent` 不会触发；若将来底层适配器或自定义 `IChatClient` 开始暴露增量，上述机制立即生效。
+
+```csharp
+public record ToolCallStreamEvent
+{
+    public string AgentId { get; init; }
+    public string CallId { get; init; }              // 流式期间可能为空
+    public string? ToolName { get; init; }
+    public string ArgumentDelta { get; init; }       // 本次增量
+    public string AccumulatedArguments { get; init; } // 累积 JSON
 }
 ```
 
@@ -196,7 +216,7 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 
 | 组件 | 注册方式 | 发布的事件 | 管道位置 |
 |---|---|---|---|
-| `EventPublishingMiddleware` | Scoped | `ModelContentEvent` | 中间件管道内，包裹 LLM 调用 |
+| `EventPublishingMiddleware` | Scoped | `ModelContentEvent`、`ToolCallStreamEvent` | 中间件管道内，包裹 LLM 调用 |
 | `AgentLifecycleFilter` | Scoped | `BeforeToolExecuteEvent`、`AfterToolExecuteEvent` | 工具过滤器管道内 |
 | `AgentLoopMiddleware` | Scoped | `AfterLlmCallEvent`、`AllToolsCompletedEvent` | 中间件管道内 |
 | `HookMiddleware` | Scoped | `BeforeLlmCallEvent`、`AgentCompletedEvent` | 中间件管道内 |
@@ -210,6 +230,7 @@ bus.Subscribe<AfterToolExecuteEvent>("wrong-key", handler);
 |---|---|
 | `src/ManInBlack.AI/Services/EventBus.cs` | EventBus 核心：Subscribe/Publish，按 key + 类型双重隔离 |
 | `src/ManInBlack.AI/Events/ModelContentEvent.cs` | 模型输出事件和 `ModelContentKind` 枚举 |
+| `src/ManInBlack.AI/Events/ToolCallStreamEvent.cs` | 流式工具调用参数增量事件 |
 | `src/ManInBlack.AI/Events/AgentLifecycleEvent.cs` | Agent 生命周期事件（8 种，含子 Agent 委托事件） |
 | `src/ManInBlack.AI/ToolCallFilters/AgentLifecycleFilter.cs` | 工具执行生命周期过滤器，发布 BeforeToolExecute / AfterToolExecute 事件 |
 | `src/ManInBlack.AI/Middlewares/EventPublishingMiddleware.cs` | 模型流式输出事件发布者 |
