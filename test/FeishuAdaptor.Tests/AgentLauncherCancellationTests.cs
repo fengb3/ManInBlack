@@ -14,6 +14,7 @@ using ManInBlack.AI.Services;
 using ManInBlack.AI.Tools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -43,6 +44,7 @@ public class AgentLauncherCancellationTests
         services.AddSingleton<EventBus>();              // Launcher 的 configure 回调要解析它
         services.AddSingleton<IChatClient>(_ => Substitute.For<IChatClient>());      // CapturingMiddleware 不调 next,永不触达
         services.AddSingleton<IHttpClientFactory>(_ => Substitute.For<IHttpClientFactory>());
+        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));   // FeishuCardSession 构造时要解析 ILogger<>
         services.AddSingleton<McpClientHostedService>(_ => new McpClientHostedService(
             Options.Create(new ManInBlackSettings()),   // McpServers 默认空 → EnsureStartedAsync 立即完成
             new ToolRegistry([]),
@@ -87,6 +89,9 @@ public class AgentLauncherCancellationTests
         var launchTask = launcher.LaunchAsync(dto);
         try
         {
+            // 若 launchTask 先于 Ready 完成（基本是管道抛异常），立即暴露异常而不是死等挂起
+            var first = await Task.WhenAny(holder.Ready.Task, launchTask);
+            if (first == launchTask) await launchTask;
             await holder.Ready.Task;                       // 等到管道捕获到旧 Agent 的 CancellationToken
             factory.RegisterAndCancelExisting("u1");       // 模拟第二条消息到达:取消旧 Agent、注册新 CTS
 
