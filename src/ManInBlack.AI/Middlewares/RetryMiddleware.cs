@@ -48,6 +48,15 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                         break;
                     }
 
+                    // 流式响应一旦开始输出，整体重试会导致内容重复/截断，语义不可接受：
+                    // 立即释放枚举器并抛出原始异常，让上游观测到真实错误。
+                    if (yielded)
+                    {
+                        await enumerator.DisposeAsync();
+                        LogRetryAbortedAfterYield(logger, context.AgentId, attempt + 1, ex);
+                        throw;
+                    }
+
                     LogRetryExhausted(logger, context.AgentId, attempt + 1);
                     fatalError = ex.Message;
                     break;
@@ -69,7 +78,7 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
                     Contents =
                     [
                         new TextContent(
-                            $"API 请求失败，已无法重试（已输出部分内容）。错误：{fatalError}"
+                            $"API 请求失败，已无法重试。错误：{fatalError}"
                         )
                     ]
                 };
@@ -99,6 +108,9 @@ public partial class RetryMiddleware(ILogger<RetryMiddleware> logger) : AgentMid
 
     [LoggerMessage(LogLevel.Error, "Agent {agentId} 流式请求重试 {attempt} 次后仍然失败")]
     static partial void LogRetryExhausted(ILogger<RetryMiddleware> logger, string agentId, int attempt);
+
+    [LoggerMessage(LogLevel.Error, "Agent {agentId} 流式响应已开始输出，第 {attempt} 次尝试异常后不再重试，直接抛出原始异常")]
+    static partial void LogRetryAbortedAfterYield(ILogger<RetryMiddleware> logger, string agentId, int attempt, Exception exception);
 
     /// <summary>
     /// 判断异常是否值得重试。仅重试瞬时错误（连接级、超时、5xx、408、429）；

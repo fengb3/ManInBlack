@@ -6,7 +6,7 @@
 
 ## 一句话总结
 
-ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道**为 15 个 AI 提供商提供统一抽象，支持工具调用、持久化、上下文压缩、重试等能力。
+ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道**为 OpenAI/Anthropic/Gemini 三种协议提供统一抽象，支持工具调用、持久化、上下文压缩、重试等能力。
 
 ---
 
@@ -45,7 +45,7 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 
 | 目录               | 内容                                                     |
 | ------------------ | -------------------------------------------------------- |
-| `ChatClient/`      | 3 个 IChatClient 适配器（OpenAI/Anthropic/Gemini）       |
+| `ChatClient/`      | 已退役：改为 `Providers.cs` 中一层很薄的 `IChatClient` 工厂（OpenAI/Anthropic/Gemini） |
 | `Configuration/`   | ManInBlackSettings、ManInBlackConfigurationBuilder、SettingsLoader、ValidateManInBlackSettings |
 | `Middlewares/`     | 15 个中间件 + AgentPipelineBuilder                        |
 | `Tools/`           | CommandLineTools、FileTools、SkillTools、DelegationTools  |
@@ -141,18 +141,26 @@ User ←──────────────── ChatResponseUpdate 流 
 
 ### 三态适配
 
-配置中通过 `Schema` 字段指定协议类型，映射到 3 种 API 适配器：
+配置中通过 `Schema` 字段指定协议类型，`ChatClientProviderExtensions.CreateChatClient()` 将其映射到官方/社区 M.E.AI 适配包：
 
 ```
-Schema: "OpenAI"    → OpenAICompatibleChatClient   (SSE: data: ... [DONE])
-Schema: "Anthropic" → AnthropicCompatibleChatClient (SSE: content_block_start/delta/stop)
-Schema: "Gemini"    → GeminiCompatibleChatClient     (SSE + API Key in query param)
+Schema: "OpenAI"    → Microsoft.Extensions.AI.OpenAI（OpenAI .NET SDK 上的 IChatClient）
+Schema: "Anthropic" → Anthropic SDK（官方 C# SDK，原生实现 IChatClient）
+Schema: "Gemini"    → Mscc.GenerativeAI.Microsoft（社区 Gemini M.E.AI 适配包）
 ```
+
+自研 SSE 客户端已删除：流解析、反序列化、tool call 分片累积、usage 提取等全部交给这些 SDK。ManInBlack 只保留一层薄工厂，负责注入命名 `HttpClient`、设置自定义 `BaseUrl`、统一禁用底层重试。
 
 ### 工厂分发
 
-`ChatClientProviderExtensions.CreateChatClient()` 通过 `switch(Schema)` 创建对应的适配器实例，注入 `HttpClient`
-和认证头。
+`ChatClientProviderExtensions.CreateChatClient()` 通过 `switch(Schema)` 创建对应的 `IChatClient` 实例：
+
+- 复用 `ManInBlackHttpClients.ChatClient` 命名 HttpClient，继承 30 分钟兜底超时与连接池配置。
+- OpenAI 兼容协议通过 `OpenAIClientOptions.Endpoint` 设置自定义 BaseUrl，支持 DeepSeek/智谱/通义千问等厂商。
+- Anthropic 通过 `AnthropicClient.BaseUrl` + `HttpClient` 接入。
+- Gemini 通过 `GoogleAI` + `RequestOptions.BaseUrl` 接入，并对 `IHttpClientFactory` 做薄包装以复用命名 client。
+
+底层 SDK 的反序列化失败、流截断、HTTP 错误等会以具体异常向上传播，不再静默吞掉。
 
 ---
 

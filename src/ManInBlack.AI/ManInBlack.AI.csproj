@@ -21,13 +21,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.8" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.8" />
-        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.8" />
-        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+        <PackageReference Include="Anthropic" Version="12.44.0" />
+        <PackageReference Include="Mscc.GenerativeAI.Microsoft" Version="3.1.0" />
         <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
         <!-- 仅为取 $(PkgFengb3_EasyCodeBuilder) 路径以打包生成器依赖；不参与编译、不进 nuspec 依赖 -->
         <PackageReference Include="Fengb3.EasyCodeBuilder" Version="0.1.6" GeneratePathProperty="true" PrivateAssets="all" ExcludeAssets="all" />

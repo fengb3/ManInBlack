@@ -59,9 +59,9 @@
 
 | 字段      | 必填 | 说明                                                        |
 | --------- | ---- | ----------------------------------------------------------- |
-| `Schema`  | 是   | 协议类型：`"OpenAI"` / `"Anthropic"` / `"Gemini"`          |
+| `Schema`  | 是   | 协议类型：`"OpenAI"` / `"Anthropic"` / `"Gemini"`。分别对应 `Microsoft.Extensions.AI.OpenAI`、`Anthropic` SDK、`Mscc.GenerativeAI.Microsoft` 三个 M.E.AI 适配包。 |
 | `ApiKey`  | 是   | API 密钥，启动时校验非空                                    |
-| `BaseUrl` | 否   | 自定义地址，省略则使用 Schema 对应的默认值                   |
+| `BaseUrl` | 否   | 自定义地址，省略则使用 Schema 对应的默认值。OpenAI 兼容厂商（DeepSeek/智谱/通义千问等）只需改 `BaseUrl` 即可接入。 |
 
 ### ModelChoices 字段
 

@@ -192,4 +192,60 @@ public class RetryMiddlewareTests
         Assert.Equal(2, callCount);
         Assert.Contains(results.ExtractTexts(), t => t.Contains("ok"));
     }
+
+    [Fact]
+    public async Task HandleAsync_ExceptionAfterYield_ShouldNotRetryAndThrow()
+    {
+        var middleware = new RetryMiddleware(NullLogger<RetryMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "test" };
+
+        var callCount = 0;
+        ChatResponseUpdateHandler next = () =>
+        {
+            callCount++;
+            return YieldThenThrow(new IOException("stream truncated"));
+        };
+
+        var ex = await Assert.ThrowsAsync<IOException>(async () =>
+        {
+            await foreach (var _ in middleware.HandleAsync(ctx, next, CancellationToken.None)) { }
+        });
+
+        // 已输出过内容，不能整体重试；应直接抛原始异常
+        Assert.Equal(1, callCount);
+        Assert.Equal("stream truncated", ex.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExceptionAfterYield_PartialContentIsStillObserved()
+    {
+        var middleware = new RetryMiddleware(NullLogger<RetryMiddleware>.Instance);
+        var ctx = new AgentContext(TestHelpers.EmptyServiceProvider) { AgentId = "test" };
+
+        ChatResponseUpdateHandler next = () => YieldThenThrow(new IOException("stream truncated"));
+
+        var observed = new List<string>();
+        try
+        {
+            await foreach (var update in middleware.HandleAsync(ctx, next, CancellationToken.None))
+            {
+                if (update.Text is not null)
+                    observed.Add(update.Text);
+            }
+        }
+        catch (IOException)
+        {
+            // 预期会抛异常
+        }
+
+        Assert.Contains("partial", observed);
+    }
+
+    private static async IAsyncEnumerable<ChatResponseUpdate> YieldThenThrow(
+        Exception ex,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        yield return new ChatResponseUpdate(ChatRole.Assistant, [new TextContent("partial")]);
+        throw ex;
+    }
 }

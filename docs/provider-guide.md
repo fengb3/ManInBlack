@@ -8,13 +8,15 @@
 
 ManInBlack 支持三种 API 协议（Schema），通过 `Schema` 字段指定：
 
-| Schema      | 适配器                          | 认证方式                                 | 默认 BaseUrl                                    |
-| ----------- | ------------------------------- | ---------------------------------------- | ----------------------------------------------- |
-| `OpenAI`    | `OpenAICompatibleChatClient`    | `Authorization: Bearer {key}`            | `https://api.openai.com`                        |
-| `Anthropic` | `AnthropicCompatibleChatClient` | `x-api-key: {key}` + `anthropic-version` | `https://api.anthropic.com`                     |
-| `Gemini`    | `GeminiCompatibleChatClient`    | URL Query `?key={key}`                   | `https://generativelanguage.googleapis.com`     |
+| Schema      | 底层适配包                                  | 认证方式                                 | 默认 BaseUrl                                    |
+| ----------- | ------------------------------------------ | ---------------------------------------- | ----------------------------------------------- |
+| `OpenAI`    | `Microsoft.Extensions.AI.OpenAI`（官方）   | `Authorization: Bearer {key}`            | `https://api.openai.com`                        |
+| `Anthropic` | `Anthropic`（Anthropic 官方 C# SDK）       | `x-api-key: {key}` + `anthropic-version` | `https://api.anthropic.com`                     |
+| `Gemini`    | `Mscc.GenerativeAI.Microsoft`（社区）      | URL Query `?key={key}`                   | `https://generativelanguage.googleapis.com`     |
 
 绝大多数厂商（DeepSeek、通义千问、智谱、Kimi、豆包等）兼容 OpenAI 协议，只需更改 `BaseUrl` 即可接入。
+
+> 自研 SSE 客户端已退役。`ManInBlack.AI` 现在只保留一层很薄的 `ChatClientProviderExtensions.CreateChatClient` 工厂：构造官方/社区 `IChatClient`、注入命名 `HttpClient`、禁用底层 SDK 内部重试，由应用层 `RetryMiddleware` 统一负责重试与可观测性。
 
 ---
 
@@ -116,6 +118,8 @@ services.AddManInBlack(opt =>
 }
 ```
 
+> OpenAI 兼容协议：Microsoft.Extensions.AI.OpenAI 基于 OpenAI .NET SDK。设置 `BaseUrl` 后，SDK 会以其为根路径追加 `/chat/completions`（不会重复 `/v1`）。例如 `https://api.deepseek.com` 会调用 `https://api.deepseek.com/chat/completions`；若你的代理本身就在 `/v1` 子路径下，直接写 `https://proxy.example.com/v1` 即可。
+
 ---
 
 ## LLM HttpClient
@@ -131,9 +135,10 @@ services.AddHttpClient(ManInBlackHttpClients.ChatClient, c => c.Timeout = TimeSp
 
 设计要点:
 
-- **移除标准 resilience**:Aspire `AddServiceDefaults` 等会经 `ConfigureHttpClientDefaults` 给所有 HttpClient 套上 `AddStandardResilienceHandler`(默认每次尝试 30s 超时 + 3 次重试)。它会砍断推理模型首字节 >30s 的流式请求,且与应用层 `RetryMiddleware` 叠加重复请求。LLM 的重试统一由 `RetryMiddleware` 负责,故主库注册时移除。
+- **移除标准 resilience**:Aspire `AddServiceDefaults` 等会经 `ConfigureHttpClientDefaults` 给所有 HttpClient 套上 `AddStandardResilienceHandler`(默认 30s 超时 + 3 次重试)。它会砍断推理模型首字节 >30s 的流式请求,且与应用层 `RetryMiddleware` 叠加重复请求。LLM 的重试统一由 `RetryMiddleware` 负责,故主库注册时移除。
 - **30 分钟兜底超时**:`HttpClient.Timeout` 覆盖整条流式生命周期(含输出阶段),需远大于 Polly 默认的 30s;正常流式时长由应用层 `CancellationToken` 控制,30 分钟仅防极端静默挂死。
-- **OTel 观测不受影响**:`AddHttpClientInstrumentation` hook 的是 HttpClient 传输层(`DiagnosticSource`),与 client 命名/resilience 无关,LLM 请求照常产生 span/metric。span 上不会自动标注 client name;若需在 Dashboard 区分 LLM 调用,可在该命名 client 上额外挂 `DelegatingHandler` 给 `Activity.Current` 打 tag(如 `mib.chat_client = "ManInBlack.Chat"`)。
+- **底层 SDK 不再自行重试**：OpenAI/Anthropic/Gemini 适配包在构造时均已把底层重试次数置 0，避免与应用层重复。
+- **OTel 观测不受影响**:`AddHttpClientInstrumentation` hook 的是 HttpClient 传输层(`DiagnosticSource`),与 client 命名/resilience 无关,LLM 请求照常产生 span/metric。span 上不会自动标注 client name;若需在 Dashboard 区分 LLM 调用,可在该命名 client 上额外挂 `DelegatingHandler` 给 `Activity.Current` 打 tag(如 `mib.chat_client = "ManInBlack.Chat"`).
 
 > `RemoveAllResilienceHandlers` 为评估期 API(`EXTEXP0001`),语义稳定,已在注册处局部 `#pragma` 抑制。
 
@@ -147,6 +152,12 @@ var choice = settings.GetModelChoice("deepseek-chat");
 var chatClient = ChatClientProviderExtensions.CreateChatClient(
     sp.GetRequiredService<IHttpClientFactory>(), choice);
 ```
+
+---
+
+## 可观测性与异常
+
+迁移到官方/社区 SDK 后，反序列化失败、SSE 流截断、HTTP 错误等场景由 SDK 抛出具体异常（如 `HttpRequestException`、`AnthropicSseException` 等），**不再静默吞掉**。ManInBlack 的 `RetryMiddleware` 仅对尚未输出内容的流式请求做重试；一旦流已开始输出，后续异常会直接抛出原始异常，避免“已输出部分内容却整体重试”导致的语义错误。
 
 ---
 
