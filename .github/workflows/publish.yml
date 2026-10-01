@@ -1,4 +1,4 @@
-# 通过 NuGet Trusted Publishing（OIDC，无长期 API Key）发布 4 个库包。
+# 通过 NuGet Trusted Publishing（OIDC，无长期 API Key）发布 5 个库包。
 # 触发方式：推送 v* 标签（如 v0.0.1），或手动 dispatch。
 # 前置条件（一次性，nuget.org 网页操作）：
 #   1. nuget.org → 用户名 → Trusted Publishing → 新建策略：
@@ -44,6 +44,7 @@ jobs:
         run: |
           dotnet pack src/ManInBlack.AI -c Release -o artifacts/packages
           dotnet pack src/ManInBlack.AI.Abstraction -c Release -o artifacts/packages
+          dotnet pack src/ManInBlack.AI.Persistence.Sqlite -c Release -o artifacts/packages
           dotnet pack src/ManInBlack.AI.SourceGenerator -c Release -o artifacts/packages
           dotnet pack bwarp/Bwarp -c Release -o artifacts/packages
 

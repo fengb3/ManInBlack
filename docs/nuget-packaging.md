@@ -70,14 +70,14 @@ dotnet pack src/ManInBlack.AI -c Release -o artifacts/packages
 发布流程（打标签即发布，工作流会先校验标签与 `Directory.Build.props` 的 `<Version>` 一致）：
 
 ```bash
-# Version 改为 0.0.2 并提交后：
-git tag v0.0.2 && git push origin v0.0.2
+# Version 改为 0.1.0 并提交后：
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
 命令行手动发布（不经 CI）仍可使用长期 API Key，nuget.org 目前继续支持：
 
 ```bash
-dotnet nuget push artifacts/packages/ManInBlack.AI.0.0.2.nupkg \
+dotnet nuget push artifacts/packages/ManInBlack.AI.0.1.0.nupkg \
     --api-key <API_KEY> --source https://api.nuget.org/v3/index.json
 ```
 

@@ -3,7 +3,7 @@
     <!-- 仓库级共享打包元数据。各库项目仅需声明 PackageId/Description/IsPackable。 -->
     <PropertyGroup>
         <!-- NuGet 会把四段版本号 0.0.1.0 规范化为 0.0.1，这里直接写规范化后的形式 -->
-        <Version>0.0.2</Version>
+        <Version>0.1.0</Version>
         <Authors>fengb3</Authors>
         <Company>fengb3</Company>
         <Copyright>Copyright © fengb3</Copyright>
