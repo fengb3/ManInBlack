@@ -3,6 +3,7 @@ using GitHubAdaptor.Models;
 using GitHubAdaptor.Webhook;
 using ManInBlack.AI;
 using ManInBlack.AI.Configuration;
+using ManInBlack.AI.Persistence;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,10 @@ builder.Services.AddSingleton(githubSettings);
 builder.Services.AddManInBlack()
     .UseConfiguration(builder.Configuration)
     .AddPipeline("github", pipeline => pipeline.UseDefault());
+
+// 启用 SQLite 持久化（覆盖默认内存存储）
+builder.Services.AddManInBlackSqlitePersistence();
+
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();

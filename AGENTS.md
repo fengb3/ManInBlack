@@ -1,12 +1,13 @@
 # AGENTS.md — ManInBlack
 
-.NET 10 AI agent 框架。通过 `Microsoft.Extensions.AI`（`IChatClient`）统一抽象 3 种聊天协议（OpenAI/Anthropic/Gemini）。洋葱模型中间件管道，源生成器工具派发，Linux 下通过 bubblewrap 沙盒执行。
+.NET 10 AI agent 框架。通过 `Microsoft.Extensions.AI`（`IChatClient`）统一抽象 3 种聊天协议（OpenAI/Anthropic/Gemini）。洋葱模型中间件管道，源生成器工具派发，默认内存存储，可选 SQLite 持久化，Linux 下通过 bubblewrap 沙盒执行。
 
 ## 构建与测试
 
 ```bash
 dotnet build ManInBlack.slnx                                    # 构建全部
 dotnet build src/ManInBlack.AI                                  # 仅构建主库
+dotnet build src/ManInBlack.AI.Persistence.Sqlite              # SQLite 持久化包
 dotnet build src/ManInBlack.AI.SourceGenerator                  # 源生成器（netstandard2.0）
 dotnet test test/ManInBlack.AI.Tests                            # 单元测试（xunit）
 dotnet test test/ManInBlack.AI.Tests --filter "FullyQualifiedName~OpenAI"  # 过滤测试
@@ -18,7 +19,7 @@ dotnet run --project demo/AppHost                              # Aspire:同时�
 cd demo/Dashboard/client && npm run dev                        # Dashboard 前端（:5173）
 dotnet publish demo/Dashboard -c Release                       # 发布（含前端构建）
 dotnet test test/Dashboard.Tests                               # Dashboard 测试
-dotnet pack ManInBlack.slnx -c Release -o artifacts/packages   # 打 NuGet 包（4 个库项目）
+dotnet pack ManInBlack.slnx -c Release -o artifacts/packages   # 打 NuGet 包（5 个库项目）
 ```
 
 未配置 linter、formatter 或 CI 管道。无 `global.json` 或 `.editorconfig`。仓库根有 `Directory.Build.props`（NuGet 包元数据与版本，默认 `IsPackable=false`，详见 [NuGet 打包指南](docs/nuget-packaging.md)）。

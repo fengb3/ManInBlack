@@ -138,7 +138,7 @@ services.AddManInBlack()
 | `McpServerBuilder` | `.Transport()` / `.Command()` / `.Arguments()` / `.Endpoint()` / `.Header()` / `.Enabled()` | MCP 服务器配置 |
 | `StorageBuilder`   | `.RootPath()` / `.Workspace(w => w.Mode(WorkspaceMode.CustomPath).CustomPath(...))` | 存储与工作空间配置 |
 
-> **存储说明：** `RootPath`（默认 `~/.man-in-black`）下存放 SQLite 数据库文件 `maninblack.db`，无需新增配置键。旧的 `sessions/` 和 `users/` 子目录不再产生新数据（仅一次性迁移工具读取）。详见 [存储指南](./storage-guide.md)。
+> **存储说明：** `RootPath`（默认 `~/.man-in-black`）是存储根目录。默认使用主包内置内存存储；安装 `ManInBlack.AI.Persistence.Sqlite` 后，`RootPath` 下会存放 SQLite 数据库文件 `maninblack.db`。旧的 `sessions/` 和 `users/` 子目录不再产生新数据（仅一次性迁移工具读取）。详见 [存储指南](./storage-guide.md)。
 
 ### 方式二：AddManInBlackFromSettings（控制台 / 测试）
 
@@ -325,7 +325,9 @@ public double Temperature { get; set; } = 1.0;
 
 ## 检查点策略配置
 
-状态持久化（检查点）默认自动启用，无需在 `settings.json` 中额外配置。框架使用 `AfterToolCallPolicy` 作为默认策略，在每轮工具调用后和 session 结束时保存快照。
+检查点机制默认自动启用，由主包内置内存存储承载。无需在 `settings.json` 中额外配置。框架使用 `AfterToolCallPolicy` 作为默认策略，在每轮工具调用后和 session 结束时保存快照。
+
+> 若安装 `ManInBlack.AI.Persistence.Sqlite`，调用 `AddManInBlackSqlitePersistence()` 后检查点会持久化到 SQLite。
 
 ### 替换检查点策略
 

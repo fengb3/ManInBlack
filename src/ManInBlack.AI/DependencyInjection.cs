@@ -6,12 +6,11 @@ using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Middlewares;
 using ManInBlack.AI.Mcp;
 using ManInBlack.AI.Services;
+using ManInBlack.AI.Storage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using ManInBlack.AI.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -51,14 +50,11 @@ public static class DependencyInjection
             services.AddSingleton<ModelChoice>(sp =>
                 sp.GetRequiredService<IOptions<ManInBlackSettings>>().Value.GetDefaultModelChoice());
 
-            // SQLite 持久化:连接串从 RootPath 取
-            services.AddDbContextFactory<ManInBlackDbContext>((sp, o) =>
-            {
-                var root = sp.GetRequiredService<IOptions<AgentStorageOptions>>().Value.RootPath;
-                Directory.CreateDirectory(root);
-                o.UseSqlite($"Data Source={Path.Combine(root, "maninblack.db")}");
-                o.AddInterceptors(new SqliteInitInterceptor());
-            });
+            // 默认内存存储：不安装 SQLite 持久化包时保证 default 管道可运行。
+            // 安装 ManInBlack.AI.Persistence.Sqlite 后调用 AddManInBlackSqlitePersistence() 会覆盖此处注册。
+            services.TryAddSingleton<IUserStorage, InMemoryUserStorage>();
+            services.TryAddSingleton<ISessionStorage, InMemoryAgentStateStorage>();
+            services.TryAddSingleton<IAgentStateStorage, InMemoryAgentStateStorage>();
 
             services.AddScoped<AgentPipelineBuilder>();
             services.AddScoped<AgentContext>();
@@ -84,8 +80,6 @@ public static class DependencyInjection
                     sp.GetRequiredService<IHttpClientFactory>(), choice);
             });
 
-            services.TryAddSingleton<IAgentStateStorage>(
-                sp => (IAgentStateStorage)sp.GetRequiredService<ISessionStorage>());
             services.TryAddSingleton<ICheckpointPolicy, AfterToolCallPolicy>();
 
             services.AddScoped<IUserWorkspace>(sp =>

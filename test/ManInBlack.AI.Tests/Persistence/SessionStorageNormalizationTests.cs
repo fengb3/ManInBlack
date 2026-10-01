@@ -37,15 +37,32 @@ public class SessionStorageNormalizationTests
         {
             var storage = CreateStorage(factory);
             var oldInteractive = await storage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
-            await Task.Delay(1100); // 让 Unix 秒递增，保证 LastAt 不同
+            await Task.Delay(50); // 仅保证 LastAt 有可见差异即可
             var webhook = await storage.CreateNewSessionIdAsync("ext-1", SessionSource.Webhook);
-            await Task.Delay(1100);
+            await Task.Delay(50);
             var newInteractive = await storage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
 
             var latest = await storage.GetLatestSessionIdAsync("ext-1", SessionSource.Interactive);
 
             Assert.Equal(newInteractive, latest);            // 不是更新的 webhook
             Assert.NotEqual(webhook, latest);
+        }
+        finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task CreateNewSessionId_TwiceInSameSecond_DoesNotThrow()
+    {
+        var (factory, sp, root) = await SqliteTestHelpers.CreateFactoryAsync();
+        try
+        {
+            var storage = CreateStorage(factory);
+            var sid1 = await storage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
+            var sid2 = await storage.CreateNewSessionIdAsync("ext-1", SessionSource.Interactive);
+
+            Assert.NotEqual(sid1, sid2);
+            Assert.StartsWith("ext-1_", sid1);
+            Assert.StartsWith("ext-1_", sid2);
         }
         finally { sp.Dispose(); try { Directory.Delete(root, true); } catch { } }
     }

@@ -21,6 +21,7 @@
   </Folder>
   <Project Path="src/ManInBlack.AI/ManInBlack.AI.csproj" />
   <Project Path="src/ManInBlack.AI.Abstraction/ManInBlack.AI.Abstraction.csproj" />
+  <Project Path="src/ManInBlack.AI.Persistence.Sqlite/ManInBlack.AI.Persistence.Sqlite.csproj" />
   <Project Path="src/ManInBlack.AI.SourceGenerator/ManInBlack.AI.SourceGenerator.csproj" />
   <Folder Name="/Bwarp/">
     <Project Path="Bwarp/Bwarp.Tests/Bwarp.Tests.csproj" />

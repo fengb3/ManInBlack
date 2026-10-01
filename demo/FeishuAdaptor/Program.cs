@@ -77,6 +77,9 @@ builder.Services.AddManInBlack()
         .Use<ToolExtraParameterMiddleware>()
         .UseSimple());
 
+// 启用 SQLite 持久化（覆盖默认内存存储）
+builder.Services.AddManInBlackSqlitePersistence();
+
 builder.Services.AddAutoRegisteredServices();
 
 var app = builder.Build();

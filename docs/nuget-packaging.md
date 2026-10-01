@@ -8,8 +8,9 @@
 
 | 包 | 项目 | 内容 |
 | ---- | ---- | ---- |
-| `ManInBlack.AI` | `src/ManInBlack.AI` | 主包：DI 入口（`AddManInBlack`）、中间件管道、内置工具、MCP、SQLite 持久化。**内嵌 `[AiTool]`/`[SlashCommand]` 源生成器**（位于包的 `analyzers/netstandard2.0/` 目录，装包即用） |
+| `ManInBlack.AI` | `src/ManInBlack.AI` | 主包：DI 入口（`AddManInBlack`）、中间件管道、内置工具、MCP、默认内存存储。**内嵌 `[AiTool]`/`[SlashCommand]` 源生成器**（位于包的 `analyzers/netstandard2.0/` 目录，装包即用） |
 | `ManInBlack.AI.Abstraction` | `src/ManInBlack.AI.Abstraction` | 契约层：`AgentDefinition`、`AgentMiddleware`、`IToolExecutor`、Hook、存储等抽象。供只写扩展（中间件/工具/Hook）而不引主包的场景使用 |
+| `ManInBlack.AI.Persistence.Sqlite` | `src/ManInBlack.AI.Persistence.Sqlite` | 可选 SQLite 持久化包：基于 EF Core 10 + SQLite 实现 `IUserStorage`/`ISessionStorage`/`IAgentStateStorage`，含启动迁移与一次性 JSON→SQLite 数据迁移 |
 | `ManInBlack.Bwarp` | `bwarp/Bwarp` | Linux bubblewrap 沙盒封装。主包的传递依赖，也可独立使用（程序集名仍为 `Bwarp`） |
 | `ManInBlack.AI.SourceGenerator` | `src/ManInBlack.AI.SourceGenerator` | 源生成器独立包（development dependency，不流入下游）。已内嵌于主包，一般无需单独安装 |
 
@@ -19,14 +20,16 @@
 ManInBlack.AI ──► ManInBlack.AI.Abstraction
               ──► ManInBlack.Bwarp
               ──► (内嵌) ManInBlack.AI.SourceGenerator
+
+ManInBlack.AI.Persistence.Sqlite ──► ManInBlack.AI
 ```
 
 ## 元数据与版本管理
 
 - 仓库根 `Directory.Build.props` 统一维护 `Version`、`Authors`、`RepositoryUrl`、`PackageLicenseExpression`（MIT）、符号包（snupkg）与 SourceLink 设置，并对所有项目默认 `IsPackable=false`。
-- 四个库项目各自声明 `PackageId`、`Description`、`PackageTags`，并显式 `IsPackable=true`。
-- **发版时只需改 `Directory.Build.props` 里的 `<Version>`**，四个包版本保持一致（主包对 Abstraction/Bwarp 的依赖版本来自各自项目的 Version，`dotnet pack` 自动对齐）。
-- 三个 C# 库启用了 `GenerateDocumentationFile`（XML 注释进入包，消费方有 IntelliSense 文档），并以 `NoWarn CS1591` 容忍未注释的公共成员。
+- 五个库项目各自声明 `PackageId`、`Description`、`PackageTags`，并显式 `IsPackable=true`。
+- **发版时只需改 `Directory.Build.props` 里的 `<Version>`**，五个包版本保持一致（主包对 Abstraction/Bwarp 的依赖版本来自各自项目的 Version，`dotnet pack` 自动对齐）。
+- 四个 C# 库启用了 `GenerateDocumentationFile`（XML 注释进入包，消费方有 IntelliSense 文档），并以 `NoWarn CS1591` 容忍未注释的公共成员。
 
 ## 打包
 
@@ -101,4 +104,4 @@ dotnet add reference <repo>/src/ManInBlack.AI/ManInBlack.AI.csproj
 
 - 改了公共 API 后记得跑 `dotnet pack` 并检查 nupkg：`lib/net10.0/`、`analyzers/netstandard2.0/`、nuspec 依赖列表是否齐全。
 - 主包 TargetFramework 为 `net10.0` 单目标；消费方需 .NET 10。
-- `Microsoft.EntityFrameworkCore.Design` 在主包为 `PrivateAssets=all`，不会流入消费者。
+- `Microsoft.EntityFrameworkCore.Design` 在 SQLite 持久化包为 `PrivateAssets=all`，不会流入消费者。

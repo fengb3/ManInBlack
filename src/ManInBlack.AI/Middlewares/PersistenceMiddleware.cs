@@ -24,7 +24,14 @@ public class ReadPersistenceMiddleware : AgentMiddleware
         [EnumeratorCancellation] CancellationToken ct = default
     )
     {
-        var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
+        var sessionStorage = context.ServiceProvider.GetService<ISessionStorage>();
+        if (sessionStorage is null)
+        {
+            // 未注册任何存储实现时，持久化中间件降级为 no-op
+            await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
+                yield return update;
+            yield break;
+        }
 
         // 恢复状态快照
         if (sessionStorage is IAgentStateStorage stateStorage)
@@ -177,7 +184,14 @@ public class SavePersistenceMiddleware : AgentMiddleware
         [EnumeratorCancellation] CancellationToken ct = default
     )
     {
-        var sessionStorage = context.ServiceProvider.GetRequiredService<ISessionStorage>();
+        var sessionStorage = context.ServiceProvider.GetService<ISessionStorage>();
+        if (sessionStorage is null)
+        {
+            // 未注册任何存储实现时，持久化中间件降级为 no-op
+            await foreach (ChatResponseUpdate update in next().WithCancellation(ct))
+                yield return update;
+            yield break;
+        }
 
         // 用包装集合替换原始 Messages，通过 Channel 异步持久化
         var original = context.Messages;

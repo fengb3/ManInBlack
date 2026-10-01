@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ManInBlack.AI\ManInBlack.AI.csproj" />
+    <ProjectReference Include="..\..\src\ManInBlack.AI.Persistence.Sqlite\ManInBlack.AI.Persistence.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\ManInBlack.AI.SourceGenerator\ManInBlack.AI.SourceGenerator.csproj" OutputItemType="Analyzer" />
   </ItemGroup>
 

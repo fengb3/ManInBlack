@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -7,7 +7,7 @@
         <!-- NuGet 打包（元数据继承自根 Directory.Build.props） -->
         <PackageId>ManInBlack.AI</PackageId>
         <IsPackable>true</IsPackable>
-        <Description>.NET AI Agent 框架：经 Microsoft.Extensions.AI (IChatClient) 统一 OpenAI/Anthropic/Gemini 三种协议，洋葱模型中间件管道 + 源生成器工具派发 + MCP + SQLite 持久化，Linux 下可用 bubblewrap 沙盒执行命令。内置 [AiTool] 源生成器，装包即用。</Description>
+        <Description>.NET AI Agent 框架：经 Microsoft.Extensions.AI (IChatClient) 统一 OpenAI/Anthropic/Gemini 三种协议，洋葱模型中间件管道 + 源生成器工具派发 + MCP，Linux 下可用 bubblewrap 沙盒执行命令。内置 [AiTool] 源生成器与内存存储，装包即用；SQLite 持久化见可选包 ManInBlack.AI.Persistence.Sqlite。</Description>
         <PackageTags>ai;agent;llm;mcp;microsoft-extensions-ai;chatclient</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -29,11 +29,6 @@
         <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
         <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
         <!-- 仅为取 $(PkgFengb3_EasyCodeBuilder) 路径以打包生成器依赖；不参与编译、不进 nuspec 依赖 -->
         <PackageReference Include="Fengb3.EasyCodeBuilder" Version="0.1.6" GeneratePathProperty="true" PrivateAssets="all" ExcludeAssets="all" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <!-- NuGet 打包（元数据继承自根 Directory.Build.props） -->
+        <PackageId>ManInBlack.AI.Persistence.Sqlite</PackageId>
+        <IsPackable>true</IsPackable>
+        <Description>ManInBlack.AI 的可选 SQLite 持久化包：基于 EF Core 10 + SQLite 实现 ISessionStorage、IUserStorage、IAgentStateStorage，含启动迁移与一次性 JSON→SQLite 数据迁移工具。</Description>
+        <PackageTags>ai;agent;llm;sqlite;efcore;persistence;microsoft-extensions-ai</PackageTags>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ManInBlack.AI\ManInBlack.AI.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- 升级到最新 10.0.x 补丁，解决 SQLitePCLRaw.lib.e_sqlite3 2.1.11 的 NU1903/GHSA-2m69-gcr7-jv3q 漏洞 -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <!-- 显式覆盖传递版本，确保不引入带漏洞的 2.1.11；EF Core 10.0.12 自身已引用 2.1.12，此处再锁一层 -->
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="ManInBlack.AI.Tests" />
+    </ItemGroup>
+
+</Project>

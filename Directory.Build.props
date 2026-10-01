@@ -15,7 +15,7 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <!-- 默认不可打包；在 4 个库项目内显式置 true -->
+        <!-- 默认不可打包；在 5 个库项目内显式置 true -->
         <IsPackable>false</IsPackable>
         <!-- CI 构建时锁定源链接路径（git commit hash），本地构建不受影响 -->
         <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>

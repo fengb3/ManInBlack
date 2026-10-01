@@ -16,9 +16,10 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 ┌────────────────────────────────────────────────────────────────────┐
 │  demo/AgentConsole  demo/FeishuAdaptor  ...                       │  ← 应用层
 ├────────────────────────────────────────────────────────────────────┤
-│  ManInBlack.AI              中间件 + 工具 + ChatClient + DI + 配置 │  ← 实现层
-│  ManInBlack.AI.Abstraction  接口 + 抽象基类 + POCO + Attribute     │  ← 契约层
-│  ManInBlack.AI.SG           四个增量源生成器                        │  ← 编译层
+│  ManInBlack.AI                        中间件 + 工具 + ChatClient + DI + 配置 + 默认内存存储 │  ← 实现层
+│  ManInBlack.AI.Abstraction            接口 + 抽象基类 + POCO + Attribute                   │  ← 契约层
+│  ManInBlack.AI.Persistence.Sqlite     SQLite 持久化实现（可选包）                            │  ← 持久化层
+│  ManInBlack.AI.SG                     四个增量源生成器                                      │  ← 编译层
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -50,8 +51,10 @@ ManInBlack 是一个 .NET AI 代理框架，通过**洋葱模型中间件管道*
 | `Tools/`           | CommandLineTools、FileTools、SkillTools、DelegationTools  |
 | `ToolCallFilters/` | LoggingFilter、AgentLifecycleFilter（LargeResultFilter 已注释） |
 | `Services/`        | SkillService、EventBus、FileUserWorkspace、AfterToolCallPolicy 等 |
-| `Persistence/`     | SqliteAgentStateStorage、SqliteUserStorage、ManInBlackDbContext（EF Core + SQLite） |
+| `Storage/`         | 默认内存存储实现 `InMemoryUserStorage`、`InMemoryAgentStateStorage` |
 | *(root)*           | AgentFactory — Agent 定义注册、管道配置、执行追踪与流式运行   |
+
+`ManInBlack.AI.Persistence.Sqlite`（可选包）提供 `Persistence/` 目录下的 EF Core + SQLite 实现：`SqliteAgentStateStorage`、`SqliteUserStorage`、`ManInBlackDbContext` 等。
 
 此外还包含 `ModelChoice`（纯数据结构：Schema/ApiKey/BaseUrl/ModelId）、`ChatClientProviderExtensions`，以及 DI 注册入口。
 
@@ -237,7 +240,7 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 
 ### 概述
 
-框架使用 **SQLite**（EF Core 10）持久化会话消息和状态快照，用于崩溃恢复和断点续传。所有运行期数据存储在 `{AgentStorageOptions.RootPath}/maninblack.db`（默认 `~/.man-in-black/maninblack.db`）。
+主包默认提供**内存存储**，不依赖数据库；如需持久化，安装可选包 `ManInBlack.AI.Persistence.Sqlite`，使用 **SQLite**（EF Core 10）持久化会话消息和状态快照，用于崩溃恢复和断点续传。所有运行期数据存储在 `{AgentStorageOptions.RootPath}/maninblack.db`（默认 `~/.man-in-black/maninblack.db`）。
 
 详见 [存储指南](./storage-guide.md)。
 
@@ -245,7 +248,8 @@ await foreach (var update in factory.RunAsync("my-agent", "你好", "user-1", "U
 
 - **`ISessionStorage`** — 消息持久化接口（`SaveMessage` / `LoadMessages`）
 - **`IAgentStateStorage`** — 扩展 `ISessionStorage`，增加 `LoadSnapshotAsync`、`SaveSnapshotAsync`、`DeleteSnapshotAsync`
-- **`SqliteAgentStateStorage`** — 默认实现（`Persistence/` 模块），基于 EF Core + SQLite，同时满足两个接口
+- **`InMemoryAgentStateStorage`** — 主包内置默认实现，基于内存字典
+- **`SqliteAgentStateStorage`** — 可选 SQLite 包实现，基于 EF Core + SQLite，同时满足 `ISessionStorage` 与 `IAgentStateStorage`
 
 ### 检查点机制
 

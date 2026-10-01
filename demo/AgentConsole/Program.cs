@@ -17,6 +17,9 @@ services.AddManInBlack()
         .Use<ToolsMiddleware>()
         .UseSimple());
 
+// 启用 SQLite 持久化（覆盖默认内存存储）
+services.AddManInBlackSqlitePersistence();
+
 // Agent 定义现在从 settings.json 的 Agents 字段自动加载，无需 AddAgentDefinition 调用
 
 var rootSp = services.BuildServiceProvider();

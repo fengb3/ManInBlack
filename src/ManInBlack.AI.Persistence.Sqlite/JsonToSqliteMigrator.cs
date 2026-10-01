@@ -1,6 +1,5 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using ManInBlack.AI.Abstraction.Attributes;
 using ManInBlack.AI.Abstraction.Storage;
 using ManInBlack.AI.Configuration;
 using ManInBlack.AI.Persistence.Entities;
@@ -15,7 +14,6 @@ namespace ManInBlack.AI.Persistence;
 /// 一次性把旧 JSON 文件导入 SQLite。幂等:按 sessionId / userId 存在性跳过。
 /// 旧布局:{RootPath}/sessions/*.jsonl、*.state.json、{RootPath}/users/userIdMap.json + {数字id}.json
 /// </summary>
-[ServiceRegister.Singleton]
 public class JsonToSqliteMigrator(
     IDbContextFactory<ManInBlackDbContext> dbFactory,
     IOptions<AgentStorageOptions> options,

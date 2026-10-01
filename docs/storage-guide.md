@@ -1,16 +1,41 @@
 # 存储指南
 
-本文档介绍 ManInBlack 的持久化存储层：SQLite 后端（EF Core 10）、数据库结构、启动迁移、一次性数据导入工具。
+本文档介绍 ManInBlack 的持久化存储层：默认内存存储、可选 SQLite 后端（EF Core 10）、数据库结构、启动迁移、一次性数据导入工具。
 
 ---
 
 ## 概述
 
-ManInBlack 使用 **SQLite**（通过 EF Core 10 + `Microsoft.EntityFrameworkCore.Sqlite`）存储所有运行期数据，包括会话消息、状态快照和用户数据。DB 文件位于 `{AgentStorageOptions.RootPath}/maninblack.db`，默认路径为 `~/.man-in-black/maninblack.db`。
+主包 `ManInBlack.AI` 内置轻量**内存存储**（`InMemoryUserStorage`、`InMemoryAgentStateStorage`），不依赖任何数据库，保证 `AddManInBlack()` 后即可运行默认管道。
+
+如需持久化，安装可选包 `ManInBlack.AI.Persistence.Sqlite`，它使用 **SQLite**（通过 EF Core 10 + `Microsoft.EntityFrameworkCore.Sqlite`）存储会话消息、状态快照和用户数据。DB 文件位于 `{AgentStorageOptions.RootPath}/maninblack.db`，默认路径为 `~/.man-in-black/maninblack.db`。
 
 无需新增配置键——`RootPath` 已有的默认值（`~/.man-in-black`）即为 DB 所在目录。
 
 > 可用 [Dashboard](dashboard-guide.md) demo 在浏览器查看库内会话消息与用户。
+
+---
+
+## 启用 SQLite 持久化
+
+在 `AddManInBlack()` 之后调用扩展方法：
+
+```csharp
+services.AddManInBlack()
+    .UseJson();
+
+// 启用 SQLite 持久化，覆盖默认内存存储
+services.AddManInBlackSqlitePersistence();
+```
+
+> 必须在 `AddManInBlack()` 之后调用，以确保 SQLite 实现取代默认内存实现。
+
+然后启动期执行迁移（应用 EF Core migrations + 设置 WAL）：
+
+```csharp
+var sp = services.BuildServiceProvider();
+await sp.MigrateManInBlackStorageAsync();
+```
 
 ---
 
@@ -104,7 +129,7 @@ await rootSp.MigrateManInBlackStorageAsync();
 | `NormalizeSessionsTimeTypes`| 时间列改 `DateTime`（数据搬迁在这一步之后、Finalize 之前执行）       |
 | `NormalizeSessionsFinalize` | 数据搬迁（blob→Sessions，`json_each`）+ 孤儿清理 + 加 `Sessions.SessionId` 唯一约束 + FK→Sessions + 删 `Users` blob 列 |
 
-迁移文件位于 `src/ManInBlack.AI/Persistence/Migrations/`。
+迁移文件位于 `src/ManInBlack.AI.Persistence.Sqlite/Migrations/`。
 
 ---
 
