@@ -41,7 +41,7 @@
     },
     "console-agent": {
       "Instruction": "你是一个AI助手。你可以通过工具执行系统命令来帮助用户完成任务。请用中文回复。",
-      "PipelineName": "default",
+      "PipelineName": "simple",
       "SubAgents": ["translator"]
     }
   },
@@ -78,7 +78,7 @@
 | ----------------- | ---- | --------------------------------------------------------------------------- |
 | `Description`     | 否   | Agent 描述，用于子 Agent 委托时的提示词生成                                  |
 | `Instruction`     | 否   | 系统提示词                                                                  |
-| `PipelineName`    | 否   | 管道名称，决定使用哪套中间件组合。默认 `"default"`                           |
+| `PipelineName`    | 否   | 管道名称，决定使用哪套中间件组合。默认 `"default"`（产品形态管道）；库消费者推荐 `"simple"` 起步 |
 | `SubAgents`       | 否   | 可委托的子 Agent 名称列表（对应 Agents 字典中的 key）                       |
 | `ModelChoiceName` | 否   | 引用的 ModelChoice 名称。不填则使用全局默认 ModelChoice                      |
 
@@ -98,8 +98,8 @@ services.AddManInBlack()
     .UseJson()                                                    // 载入 ~/.man-in-black/settings.json（缺失则创建默认）
     .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.openai.com"))
     .AddModelChoice("default", c => c.Provider("default").ModelId("gpt-4o"))
-    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline("default"))
-    .AddPipeline("custom", builder => builder.Use<MyMiddleware>().UseDefault())
+    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline("simple"))   // 从 simple 起步
+    .AddPipeline("custom", builder => builder.Use<MyMiddleware>().UseSimple())      // 自定义管道以 simple 为基础
     .UseSandbox();
 ```
 

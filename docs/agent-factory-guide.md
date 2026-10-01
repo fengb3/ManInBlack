@@ -30,8 +30,8 @@
 
 每个管道对应一个 `Func<AgentPipelineBuilder, AgentPipelineBuilder>` 委托。Factory 内置两个预设：
 
-- `"default"` — `builder.UseDefault()`，完整管道（含工具、持久化、压缩等）
-- `"simple"` — `builder.UseSimple()`，精简管道（不含工具和持久化）
+- `"simple"` — `builder.UseSimple()`，最小管道。库消费者推荐从该管道起步，按需叠加能力。
+- `"default"` — `builder.UseDefault()`，产品形态管道（含 profile、skill、持久化、压缩等），会引入较多环境耦合。
 
 自定义管道推荐通过 `.AddPipeline()` 在 DI 期注册，也可通过 `factory.RegisterPipeline()` 运行时动态注册（见[注册自定义管道](#注册自定义管道)）。
 
@@ -62,7 +62,7 @@
     },
     "console-agent": {
       "Instruction": "你是一个AI助手...",
-      "PipelineName": "default",
+      "PipelineName": "simple",
       "SubAgents": ["translator"]
     }
   }
@@ -86,7 +86,7 @@ services.AddManInBlack()
     .UseJson()
     .AddAgent("my-agent", a => a
         .Instruction("你是一个AI助手，可以用工具帮助用户完成任务。请用中文回复。")
-        .Pipeline("default"));
+        .Pipeline("simple")); // 从最小管道起步
 ```
 
 也可以继续使用独立的 `AddAgentDefinition()` 方法：
@@ -98,7 +98,7 @@ services.AddAgentDefinition(new AgentDefinition
 {
     Name = "my-agent",
     Instruction = "你是一个AI助手，可以用工具帮助用户完成任务。请用中文回复。",
-    PipelineName = "default"
+    PipelineName = "simple"
 });
 ```
 
@@ -117,9 +117,9 @@ services.AddAgentDefinition(new AgentDefinition
 ```csharp
 services.AddManInBlack()
     .UseJson()
-    .AddPipeline("feishu", pipeline => pipeline
-        .Use<MyCustomMiddleware>()
-        .UseDefault());
+    .AddPipeline("my-pipeline", pipeline => pipeline
+        .Use<MyCustomMiddleware>()   // 只加需要的中间件
+        .UseSimple());
 ```
 
 > **注意：** `.AddPipeline()` 是覆盖式注册。如果名称与内置管道（`"default"`、`"simple"`）相同，新委托会替换旧的。
@@ -132,12 +132,12 @@ services.AddManInBlack()
 // 在 WebApplication.Build() 之后获取 Factory
 var factory = app.Services.GetRequiredService<AgentFactory>();
 
-// 注册飞书自定义管道
-factory.RegisterPipeline("feishu", pipeline => pipeline
+// 注册自定义管道
+factory.RegisterPipeline("my-pipeline", pipeline => pipeline
     .Use<MyCustomMiddleware>()    // 自定义中间件
-    .UseDefault());               // 接上默认管道
+    .UseSimple());                // 以最小管道为基础
 
-// 对应的 Agent 定义需要指定 PipelineName = "feishu"
+// 对应的 Agent 定义需要指定 PipelineName = "my-pipeline"
 ```
 
 > **注意：** `RegisterPipeline` 是覆盖式注册，语义与 `.AddPipeline()` 相同。推荐优先使用 `.AddPipeline()`，仅在确实需要运行时动态注册时才用此逃生口。
@@ -384,7 +384,7 @@ IDisposable? toolExecutingSub = null;
 IDisposable? toolExecutedSub = null;
 AgentContext? capturedContext = null;
 
-// 3. 运行 Agent
+// 3. 运行 Agent（console-agent 使用 simple 管道起步）
 var updates = factory.RunAsync("console-agent", args[0], "console", "Default", ctx =>
 {
     capturedContext = ctx;

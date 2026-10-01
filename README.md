@@ -23,7 +23,8 @@ services.AddManInBlack()
     .UseJson() // 从 ~/.man-in-black/settings.json 读取配置
     .AddAgent("my-agent", a => a
         .Description("通用助手")
-        .Instruction("你是一个有帮助的AI助手。请用中文回复。"));
+        .Instruction("你是一个有帮助的AI助手。请用中文回复。")
+        .Pipeline("simple")); // 从最小管道起步，按需开启能力
 
 var rootSp = services.BuildServiceProvider();
 var factory = rootSp.GetRequiredService<AgentFactory>();
@@ -55,7 +56,7 @@ await foreach (var update in factory.RunAsync(
 services.AddManInBlack()
     .AddProvider("default", p => p.Schema("OpenAI").ApiKey("sk-xxx").BaseUrl("https://api.deepseek.com"))
     .AddModelChoice("default", c => c.Provider("default").ModelId("deepseek-chat"))
-    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手"));
+    .AddAgent("my-agent", a => a.Instruction("你是一个AI助手").Pipeline("simple"));
 ```
 
 ## 自定义工具：标记即注册
@@ -79,8 +80,9 @@ public partial class WeatherTools
 
 | 包 | 用途 |
 | --- | --- |
-| `ManInBlack.AI` | 主包：DI 入口、中间件管道、内置工具、MCP、SQLite 持久化、源生成器 |
+| `ManInBlack.AI` | 主包：DI 入口、中间件管道、内置工具、MCP、源生成器；默认内存存储 |
 | `ManInBlack.AI.Abstraction` | 契约层：Agent 定义、中间件、工具、Hook、存储等抽象（扩展实现方引用） |
+| `ManInBlack.AI.Persistence.Sqlite` | 可选包：SQLite 持久化（EF Core 10），安装后覆盖默认内存存储 |
 | `ManInBlack.Bwarp` | Linux bubblewrap 沙盒封装（主包的传递依赖，可独立使用） |
 | `ManInBlack.AI.SourceGenerator` | 源生成器独立包（已内嵌于主包，一般无需单独安装） |
 
